@@ -1,0 +1,173 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  verify-main:
+    name: verify-main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure tag commit is on main
+        run: |
+          set -eu
+          git fetch origin main
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" "origin/main"; then
+            if ! git merge-base --is-ancestor "origin/main" "${GITHUB_SHA}"; then
+              echo "::error::tag commit ${GITHUB_SHA} is not reachable from main" >&2
+              exit 1
+            fi
+          fi
+
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    needs: verify-main
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Go test
+        run: go test ./...
+
+      - name: Go vet
+        run: go vet ./...
+
+  build:
+    name: build (${{ matrix.target.os }}/${{ matrix.target.arch }})
+    runs-on: ubuntu-latest
+    needs: gate
+    strategy:
+      matrix:
+        target:
+          - { os: darwin, arch: arm64 }
+          - { os: darwin, arch: amd64 }
+          - { os: linux,  arch: arm64 }
+          - { os: linux,  arch: amd64 }
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build and package
+        env:
+          GOOS: ${{ matrix.target.os }}
+          GOARCH: ${{ matrix.target.arch }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -eu
+          mkdir -p "dist/${GOOS}-${GOARCH}"
+          go build \
+            -trimpath \
+            -ldflags "-X main.version=${TAG} -s -w" \
+            -o "dist/${GOOS}-${GOARCH}/ezida" \
+            ./cmd/ezida
+          cp LICENSE "dist/${GOOS}-${GOARCH}/LICENSE"
+          tarball="ezida_${TAG}_${GOOS}_${GOARCH}.tar.gz"
+          tar -czf "${tarball}" -C "dist/${GOOS}-${GOARCH}" ezida LICENSE
+          echo "tarball=${tarball}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ezida_${{ github.ref_name }}_${{ matrix.target.os }}_${{ matrix.target.arch }}
+          path: ezida_${{ github.ref_name }}_${{ matrix.target.os }}_${{ matrix.target.arch }}.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  checksums:
+    name: checksums
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      tarball-count: ${{ steps.verify.outputs.count }}
+    steps:
+      - name: Download all tarballs
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect tarballs
+        run: |
+          set -eu
+          mkdir -p release
+          find artifacts -type f -name '*.tar.gz' -exec cp {} release/ \;
+          ls -l release/
+
+      - name: Generate checksums
+        working-directory: release
+        run: sha256sum *.tar.gz > checksums.txt
+
+      - name: Verify checksums.txt has exactly four lines
+        id: verify
+        working-directory: release
+        run: |
+          set -eu
+          count="$(wc -l < checksums.txt | tr -d ' ')"
+          if [ "${count}" != "4" ]; then
+            echo "::error::expected 4 lines in checksums.txt, got ${count}" >&2
+            cat checksums.txt
+            exit 1
+          fi
+          echo "count=${count}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundle
+          path: release/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+    needs: checksums
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download release bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: release-bundle
+          path: release
+
+      - name: Stage install.sh
+        run: cp scripts/install.sh release/install.sh
+
+      - name: List files to publish
+        run: ls -l release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            release/ezida_${{ github.ref_name }}_darwin_arm64.tar.gz
+            release/ezida_${{ github.ref_name }}_darwin_amd64.tar.gz
+            release/ezida_${{ github.ref_name }}_linux_arm64.tar.gz
+            release/ezida_${{ github.ref_name }}_linux_amd64.tar.gz
+            release/checksums.txt
+            release/install.sh
+          fail_on_unmatched_files: true

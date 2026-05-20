@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Editors / IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Go build artifacts
+/ezida
+/dist/
+/bin/
+*.exe
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go module / vendor
+vendor/
+
+# Env / local config
+.env
+.env.local
+*.local
+
+# Logs
+*.log
+
+# Claude Code: personal workflow tooling (opsx commands + openspec skills)
+.claude/commands/opsx/
+.claude/skills/openspec-*/
+.claude/settings.local.json
+
+# OpenSpec workflow (local only — only specs/ is shared, via symlink)
+openspec/
+
+# Agent context refs (not for public repo)
+refs/

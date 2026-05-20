@@ -1,0 +1,34 @@
+schema_version = 1
+
+[board]
+columns = ["todo", "ongoing", "done"]
+priorities = ["low", "medium", "high"]
+
+[[cards]]
+id = "aaaaaa"
+title = "Design schema"
+column = "done"
+description = "Lay out the kanban.toml schema."
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-02T10:00:00Z
+tags = ["design", "v1"]
+priority = "high"
+
+[[cards]]
+id = "bbbbbb"
+title = "Implement Load"
+column = "ongoing"
+description = "Parse kanban.toml into *Board."
+created_at = 2026-05-03T09:00:00Z
+updated_at = 2026-05-03T09:00:00Z
+tags = []
+priority = "medium"
+
+[[cards]]
+id = "cccccc"
+title = "Write tests"
+column = "todo"
+description = ""
+created_at = 2026-05-04T09:00:00Z
+updated_at = 2026-05-04T09:00:00Z
+tags = ["tests"]

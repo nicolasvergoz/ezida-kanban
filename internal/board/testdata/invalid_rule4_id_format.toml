@@ -1,0 +1,14 @@
+schema_version = 1
+
+[board]
+columns = ["todo"]
+priorities = ["low"]
+
+[[cards]]
+id = "BAD!ID"
+title = "Bad id"
+column = "todo"
+description = ""
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = []

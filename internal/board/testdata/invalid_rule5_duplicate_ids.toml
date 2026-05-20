@@ -1,0 +1,23 @@
+schema_version = 1
+
+[board]
+columns = ["todo"]
+priorities = ["low"]
+
+[[cards]]
+id = "a3f2k9"
+title = "First"
+column = "todo"
+description = ""
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = []
+
+[[cards]]
+id = "a3f2k9"
+title = "Second"
+column = "todo"
+description = ""
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = []

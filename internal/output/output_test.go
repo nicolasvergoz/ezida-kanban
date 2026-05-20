@@ -17,10 +17,10 @@ import (
 
 func TestClassify_TypedBoardErrors(t *testing.T) {
 	tests := []struct {
-		name      string
-		err       error
-		wantCode  string
-		wantExit  int
+		name     string
+		err      error
+		wantCode string
+		wantExit int
 	}{
 		{
 			name:     "schema version mismatch",

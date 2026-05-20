@@ -226,10 +226,10 @@ func TestAdd_TextOutputIsIDOnly(t *testing.T) {
 
 func TestParseTags(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    string
-		want     []string
-		wantErr  bool
+		name    string
+		input   string
+		want    []string
+		wantErr bool
 	}{
 		{"empty input", "", []string{}, false},
 		{"single tag", "security", []string{"security"}, false},

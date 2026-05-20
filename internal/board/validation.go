@@ -186,8 +186,8 @@ func Validate(b *Board) *ValidationError {
 		}
 		if !c.CreatedAt.IsZero() && !c.UpdatedAt.IsZero() && c.UpdatedAt.Before(c.CreatedAt) {
 			vs = append(vs, Violation{
-				Rule:    9,
-				CardID:  c.ID,
+				Rule:   9,
+				CardID: c.ID,
 				Message: fmt.Sprintf("updated_at (%s) must be >= created_at (%s)",
 					c.UpdatedAt.Format(time.RFC3339), c.CreatedAt.Format(time.RFC3339)),
 			})

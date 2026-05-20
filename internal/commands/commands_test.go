@@ -505,7 +505,9 @@ func TestList_NoFilters_AllCards(t *testing.T) {
 func TestList_FilterColumn(t *testing.T) {
 	path := copyFixture(t)
 	stdout := captureList(t, path, listFlags{column: "todo"}, true)
-	var raw struct{ Cards []map[string]any `json:"cards"` }
+	var raw struct {
+		Cards []map[string]any `json:"cards"`
+	}
 	_ = json.Unmarshal([]byte(stdout), &raw)
 	if len(raw.Cards) != 3 {
 		t.Errorf("todo cards: got %d, want 3", len(raw.Cards))
@@ -515,7 +517,9 @@ func TestList_FilterColumn(t *testing.T) {
 func TestList_FilterTag(t *testing.T) {
 	path := copyFixture(t)
 	stdout := captureList(t, path, listFlags{tag: "infra"}, true)
-	var raw struct{ Cards []map[string]any `json:"cards"` }
+	var raw struct {
+		Cards []map[string]any `json:"cards"`
+	}
 	_ = json.Unmarshal([]byte(stdout), &raw)
 	if len(raw.Cards) != 2 {
 		t.Errorf("infra cards: got %d, want 2", len(raw.Cards))
@@ -525,7 +529,9 @@ func TestList_FilterTag(t *testing.T) {
 func TestList_FilterColumnAndTag(t *testing.T) {
 	path := copyFixture(t)
 	stdout := captureList(t, path, listFlags{column: "todo", tag: "security"}, true)
-	var raw struct{ Cards []map[string]any `json:"cards"` }
+	var raw struct {
+		Cards []map[string]any `json:"cards"`
+	}
 	_ = json.Unmarshal([]byte(stdout), &raw)
 	if len(raw.Cards) != 1 {
 		t.Errorf("todo+security: got %d, want 1", len(raw.Cards))
@@ -538,7 +544,9 @@ func TestList_FilterColumnAndTag(t *testing.T) {
 func TestList_FilterColumnAndPriority(t *testing.T) {
 	path := copyFixture(t)
 	stdout := captureList(t, path, listFlags{column: "done", priority: "high"}, true)
-	var raw struct{ Cards []map[string]any `json:"cards"` }
+	var raw struct {
+		Cards []map[string]any `json:"cards"`
+	}
 	_ = json.Unmarshal([]byte(stdout), &raw)
 	if len(raw.Cards) != 1 {
 		t.Errorf("done+high: got %d, want 1", len(raw.Cards))
@@ -551,7 +559,9 @@ func TestList_FilterColumnAndPriority(t *testing.T) {
 func TestList_TitleContainsCaseInsensitive(t *testing.T) {
 	path := copyFixture(t)
 	stdout := captureList(t, path, listFlags{titleContains: "AUTH"}, true)
-	var raw struct{ Cards []map[string]any `json:"cards"` }
+	var raw struct {
+		Cards []map[string]any `json:"cards"`
+	}
 	_ = json.Unmarshal([]byte(stdout), &raw)
 	if len(raw.Cards) != 1 || raw.Cards[0]["id"] != "a3f2k9" {
 		t.Errorf("title contains AUTH: %v", raw.Cards)
@@ -568,7 +578,9 @@ func TestList_NoMatchExitZero(t *testing.T) {
 	if err != nil {
 		t.Fatalf("no-match should be success: %v", err)
 	}
-	var raw struct{ Cards []map[string]any `json:"cards"` }
+	var raw struct {
+		Cards []map[string]any `json:"cards"`
+	}
 	_ = json.Unmarshal(stdout.Bytes(), &raw)
 	if len(raw.Cards) != 0 {
 		t.Errorf("cards: got %d, want 0", len(raw.Cards))
@@ -614,7 +626,9 @@ func TestList_InvalidPriorityFilter(t *testing.T) {
 func TestList_DescriptionOmittedInJSON(t *testing.T) {
 	path := copyFixture(t)
 	stdout := captureList(t, path, listFlags{}, true)
-	var raw struct{ Cards []map[string]any `json:"cards"` }
+	var raw struct {
+		Cards []map[string]any `json:"cards"`
+	}
 	if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}

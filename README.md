@@ -343,8 +343,9 @@ The official first-release procedure:
 1. Bump the version in `CHANGELOG.md` if/when added (none yet for v0.1.0).
 2. From a clean `main` checkout, push the tag: `git tag v0.1.0 && git push origin v0.1.0`.
    The release workflow refuses tags not reachable from `main`.
-3. Watch the workflow: `gh run watch <run-id> --workflow=release.yml`. It
-   must produce four tarballs, `checksums.txt`, and `install.sh` (six assets).
+3. Watch the workflow: `gh run list --workflow=release.yml --limit 1`
+   to find the run id, then `gh run watch <run-id>`. It must produce
+   four tarballs, `checksums.txt`, and `install.sh` (six assets).
 4. Smoke-test the install on a fresh machine:
    `curl -sSL https://github.com/nicolasvergoz/ezida-kanban/releases/latest/download/install.sh | sh`
    and confirm `~/.local/bin/ezida --version` prints `v0.1.0`.

@@ -39,6 +39,9 @@ func newRootCmd() *cobra.Command {
 	rootCmd.AddCommand(commands.NewAddCmd(&jsonOut))
 	rootCmd.AddCommand(commands.NewMoveCmd(&jsonOut))
 	rootCmd.AddCommand(commands.NewRmCmd(&jsonOut))
+	rootCmd.AddCommand(commands.NewEditCmd(&jsonOut))
+	rootCmd.AddCommand(commands.NewColumnsCmd(&jsonOut))
+	rootCmd.AddCommand(commands.NewPrioritiesCmd(&jsonOut))
 	// Silence cobra's default error rendering; output.Fail owns it.
 	rootCmd.SilenceErrors = true
 	rootCmd.SilenceUsage = true

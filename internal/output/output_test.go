@@ -369,6 +369,100 @@ func mustTime(s string) time.Time {
 	return t
 }
 
+// TestOutputFail_DetailedErrors_TextAndJSON covers task 1.5: the output
+// dispatcher must emit the verbatim Error() text in text mode and the
+// {code, message, details} envelope in JSON mode for every new P4
+// typed error.
+func TestOutputFail_DetailedErrors_TextAndJSON(t *testing.T) {
+	twoCards := []commands.AffectedCard{
+		{ID: "a3f2k9", Title: "Refactor auth"},
+		{ID: "b7m1p4", Title: "Update README"},
+	}
+	_ = twoCards
+	cases := []struct {
+		name      string
+		err       error
+		wantCode  string
+		wantTexts []string // substrings expected in text body
+	}{
+		{
+			name:      "column in use",
+			err:       commands.NewColumnInUseError("todo", []commands.AffectedCard{{ID: "a3f2k9", Title: "Refactor auth"}, {ID: "b7m1p4", Title: "Update README"}}),
+			wantCode:  "COLUMN_IN_USE",
+			wantTexts: []string{`Error: column "todo"`, "  a3f2k9  Refactor auth", "Move or remove these cards first."},
+		},
+		{
+			name:      "priority in use",
+			err:       commands.NewPriorityInUseError("high", []commands.AffectedCard{{ID: "a3f2k9", Title: "x"}}),
+			wantCode:  "PRIORITY_IN_USE",
+			wantTexts: []string{`Error: priority "high"`, "  a3f2k9  x"},
+		},
+		{
+			name:      "duplicate",
+			err:       commands.NewDuplicateError("column", "todo"),
+			wantCode:  "DUPLICATE",
+			wantTexts: []string{`Error: column "todo" already exists`},
+		},
+		{
+			name:      "position out of range",
+			err:       commands.NewPositionOutOfRangeError(0, 4),
+			wantCode:  "POSITION_OUT_OF_RANGE",
+			wantTexts: []string{"Error: position 0 is out of range"},
+		},
+		{
+			name:      "last column",
+			err:       commands.NewLastColumnError("todo"),
+			wantCode:  "LAST_COLUMN",
+			wantTexts: []string{`Error: cannot remove column "todo"`},
+		},
+		{
+			name:      "last priority",
+			err:       commands.NewLastPriorityError("low"),
+			wantCode:  "LAST_PRIORITY",
+			wantTexts: []string{`Error: cannot remove priority "low"`},
+		},
+		{
+			name:      "nothing to edit",
+			err:       commands.NewNothingToEditError(),
+			wantCode:  "NOTHING_TO_EDIT",
+			wantTexts: []string{"Error: edit requires at least one of"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Text mode: stderr writer.
+			var buf strings.Builder
+			exit := FailTo(&buf, tc.err, false)
+			if exit != 1 {
+				t.Errorf("exit: got %d, want 1", exit)
+			}
+			for _, w := range tc.wantTexts {
+				if !strings.Contains(buf.String(), w) {
+					t.Errorf("text mode missing %q in:\n%s", w, buf.String())
+				}
+			}
+
+			// JSON mode.
+			buf.Reset()
+			exit = FailTo(&buf, tc.err, true)
+			if exit != 1 {
+				t.Errorf("json exit: got %d, want 1", exit)
+			}
+			var raw map[string]any
+			if err := json.Unmarshal([]byte(buf.String()), &raw); err != nil {
+				t.Fatalf("unmarshal: %v\n%s", err, buf.String())
+			}
+			errObj := raw["error"].(map[string]any)
+			if errObj["code"] != tc.wantCode {
+				t.Errorf("code: got %v, want %s", errObj["code"], tc.wantCode)
+			}
+			if _, hasMsg := errObj["message"].(string); !hasMsg {
+				t.Errorf("missing string message: %v", errObj)
+			}
+		})
+	}
+}
+
 func TestError_EnvelopeShape(t *testing.T) {
 	env := ErrorEnvelope{Error: ErrorBody{
 		Code:    "CARD_NOT_FOUND",

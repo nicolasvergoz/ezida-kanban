@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 
@@ -32,30 +33,52 @@ type CodedError interface {
 	Details() map[string]any
 }
 
-// classify maps an error to the (code, exitCode, details) triple used
-// by Fail. The mapping rules match the design's Fail table:
+// DetailedError is the richer P4 error contract. Typed errors that need
+// to carry a structured details payload distinct from their text
+// rendering (e.g. ColumnInUseError with its embedded card list) implement
+// this interface. The output layer recognises it via errors.As so the
+// commands package can keep its concrete types private.
 //
-//   - *board.SchemaVersionError → SCHEMA_VERSION_MISMATCH, exit 1
-//   - *board.ValidationError    → VALIDATION_FAILED, exit 1
-//   - fs.ErrNotExist            → BOARD_NOT_FOUND, exit 1
-//   - fs.ErrPermission          → IO_ERROR, exit 2
-//   - CodedError                → as carried by the error
-//   - everything else           → IO_ERROR, exit 2
-func classify(err error) (code string, exit int, message string, details map[string]any) {
+//   - Code returns the stable UPPER_SNAKE error code.
+//   - Details returns the JSON-mode `error.details` payload.
+//   - ShortMessage returns the one-line JSON-mode message.
+//   - Error() (inherited from error) returns the full text-mode rendering.
+type DetailedError interface {
+	error
+	Code() string
+	Details() any
+	ShortMessage() string
+}
+
+// classify maps an error to the (code, exitCode, message, jsonMessage, details, textBody) tuple
+// used by Fail.
+//
+// For DetailedError values the JSON message is ShortMessage() and the
+// text body is Error(). For legacy CodedError values both JSON message
+// and text body equal Error() and details come from the legacy map.
+func classify(err error) (code string, exit int, textBody string, jsonMessage string, jsonDetails any) {
 	if err == nil {
-		return "", ExitOK, "", nil
+		return "", ExitOK, "", "", nil
+	}
+
+	// DetailedError takes priority over CodedError: the P4 errors
+	// implement both interfaces (legacy CodedError methods are absent),
+	// so this branch only catches the new typed errors.
+	var de DetailedError
+	if errors.As(err, &de) {
+		return de.Code(), ExitUserError, de.Error(), de.ShortMessage(), de.Details()
 	}
 
 	// CodedError takes precedence so command-specific errors can carry
 	// their own classification.
 	var ce CodedError
 	if errors.As(err, &ce) {
-		return ce.ErrorCode(), ce.ExitCode(), ce.Error(), ce.Details()
+		return ce.ErrorCode(), ce.ExitCode(), ce.Error(), ce.Error(), mapToAny(ce.Details())
 	}
 
 	var sv *board.SchemaVersionError
 	if errors.As(err, &sv) {
-		return "SCHEMA_VERSION_MISMATCH", ExitUserError, err.Error(), map[string]any{
+		return "SCHEMA_VERSION_MISMATCH", ExitUserError, err.Error(), err.Error(), map[string]any{
 			"file_version":      sv.FileVersion,
 			"supported_version": sv.SupportedVersion,
 		}
@@ -63,20 +86,18 @@ func classify(err error) (code string, exit int, message string, details map[str
 
 	var ve *board.ValidationError
 	if errors.As(err, &ve) {
-		return "VALIDATION_FAILED", ExitUserError, err.Error(), nil
+		return "VALIDATION_FAILED", ExitUserError, err.Error(), err.Error(), nil
 	}
 
 	if errors.Is(err, fs.ErrNotExist) {
 		// Heuristic: most fs.ErrNotExist cases the CLI surfaces are a
 		// missing kanban.toml. The message hint nudges toward `ezida init`.
-		return "BOARD_NOT_FOUND",
-			ExitUserError,
-			"kanban.toml not found in this directory; run `ezida init` to create one",
-			nil
+		msg := "kanban.toml not found in this directory; run `ezida init` to create one"
+		return "BOARD_NOT_FOUND", ExitUserError, msg, msg, nil
 	}
 
 	if errors.Is(err, fs.ErrPermission) {
-		return "IO_ERROR", ExitSystemError, err.Error(), nil
+		return "IO_ERROR", ExitSystemError, err.Error(), err.Error(), nil
 	}
 
 	// UsageError-like errors raised by cobra (argument count, unknown
@@ -84,10 +105,20 @@ func classify(err error) (code string, exit int, message string, details map[str
 	// them by message prefix because cobra does not expose a sentinel.
 	msg := err.Error()
 	if isUsageError(msg) {
-		return "USAGE_ERROR", ExitUserError, msg, nil
+		return "USAGE_ERROR", ExitUserError, msg, msg, nil
 	}
 
-	return "IO_ERROR", ExitSystemError, err.Error(), nil
+	return "IO_ERROR", ExitSystemError, err.Error(), err.Error(), nil
+}
+
+// mapToAny normalises a legacy details map (used by CodedError) into the
+// any payload the JSON envelope accepts. nil/empty maps become nil so
+// the "details" key is omitted.
+func mapToAny(m map[string]any) any {
+	if len(m) == 0 {
+		return nil
+	}
+	return m
 }
 
 // isUsageError reports whether msg looks like one of cobra's argument-
@@ -117,7 +148,7 @@ func hasPrefix(s, p string) bool {
 // returns the (code, exitCode) pair only; the message and details are
 // kept internal to Fail.
 func Classify(err error) (code string, exit int) {
-	c, e, _, _ := classify(err)
+	c, e, _, _, _ := classify(err)
 	return c, e
 }
 
@@ -133,28 +164,29 @@ func Fail(err error, asJSON bool) {
 }
 
 // FailTo is the testable variant of Fail.
-func FailTo(stderr *os.File, err error, asJSON bool) int {
-	code, exit, message, details := classify(err)
+//
+// In text mode it writes `Error: <Error()>\n`. In JSON mode it emits
+// `{"error":{"code":...,"message":<ShortMessage>,"details":<Details>}}\n`.
+func FailTo(stderr io.Writer, err error, asJSON bool) int {
+	code, exit, textBody, jsonMessage, details := classify(err)
 	if asJSON {
-		env := map[string]any{
-			"error": map[string]any{
-				"code":    code,
-				"message": message,
-			},
+		inner := map[string]any{
+			"code":    code,
+			"message": jsonMessage,
 		}
 		if details != nil {
-			env["error"].(map[string]any)["details"] = details
+			inner["details"] = details
 		}
-		buf, mErr := json.Marshal(env)
+		buf, mErr := json.Marshal(map[string]any{"error": inner})
 		if mErr != nil {
 			// Fallback: write the marshal error as plain text so we
 			// never lose signal.
-			fmt.Fprintf(stderr, "Error: %s\n", message)
+			fmt.Fprintf(stderr, "Error: %s\n", jsonMessage)
 			return exit
 		}
 		fmt.Fprintln(stderr, string(buf))
 		return exit
 	}
-	fmt.Fprintf(stderr, "Error: %s\n", message)
+	fmt.Fprintf(stderr, "Error: %s\n", textBody)
 	return exit
 }

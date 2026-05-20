@@ -1,0 +1,113 @@
+schema_version = 1
+
+[board]
+columns = ["todo", "ongoing", "done"]
+priorities = ["low", "medium", "high"]
+
+[[cards]]
+id = "a3f2k9"
+title = "Refactor auth"
+column = "todo"
+description = "Move from session-based to JWT.\nCheck token expiry handling.\n"
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = ["security", "tech-debt"]
+priority = "high"
+
+[[cards]]
+id = "b7m1p4"
+title = "Update README"
+column = "todo"
+description = ""
+created_at = 2026-05-20T14:31:00Z
+updated_at = 2026-05-20T14:31:00Z
+tags = []
+
+[[cards]]
+id = "c8q3r5"
+title = "Fix login redirect"
+column = "todo"
+description = "After SSO, redirect to original URL."
+created_at = 2026-05-20T14:32:00Z
+updated_at = 2026-05-20T14:32:00Z
+tags = ["bug"]
+priority = "medium"
+
+[[cards]]
+id = "d2s4t6"
+title = "Investigate flaky test"
+column = "ongoing"
+description = "TestPaymentFlow times out under load."
+created_at = 2026-05-20T14:33:00Z
+updated_at = 2026-05-20T14:33:00Z
+tags = ["tests", "flaky"]
+priority = "high"
+
+[[cards]]
+id = "e5u7v9"
+title = "Ship v0.1.0"
+column = "done"
+description = "Released 2026-05-19."
+created_at = 2026-05-19T10:00:00Z
+updated_at = 2026-05-19T10:00:00Z
+tags = ["release"]
+priority = "low"
+
+[[cards]]
+id = "f6w8x1"
+title = "Migrate to Go 1.25"
+column = "done"
+description = ""
+created_at = 2026-05-19T11:00:00Z
+updated_at = 2026-05-19T11:00:00Z
+tags = ["tech-debt"]
+priority = "medium"
+
+[[cards]]
+id = "g7y9z2"
+title = "Add Sentry"
+column = "done"
+description = ""
+created_at = 2026-05-19T12:00:00Z
+updated_at = 2026-05-19T12:00:00Z
+tags = ["observability"]
+priority = "low"
+
+[[cards]]
+id = "h8a1b3"
+title = "Set up CI"
+column = "done"
+description = ""
+created_at = 2026-05-19T13:00:00Z
+updated_at = 2026-05-19T13:00:00Z
+tags = ["infra"]
+priority = "medium"
+
+[[cards]]
+id = "i9c2d4"
+title = "Write architecture doc"
+column = "done"
+description = "Covers the request lifecycle."
+created_at = 2026-05-19T14:00:00Z
+updated_at = 2026-05-19T14:00:00Z
+tags = ["docs"]
+
+[[cards]]
+id = "j1e3f5"
+title = "Configure dependabot"
+column = "done"
+description = ""
+created_at = 2026-05-19T15:00:00Z
+updated_at = 2026-05-19T15:00:00Z
+tags = ["infra", "security"]
+priority = "low"
+
+[[cards]]
+id = "k2g4h6"
+title = "Audit error logging"
+column = "done"
+description = ""
+created_at = 2026-05-19T16:00:00Z
+updated_at = 2026-05-19T16:00:00Z
+tags = ["observability"]
+priority = "high"

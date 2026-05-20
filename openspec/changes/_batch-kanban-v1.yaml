@@ -1,0 +1,40 @@
+topic: kanban-v1
+brief: refs/PROJECT_BRIEF.md
+created: 2026-05-20
+shared_decisions: openspec/decisions/0001-kanban-v1-batch.md
+verify: "go test ./... && go vet ./..."
+order:
+  - name: board-storage
+    title: "Phase 1 — Board core (in-memory model + TOML round-trip + validation)"
+    deps: []
+    agent: general-purpose
+  - name: card-reading
+    title: "Phase 2 — Read commands (init, board, list, get) + output layer"
+    deps: [board-storage]
+    agent: general-purpose
+  - name: card-writing
+    title: "Phase 3 — Write commands (add, move, rm) + interactive prompt"
+    deps: [board-storage, card-reading]
+    agent: general-purpose
+  - name: board-config
+    title: "Phase 4 — Edit + columns / priorities admin with propagation"
+    deps: [board-storage, card-reading, card-writing]
+    agent: general-purpose
+  - name: skill-packaging
+    title: "Phase 5 — Embed SKILL.md (go:embed) and write it during init"
+    deps: [board-storage, card-reading]
+    agent: general-purpose
+  - name: distribution
+    title: "Phase 6 — install.sh, release workflow, CI, README, LICENSE"
+    deps: [board-storage, card-reading, card-writing, board-config, skill-packaging]
+    agent: general-purpose
+assumptions:
+  - "Verify command set to `go test ./... && go vet ./...` based on brief §4 (Go 1.22+). User did not explicitly confirm; logged here. Affects: every phase's acceptance gate."
+  - "Decisions document numbered 0001 (no prior decisions in openspec/decisions/). Affects: all phases reference [ADR §Dx]."
+  - "P2 picked the capability split `card-reading` / `card-writing` / `board-config` rather than a single `card-management` — better separation of read vs. write vs. config and easier to evolve independently. Affects: P2, P3, P4."
+  - "P5 design notes a possible path adjustment for the embed source (canonical file may end up at `internal/skill/SKILL.md` rather than `skill/SKILL.md`) because Go's `//go:embed` rejects parent-relative paths. The spec wording remains intent-correct; the implementation task may move the file. Affects: P5."
+  - "P3 chose to refresh `updated_at` on no-op same-column moves (consistency: every mutating call updates the timestamp). Affects: P3."
+  - "P4 chose NOT to expose `--position` on `priorities add` (priorities are inherently ordered low→high; mid-list insertion is semantically fraught). Workaround: re-init with `--force`. Affects: P4."
+  - "P5 chose `os.WriteFile` (non-atomic) for the skill file because it is non-critical (re-runnable via `--skill-only`). The board file keeps its atomic-rename guarantee. Affects: P5."
+  - "P6 declined GoReleaser in favor of hand-rolled bash inside the release workflow. Trade-off documented in the design. Affects: P6."
+  - "Release verification refuses tags not reachable from main (best-effort via `git merge-base --is-ancestor`). Not bulletproof against force-pushes by maintainers. Affects: P6."

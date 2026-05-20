@@ -35,8 +35,5 @@ vendor/
 .claude/skills/openspec-*/
 .claude/settings.local.json
 
-# OpenSpec workflow (local only — only specs/ is shared, via symlink)
-openspec/
-
 # Agent context refs (not for public repo)
 refs/

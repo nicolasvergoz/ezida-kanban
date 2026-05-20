@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nicolasvergoz/ezida-kanban/internal/board"
+	"github.com/nicolasvergoz/ezida-kanban/internal/skill"
 )
 
 // fixturePath is the absolute path of the shared populated fixture
@@ -61,7 +63,7 @@ func TestInit_FreshDefaults_Text(t *testing.T) {
 	if err != nil {
 		t.Fatalf("init: %v", err)
 	}
-	if !strings.Contains(stdout, "initialized kanban.toml") {
+	if !strings.Contains(stdout, "initialized ") || !strings.Contains(stdout, "kanban.toml") {
 		t.Errorf("stdout: %q", stdout)
 	}
 	b, err := board.Load(path)
@@ -167,14 +169,195 @@ func TestInit_DuplicateColumns_ValidationSurfaces(t *testing.T) {
 	}
 }
 
+// --- P5: skill packaging additions to init ---
+
+func TestInit_WritesSkill(t *testing.T) {
+	dir := t.TempDir()
+	boardPath := filepath.Join(dir, "kanban.toml")
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	cmd := newDummyInitForPaths(boardPath, skillPath, false)
+	_, _, err := executeCobraText(cmd, []string{}, false)
+	if err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	got, err := os.ReadFile(skillPath)
+	if err != nil {
+		t.Fatalf("read skill: %v", err)
+	}
+	if !bytes.Equal(got, skill.Bytes) {
+		t.Errorf("skill file bytes differ from skill.Bytes (len got=%d, want=%d)", len(got), len(skill.Bytes))
+	}
+}
+
+func TestInit_SkillOnly_DoesNotCreateBoard(t *testing.T) {
+	dir := t.TempDir()
+	boardPath := filepath.Join(dir, "kanban.toml")
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	cmd := newDummyInitForPaths(boardPath, skillPath, false)
+	_, _, err := executeCobraText(cmd, []string{"--skill-only"}, false)
+	if err != nil {
+		t.Fatalf("init --skill-only: %v", err)
+	}
+	if _, err := os.Stat(boardPath); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("kanban.toml unexpectedly created: %v", err)
+	}
+	if _, err := os.Stat(skillPath); err != nil {
+		t.Errorf("skill not written: %v", err)
+	}
+}
+
+func TestInit_SkillOnly_DoesNotTouchExistingBoard(t *testing.T) {
+	dir := t.TempDir()
+	boardPath := filepath.Join(dir, "kanban.toml")
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	sentinel := []byte("# sentinel\nschema_version = 1\n")
+	if err := os.WriteFile(boardPath, sentinel, 0o644); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	cmd := newDummyInitForPaths(boardPath, skillPath, false)
+	_, _, err := executeCobraText(cmd, []string{"--skill-only"}, false)
+	if err != nil {
+		t.Fatalf("init --skill-only: %v", err)
+	}
+	got, err := os.ReadFile(boardPath)
+	if err != nil {
+		t.Fatalf("read board: %v", err)
+	}
+	if !bytes.Equal(got, sentinel) {
+		t.Errorf("kanban.toml changed: got %q want %q", got, sentinel)
+	}
+}
+
+func TestInit_JSONEnvelope_Full(t *testing.T) {
+	dir := t.TempDir()
+	boardPath := filepath.Join(dir, "kanban.toml")
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	cmd := newDummyInitForPaths(boardPath, skillPath, true)
+	stdout, _, err := executeCobraText(cmd, []string{}, true)
+	if err != nil {
+		t.Fatalf("init --json: %v", err)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
+		t.Fatalf("unmarshal %q: %v", stdout, err)
+	}
+	if raw["initialized"] != true {
+		t.Errorf("initialized: %v", raw["initialized"])
+	}
+	if raw["path"] != boardPath {
+		t.Errorf("path: %v want %v", raw["path"], boardPath)
+	}
+	if raw["skill_path"] != skillPath {
+		t.Errorf("skill_path: %v want %v", raw["skill_path"], skillPath)
+	}
+	if _, has := raw["skill_only"]; has {
+		t.Errorf("skill_only must be absent in full envelope: %v", raw)
+	}
+}
+
+func TestInit_JSONEnvelope_SkillOnly(t *testing.T) {
+	dir := t.TempDir()
+	boardPath := filepath.Join(dir, "kanban.toml")
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	cmd := newDummyInitForPaths(boardPath, skillPath, true)
+	stdout, _, err := executeCobraText(cmd, []string{"--skill-only"}, true)
+	if err != nil {
+		t.Fatalf("init --skill-only --json: %v", err)
+	}
+	if !strings.HasSuffix(stdout, "\n") {
+		t.Errorf("expected trailing newline: %q", stdout)
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(stdout), &raw); err != nil {
+		t.Fatalf("unmarshal %q: %v", stdout, err)
+	}
+	if raw["skill_only"] != true {
+		t.Errorf("skill_only: %v", raw["skill_only"])
+	}
+	if raw["skill_path"] != skillPath {
+		t.Errorf("skill_path: %v want %v", raw["skill_path"], skillPath)
+	}
+	if _, has := raw["initialized"]; has {
+		t.Errorf("initialized must be absent in skill-only envelope: %v", raw)
+	}
+	if _, has := raw["path"]; has {
+		t.Errorf("path must be absent in skill-only envelope: %v", raw)
+	}
+}
+
+func TestInit_TextOutput_IncludesCommentNote(t *testing.T) {
+	dir := t.TempDir()
+	boardPath := filepath.Join(dir, "kanban.toml")
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	cmd := newDummyInitForPaths(boardPath, skillPath, false)
+	stdout, _, err := executeCobraText(cmd, []string{}, false)
+	if err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	const note = "note: TOML comments are not preserved across ezida writes"
+	if !strings.Contains(stdout, note) {
+		t.Errorf("missing note line: %q", stdout)
+	}
+	lines := strings.Split(strings.TrimRight(stdout, "\n"), "\n")
+	if got := lines[len(lines)-1]; got != note {
+		t.Errorf("last line: %q, want %q", got, note)
+	}
+}
+
+func TestInit_SkillOnly_TextOutput_NoBoardMention(t *testing.T) {
+	dir := t.TempDir()
+	boardPath := filepath.Join(dir, "kanban.toml")
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	cmd := newDummyInitForPaths(boardPath, skillPath, false)
+	stdout, _, err := executeCobraText(cmd, []string{"--skill-only"}, false)
+	if err != nil {
+		t.Fatalf("init --skill-only: %v", err)
+	}
+	if strings.Contains(stdout, "kanban.toml") {
+		t.Errorf("skill-only stdout must not mention kanban.toml: %q", stdout)
+	}
+	if !strings.Contains(stdout, skillPath) {
+		t.Errorf("expected skill path in stdout: %q", stdout)
+	}
+}
+
+// TestWriteSkillFile_CreatesNestedParents confirms writeSkillFile
+// creates missing parent directories (task 3.2 done-condition).
+func TestWriteSkillFile_CreatesNestedParents(t *testing.T) {
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "a", "b", "c", "SKILL.md")
+	if err := writeSkillFile(nested); err != nil {
+		t.Fatalf("writeSkillFile: %v", err)
+	}
+	got, err := os.ReadFile(nested)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !bytes.Equal(got, skill.Bytes) {
+		t.Error("written bytes differ from embedded skill.Bytes")
+	}
+}
+
 // newDummyInitForPath returns an init command that writes to the
 // given absolute path instead of the hard-coded BoardPath. It mirrors
-// the production NewInitCmd flag wiring.
+// the production NewInitCmd flag wiring. The skill file is written
+// next to the board file under a private .claude/skills tree so tests
+// stay isolated to t.TempDir().
 func newDummyInitForPath(path string, asJSON bool) *cobra.Command {
+	dir := filepath.Dir(path)
+	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
+	return newDummyInitForPaths(path, skillPath, asJSON)
+}
+
+// newDummyInitForPaths is the lower-level helper used by skill-only
+// tests that need to assert the skill path independently of the board
+// path.
+func newDummyInitForPaths(boardPath, skillPath string, asJSON bool) *cobra.Command {
 	var (
 		columnsCSV    string
 		prioritiesCSV string
 		force         bool
+		skillOnly     bool
 	)
 	cmd := &cobra.Command{
 		Use:  "init",
@@ -182,12 +365,13 @@ func newDummyInitForPath(path string, asJSON bool) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cols := parseCSVOrDefault(columnsCSV, defaultColumns)
 			prios := parseCSVOrDefault(prioritiesCSV, defaultPriorities)
-			return runInit(cmd, path, cols, prios, force, asJSON)
+			return runInit(cmd, boardPath, skillPath, cols, prios, force, skillOnly, asJSON)
 		},
 	}
 	cmd.Flags().StringVar(&columnsCSV, "columns", "", "")
 	cmd.Flags().StringVar(&prioritiesCSV, "priorities", "", "")
 	cmd.Flags().BoolVar(&force, "force", false, "")
+	cmd.Flags().BoolVar(&skillOnly, "skill-only", false, "")
 	return cmd
 }
 

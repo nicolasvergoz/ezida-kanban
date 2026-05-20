@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 	"github.com/nicolasvergoz/ezida-kanban/internal/commands"
@@ -88,6 +89,36 @@ func TestClassify_TypedCommandErrors(t *testing.T) {
 			name:     "already initialized",
 			err:      &commands.AlreadyInitializedError{Path: "kanban.toml"},
 			wantCode: "ALREADY_INITIALIZED",
+			wantExit: 1,
+		},
+		{
+			name:     "column not found",
+			err:      &commands.ColumnNotFoundError{Name: "ghost"},
+			wantCode: "COLUMN_NOT_FOUND",
+			wantExit: 1,
+		},
+		{
+			name:     "invalid priority",
+			err:      &commands.InvalidPriorityError{Name: "urgent"},
+			wantCode: "INVALID_PRIORITY",
+			wantExit: 1,
+		},
+		{
+			name:     "missing title",
+			err:      &commands.MissingTitleError{},
+			wantCode: "MISSING_TITLE",
+			wantExit: 1,
+		},
+		{
+			name:     "invalid tag",
+			err:      &commands.InvalidTagError{Raw: ",foo,"},
+			wantCode: "INVALID_TAG",
+			wantExit: 1,
+		},
+		{
+			name:     "interactive required",
+			err:      &commands.InteractiveRequiredError{Hint: "use --yes"},
+			wantCode: "INTERACTIVE_REQUIRED",
 			wantExit: 1,
 		},
 	}
@@ -270,6 +301,72 @@ func TestList_OmitsDescription(t *testing.T) {
 			t.Errorf("list card unexpectedly carries description: %v", obj)
 		}
 	}
+}
+
+func TestJSONCard_IncludesAllExpectedKeys(t *testing.T) {
+	now := mustTime("2026-05-20T14:30:00Z")
+	c := board.Card{
+		ID:          "a3f2k9",
+		Title:       "Refactor auth",
+		Column:      "todo",
+		Description: "JWT migration",
+		Tags:        []string{"security", "tech-debt"},
+		Priority:    "high",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	buf := JSONCard(c)
+	if !strings.HasSuffix(string(buf), "\n") {
+		t.Errorf("missing trailing newline: %q", buf)
+	}
+	var raw struct {
+		Card map[string]any `json:"card"`
+	}
+	if err := json.Unmarshal(buf, &raw); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	for _, k := range []string{"id", "title", "column", "description", "tags", "priority", "created_at", "updated_at"} {
+		if _, has := raw.Card[k]; !has {
+			t.Errorf("missing key %q in %v", k, raw.Card)
+		}
+	}
+	if raw.Card["description"] != "JWT migration" {
+		t.Errorf("description: %v", raw.Card["description"])
+	}
+}
+
+func TestJSONCard_NilTagsBecomesEmptySlice(t *testing.T) {
+	now := mustTime("2026-05-20T14:30:00Z")
+	c := board.Card{
+		ID:        "a3f2k9",
+		Title:     "x",
+		Column:    "todo",
+		Tags:      nil,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	buf := JSONCard(c)
+	var raw struct {
+		Card map[string]any `json:"card"`
+	}
+	if err := json.Unmarshal(buf, &raw); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	tags, ok := raw.Card["tags"].([]any)
+	if !ok {
+		t.Fatalf("tags not an array: %v", raw.Card["tags"])
+	}
+	if len(tags) != 0 {
+		t.Errorf("want empty slice, got %v", tags)
+	}
+}
+
+func mustTime(s string) time.Time {
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		panic(err)
+	}
+	return t
 }
 
 func TestError_EnvelopeShape(t *testing.T) {

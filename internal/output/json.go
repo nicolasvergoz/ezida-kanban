@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"time"
+
+	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 )
 
 // BoardEnvelope is the JSON shape for `ezida board --json` (ADR §D7).
@@ -87,6 +89,33 @@ func Get(env GetEnvelope) ([]byte, error) { return marshalLine(env) }
 
 // Error marshals an ErrorEnvelope and appends a newline.
 func Error(env ErrorEnvelope) ([]byte, error) { return marshalLine(env) }
+
+// JSONCard returns `{"card":{...}}\n` for the given card. Includes
+// the `description` field (mutating commands echo the full card, unlike
+// `list` which omits it). Returns the marshaled bytes; the trailing
+// newline is always present. On marshal failure (which should not
+// happen in practice with well-typed inputs) returns nil.
+func JSONCard(c board.Card) []byte {
+	tags := c.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	env := GetEnvelope{Card: GetCard{
+		ID:          c.ID,
+		Title:       c.Title,
+		Column:      c.Column,
+		Priority:    c.Priority,
+		Tags:        tags,
+		Description: c.Description,
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+	}}
+	buf, err := marshalLine(env)
+	if err != nil {
+		return nil
+	}
+	return buf
+}
 
 // Compact reports whether buf is a single JSON value followed by a
 // single trailing newline. Used by tests to validate envelope shape

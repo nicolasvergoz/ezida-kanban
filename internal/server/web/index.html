@@ -89,6 +89,7 @@
                     <li class="tag t-tag" x-text="tag"></li>
                   </template>
                 </ul>
+                <button type="button" class="card-delete" aria-label="Delete card" @click="deleteCard(card.id, $event)">&times;</button>
               </li>
             </template>
             <template x-if="cardsByColumn(col).length === 0">
@@ -98,6 +99,60 @@
               <li class="no-matches t-body-md">No matches</li>
             </template>
           </ul>
+          <div class="column-footer"
+               x-data="{ composing: false, draft: '', error: '', submitting: false,
+                         openComposer() { this.composing = true; this.draft = ''; this.error = ''; },
+                         cancelComposer() { this.composing = false; this.draft = ''; this.error = ''; },
+                         async submitComposer() {
+                           const title = (this.draft || '').trim();
+                           if (!title) { this.cancelComposer(); return; }
+                           this.submitting = true; this.error = '';
+                           try {
+                             const res = await fetch('/api/cards', {
+                               method: 'POST',
+                               headers: {'Content-Type': 'application/json'},
+                               body: JSON.stringify({ column: col, title: title })
+                             });
+                             if (!res.ok) {
+                               const err = await res.json().catch(() => ({}));
+                               this.error = (err && err.error && err.error.message) || ('HTTP ' + res.status);
+                               this.submitting = false;
+                               return;
+                             }
+                             this.composing = false; this.draft = ''; this.submitting = false;
+                           } catch (e) {
+                             this.error = e.message || String(e);
+                             this.submitting = false;
+                           }
+                         } }">
+            <button x-show="!composing"
+                    type="button"
+                    class="button-ghost composer-open"
+                    @click="openComposer()">+ Add a card</button>
+            <form x-show="composing"
+                  class="composer"
+                  @submit.prevent="submitComposer()">
+              <textarea x-model="draft"
+                        x-ref="composerInput"
+                        x-init="$watch('composing', v => v && $nextTick(() => $refs.composerInput.focus()))"
+                        rows="2"
+                        placeholder="Enter a title&hellip;"
+                        @keydown.enter.prevent="submitComposer()"
+                        @keydown.escape="cancelComposer()"
+                        @blur="if (!$event.relatedTarget || !$event.relatedTarget.closest('.composer')) cancelComposer()"
+                        :disabled="submitting"></textarea>
+              <div class="composer-actions">
+                <button type="submit"
+                        class="button-primary"
+                        :disabled="submitting"
+                        x-text="submitting ? 'Adding…' : 'Add'"></button>
+                <button type="button"
+                        class="button-ghost"
+                        @click="cancelComposer()">Cancel</button>
+              </div>
+              <p class="composer-error" x-show="error" x-text="error"></p>
+            </form>
+          </div>
         </section>
       </template>
     </div>

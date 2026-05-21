@@ -24,6 +24,11 @@ function board() {
     // so they can be destroyed before being remounted after a refetch
     // (Alpine reuses the <ul> nodes across renders).
     _sortables: [],
+    // _dragJustEnded is a transient flag set by Sortable's onEnd and
+    // cleared on the next tick. deleteCard() consults it so a
+    // drag-end mouseup that happens to land on the .card-delete
+    // button does NOT fire a stray DELETE (UI-4 design.md §D5).
+    _dragJustEnded: false,
     // V3 edit-modal state. `editing` toggles the overlay; `draft` is
     // a shallow-cloned card under edit; `tagInput` is the chip-input
     // buffer; `error` carries the last server-side validation
@@ -266,10 +271,43 @@ function board() {
           group: 'cards',
           animation: 0,
           ghostClass: 'sortable-ghost',
-          onEnd: (evt) => self.handleDrop(evt),
+          onEnd: (evt) => {
+            self._dragJustEnded = true;
+            setTimeout(() => { self._dragJustEnded = false; }, 0);
+            self.handleDrop(evt);
+          },
         });
         self._sortables.push(s);
       });
+    },
+    // deleteCard issues DELETE /api/cards/<id> per UI-4 design.md §D5.
+    // - stopPropagation prevents the card's click handler from also
+    //   firing openCard(card) and popping the modal.
+    // - _dragJustEnded guards against a drag-end mouseup that lands
+    //   on the delete button region — Sortable's onEnd handler sets
+    //   the flag in the same macrotask, so a 0 ms timeout is enough
+    //   to skip the immediate-following synthetic click and re-arm.
+    // - On 404 (or any non-2xx) the page refetches /api/board so the
+    //   client recovers from a CLI race that already deleted the card.
+    // - On success, the SSE board-changed event drives the refetch;
+    //   no optimistic local mutation here.
+    async deleteCard(id, evt) {
+      if (evt) evt.stopPropagation();
+      if (this._dragJustEnded) return;
+      try {
+        const res = await fetch('/api/cards/' + encodeURIComponent(id), {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          console.warn('delete failed', res.status);
+          await this.load();
+          return;
+        }
+        // SSE will refetch; no manual reload here.
+      } catch (e) {
+        console.error('delete request errored, refetching', e);
+        await this.load();
+      }
     },
     // openCard clones the clicked card into `draft` and flips the
     // modal open. The shallow clone (plus an explicit tags-slice

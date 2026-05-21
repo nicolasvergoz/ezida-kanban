@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/nicolasvergoz/ezida-kanban/internal/board"
@@ -43,8 +44,10 @@ func (s *serverState) routes(mux *http.ServeMux) {
 	staticFS, _ := fs.Sub(webFS, "web")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticFS)))
 	mux.HandleFunc("GET /api/board", s.handleBoard)
+	mux.HandleFunc("POST /api/cards", s.handleCreate)
 	mux.HandleFunc("POST /api/cards/{id}/move", s.handleMove)
 	mux.HandleFunc("PATCH /api/cards/{id}", s.handlePatch)
+	mux.HandleFunc("DELETE /api/cards/{id}", s.handleDelete)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("/", s.handleNotFound)
@@ -147,6 +150,165 @@ func (s *serverState) handlePatch(w http.ResponseWriter, r *http.Request) {
 	}
 	// Defensive: UpdateCard succeeded but the card vanished afterwards.
 	httpError(w, fmt.Errorf("card %q missing after patch", id))
+}
+
+// createCardPayload is the JSON body shape accepted by POST
+// /api/cards. Snake_case per ADR 0002 §D7. Optional fields default
+// to their zero values when absent from the JSON, which is exactly
+// the behaviour the spec requires (UI-4 design.md §D6).
+type createCardPayload struct {
+	Column      string   `json:"column"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Priority    string   `json:"priority"`
+	Tags        []string `json:"tags"`
+}
+
+// handleCreate implements POST /api/cards (UI-4 design.md §D7).
+// Validation order (each step is its own block for readability):
+//
+//  1. Decode body → 400 INVALID_BODY.
+//  2. Trim-empty title → 400 MISSING_TITLE.
+//  3. Each tag must be non-empty after trim → 400 INVALID_TAG.
+//  4. column must be declared in [board].columns → 404 COLUMN_NOT_FOUND
+//     (deliberate departure from V2's 400 — design.md §D2).
+//  5. priority, if non-empty, must be declared in [board].priorities
+//     → 400 INVALID_PRIORITY.
+//  6. board.NewUniqueID against existing IDs (ErrIDExhausted → 500
+//     IO_ERROR via httpError catch-all).
+//  7. Build the Card, AppendCardToColumn, Save.
+//  8. 201 with {"card": cardToResponse(card)}.
+func (s *serverState) handleCreate(w http.ResponseWriter, r *http.Request) {
+	var p createCardPayload
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"INVALID_BODY", err.Error(), nil)
+		return
+	}
+
+	title := strings.TrimSpace(p.Title)
+	if title == "" {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"MISSING_TITLE", "title must be non-empty", nil)
+		return
+	}
+
+	for _, tag := range p.Tags {
+		if strings.TrimSpace(tag) == "" {
+			writeErrorJSON(w, http.StatusBadRequest,
+				"INVALID_TAG",
+				fmt.Sprintf("tag %q is empty or whitespace-only", tag),
+				map[string]any{"tag": tag})
+			return
+		}
+	}
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	// Column must exist before any other check that depends on it.
+	colKnown := false
+	for _, c := range b.Board.Columns {
+		if c == p.Column {
+			colKnown = true
+			break
+		}
+	}
+	if !colKnown {
+		// Deliberate 404 departure from V2's 400 (design.md §D2).
+		writeErrorJSON(w, http.StatusNotFound,
+			"COLUMN_NOT_FOUND",
+			fmt.Sprintf("column %q is not declared in [board].columns", p.Column),
+			map[string]any{"column": p.Column})
+		return
+	}
+
+	if p.Priority != "" {
+		priKnown := false
+		for _, pr := range b.Board.Priorities {
+			if pr == p.Priority {
+				priKnown = true
+				break
+			}
+		}
+		if !priKnown {
+			writeErrorJSON(w, http.StatusBadRequest,
+				"INVALID_PRIORITY",
+				fmt.Sprintf("priority %q is not declared in [board].priorities", p.Priority),
+				map[string]any{"priority": p.Priority})
+			return
+		}
+	}
+
+	existingIDs := make([]string, 0, len(b.Cards))
+	for _, c := range b.Cards {
+		existingIDs = append(existingIDs, c.ID)
+	}
+	id, err := board.NewUniqueID(existingIDs)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	tags := p.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	card := board.Card{
+		ID:          id,
+		Title:       title,
+		Column:      p.Column,
+		Description: p.Description,
+		Priority:    p.Priority,
+		Tags:        tags,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	board.AppendCardToColumn(b, card)
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"card": cardToResponse(card),
+	})
+}
+
+// handleDelete implements DELETE /api/cards/{id} (UI-4 design.md §D7).
+// Loads the board, removes the card via board.DeleteCard (which
+// returns *CardNotFoundError if no card matches), persists via
+// board.Save, then responds with `{"deleted":"<id>"}`.
+func (s *serverState) handleDelete(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.DeleteCard(b, id); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"deleted": id,
+	})
 }
 
 // handleIndex serves the embedded index.html with an explicit

@@ -866,3 +866,140 @@
     color: var(--bg-base);
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * UI-4: inline card create/delete affordances.
+ *
+ * The hover-revealed delete button lives at the card's top-right and is
+ * invisible until the user hovers the parent .card; on its own :hover it
+ * shifts to the danger token. The composer surface lives in .column-footer
+ * (Alpine sub-scope, ADR 0003 §D10) — an idle ghost button switches to a
+ * form with textarea + Add / Cancel buttons on click.
+ * ------------------------------------------------------------------------- */
+
+.card { position: relative; }
+
+.card-delete {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  border: 0;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+}
+
+.card:hover .card-delete {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.card-delete:hover {
+  background: color-mix(in oklab, var(--danger) 15%, var(--surface));
+  color: var(--danger);
+}
+
+.column-footer {
+  padding: var(--space-sm);
+}
+
+.composer-open {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--rounded-md);
+  font: inherit;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.composer-open:hover {
+  background: color-mix(in oklab, var(--text) 4%, transparent);
+  color: var(--text);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-lg);
+  padding: var(--space-md);
+}
+
+.composer textarea {
+  resize: vertical;
+  min-height: 56px;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font: inherit;
+  color: var(--text);
+}
+
+.composer:focus-within {
+  border-color: var(--accent);
+}
+
+.composer-actions {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.composer-actions .button-primary {
+  border: 0;
+  background: var(--text);
+  color: var(--bg-base);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--rounded-md);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+
+.composer-actions .button-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--text) 92%, transparent);
+}
+
+.composer-actions .button-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.composer-actions .button-ghost {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--rounded-md);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.composer-actions .button-ghost:hover {
+  background: color-mix(in oklab, var(--text) 4%, transparent);
+  color: var(--text);
+}
+
+.composer-error {
+  color: var(--danger);
+  margin: 0;
+  font-size: 12px;
+}

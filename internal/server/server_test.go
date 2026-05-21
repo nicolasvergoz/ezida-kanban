@@ -301,6 +301,28 @@ func TestHandle_Index(t *testing.T) {
 	}
 }
 
+// TestHandle_Index_ContainsUI4Markup asserts that GET / ships the
+// UI-4 footer composer and per-card delete button markup so the
+// browser sees both affordances on first paint.
+func TestHandle_Index_ContainsUI4Markup(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	src := string(body)
+	if !strings.Contains(src, `class="column-footer"`) {
+		t.Fatalf(`index.html missing class="column-footer"`)
+	}
+	if !strings.Contains(src, `class="card-delete"`) {
+		t.Fatalf(`index.html missing class="card-delete"`)
+	}
+}
+
 func TestHandle_Static_App(t *testing.T) {
 	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
 	defer cleanup()

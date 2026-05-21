@@ -1,12 +1,12 @@
 ## 1. Board primitive — `DeleteCard`
 
-- [ ] 1.1 In `internal/board/` (new `delete.go` or appended to
+- [x] 1.1 In `internal/board/` (new `delete.go` or appended to
   `board.go` — pick whichever keeps the file under ~300 LOC),
   declare `func DeleteCard(b *Board, id string) error`. Algorithm
   per design.md §D7: locate index, return `*CardNotFoundError` on
   miss, slice-splice on hit, no mutation on failure paths. Done
   when `go vet ./internal/board` is clean.
-- [ ] 1.2 Confirm `*CardNotFoundError` is already exported by
+- [x] 1.2 Confirm `*CardNotFoundError` is already exported by
   `internal/board` (it is — defined in `board.go` next to
   `*ColumnNotFoundError`). Do NOT redeclare. Done when `grep -n
   "type CardNotFoundError" internal/board/` returns exactly one
@@ -14,7 +14,7 @@
 
 ## 2. Board tests
 
-- [ ] 2.1 Add `TestDeleteCard_Success`,
+- [x] 2.1 Add `TestDeleteCard_Success`,
   `TestDeleteCard_PreservesOrder`,
   `TestDeleteCard_UnknownIDReturnsNotFound`,
   `TestDeleteCard_DoesNotMutateOnMiss`,
@@ -28,21 +28,21 @@
 
 ## 3. Server endpoint — `DELETE /api/cards/{id}`
 
-- [ ] 3.1 Register `DELETE /api/cards/{id}` in
+- [x] 3.1 Register `DELETE /api/cards/{id}` in
   `serverState.routes()` (in `internal/server/handlers.go`),
   alongside the existing `POST /api/cards/{id}/move` and `PATCH
   /api/cards/{id}` routes. Done when `curl -X DELETE
   http://127.0.0.1:<port>/api/cards/abcdef` reaches the handler
   (returns 404 or 200 depending on the fixture, NOT
   method-not-allowed).
-- [ ] 3.2 Implement `handleDelete(w, r)` per design.md §D7: read
+- [x] 3.2 Implement `handleDelete(w, r)` per design.md §D7: read
   path param, `board.Load`, `board.DeleteCard`, `board.Save`,
   respond `200` with `{"deleted":"<id>"}`. Reuse the existing
   `httpError` mapping for `*CardNotFoundError` (already returns
   404 `CARD_NOT_FOUND`). Done when a unit test hitting the
   handler with an existing card observes status 200 and the
   expected JSON body.
-- [ ] 3.3 Add server tests:
+- [x] 3.3 Add server tests:
   - `TestHandle_Delete_Success` (200, JSON body, on-disk card
     removed, surviving cards' order preserved).
   - `TestHandle_Delete_UnknownCard` (404 `CARD_NOT_FOUND`,
@@ -58,12 +58,12 @@
 
 ## 4. Server endpoint — `POST /api/cards`
 
-- [ ] 4.1 Register `POST /api/cards` in `serverState.routes()`.
+- [x] 4.1 Register `POST /api/cards` in `serverState.routes()`.
   Use the stdlib mux method-prefix pattern (`mux.HandleFunc("POST
   /api/cards", s.handleCreate)`). Done when `curl -X POST
   http://127.0.0.1:<port>/api/cards -d '{}'` reaches the handler
   (returns 400, not 404).
-- [ ] 4.2 Implement `handleCreate(w, r)` per design.md §D7
+- [x] 4.2 Implement `handleCreate(w, r)` per design.md §D7
   validation order:
   1. Decode body → on error,
      `writeErrorJSON(w, 400, "INVALID_BODY", err.Error(), nil)`.
@@ -84,7 +84,7 @@
      `{"card": cardToResponse(card)}`.
   Done when each step is a separate, readable block in the
   handler source.
-- [ ] 4.3 Define the request struct `createCardPayload` in
+- [x] 4.3 Define the request struct `createCardPayload` in
   `handlers.go`:
   ```go
   type createCardPayload struct {
@@ -100,7 +100,7 @@
   from the JSON — exactly the behaviour we want. Done when the
   struct compiles and the handler decodes a full-payload curl
   hit correctly.
-- [ ] 4.4 Add server tests covering every scenario in the
+- [x] 4.4 Add server tests covering every scenario in the
   viewer-server delta:
   - `TestHandle_Create_Success_TitleOnly` (201, well-formed
     `card` object, on-disk append, ID matches `^[0-9a-z]{6}$`).
@@ -126,7 +126,7 @@
 
 ## 5. UI — column footer + composer markup
 
-- [ ] 5.1 In `internal/server/web/index.html`, locate the existing
+- [x] 5.1 In `internal/server/web/index.html`, locate the existing
   `<template x-for="col in columns">` block. Inside the `<section
   class="column">`, after the existing `<ul class="cards">`, add
   the `<div class="column-footer">` Alpine sub-scope per design.md
@@ -137,13 +137,13 @@
   `class="column-footer"` once per column and the
   `submitComposer` body references `column: col` for the closure
   capture.
-- [ ] 5.2 Inside the composer form, the textarea MUST carry
+- [x] 5.2 Inside the composer form, the textarea MUST carry
   `@keydown.enter.prevent="submitComposer()"`,
   `@keydown.escape="cancelComposer()"`, and the blur handler
   `@blur="if (!$event.relatedTarget || !$event.relatedTarget.closest('.composer')) cancelComposer()"`.
   The Add button is `type="submit"`; Cancel is `type="button"`.
   Done when the page source contains all three handlers verbatim.
-- [ ] 5.3 The composer textarea MUST auto-focus when `composing`
+- [x] 5.3 The composer textarea MUST auto-focus when `composing`
   becomes true. Use `x-ref="composerInput"` plus the
   `x-init="$watch('composing', v => v && $nextTick(() =>
   $refs.composerInput.focus()))"` idiom. Done when a manual
@@ -152,20 +152,20 @@
 
 ## 6. UI — hover delete button markup + handler
 
-- [ ] 6.1 In the `<li class="card">` template (inside
+- [x] 6.1 In the `<li class="card">` template (inside
   `index.html`), add `<button type="button" class="card-delete"
   aria-label="Delete card"
   @click="deleteCard(card.id, $event)">×</button>` as the last
   child of the card body. Done when the rendered HTML contains
   one `.card-delete` button per card.
-- [ ] 6.2 In `internal/server/web/app.js`, extend the root
+- [x] 6.2 In `internal/server/web/app.js`, extend the root
   `board()` component with:
   - a transient flag `_dragJustEnded: false`,
   - `async deleteCard(id, evt)` per design.md §D5 (stop
     propagation, skip-if-drag-just-ended, DELETE, refetch on
     404 or fetch reject).
   Done when both symbols exist in the returned object literal.
-- [ ] 6.3 Extend `mountSortable()`'s `Sortable.create` options to
+- [x] 6.3 Extend `mountSortable()`'s `Sortable.create` options to
   set `_dragJustEnded` inside `onEnd`:
   ```js
   onEnd: (evt) => {
@@ -180,7 +180,7 @@
 
 ## 7. CSS — composer surface + hover delete affordance
 
-- [ ] 7.1 In `internal/server/web/style.css`, add the
+- [x] 7.1 In `internal/server/web/style.css`, add the
   `.column-footer`, `.composer-open`, `.composer`,
   `.composer textarea`, `.composer:focus-within`,
   `.composer-actions`, and `.composer-error` rules per design.md
@@ -189,7 +189,7 @@
   `--danger-fg`). NO hex literals introduced. Done when a CSS
   audit (`grep -n '#[0-9a-fA-F]\{3,6\}' internal/server/web/style.css`)
   yields no new hex values beyond the existing token block.
-- [ ] 7.2 Add the `.card { position: relative }` + `.card-delete`
+- [x] 7.2 Add the `.card { position: relative }` + `.card-delete`
   rules per design.md §D9: 22 px round, top-right absolute,
   hidden by default, revealed on `.card:hover`, danger-tinted on
   `.card-delete:hover`. Done when the rendered page's `.card`
@@ -198,14 +198,14 @@
 
 ## 8. Server tests — error envelope coverage
 
-- [ ] 8.1 Confirm `httpError` still maps every error code the new
+- [x] 8.1 Confirm `httpError` still maps every error code the new
   handlers can raise (`MISSING_TITLE`, `INVALID_TAG`,
   `INVALID_PRIORITY`, `CARD_NOT_FOUND`, `COLUMN_NOT_FOUND`,
   `INVALID_BODY`, `IO_ERROR`). NO new code branches required —
   the V3 handler already exercised every reusable mapping. Done
   when a code review of `httpError` confirms no missing typed-error
   cases.
-- [ ] 8.2 Add `TestHandle_Create_UnknownColumn_Returns404` as a
+- [x] 8.2 Add `TestHandle_Create_UnknownColumn_Returns404` as a
   dedicated guard for the deliberate 404 departure (design.md §D2).
   Verifies that the create handler emits the 404 status even
   though the existing `httpError` returns 400 for the same typed
@@ -215,11 +215,11 @@
 
 ## 9. UI tests (smoke / DOM substring)
 
-- [ ] 9.1 Extend `internal/server/server_test.go` to assert that
+- [x] 9.1 Extend `internal/server/server_test.go` to assert that
   `GET /` returns HTML containing `class="column-footer"` (proves
   the footer markup ships) and `class="card-delete"` (proves the
   delete button markup ships). Done when the test passes.
-- [ ] 9.2 Optional (skip if local headless infra is absent): a
+- [x] 9.2 Optional (skip if local headless infra is absent): a
   Playwright or equivalent smoke that opens the composer in
   `todo`, types `Smoke check`, presses Enter, and asserts the
   card appears within 1 s. Done OR explicitly noted skipped with
@@ -227,29 +227,29 @@
 
 ## 10. Manual smoke
 
-- [ ] 10.1 Open the page → click `+ Add a card` in `todo` → type
+- [x] 10.1 Open the page → click `+ Add a card` in `todo` → type
   `Smoke check` → press Enter → the composer closes and the new
   card appears in the column. Done when verified.
-- [ ] 10.2 Open the composer → type `Junk` → press Escape → the
+- [x] 10.2 Open the composer → type `Junk` → press Escape → the
   composer closes, no request fires, no card appears. Done when
   verified.
-- [ ] 10.3 Open the composer → type `Junk` → click outside the
+- [x] 10.3 Open the composer → type `Junk` → click outside the
   composer → composer closes, no request fires. Done when
   verified.
-- [ ] 10.4 Hover a card → the × button fades in → click it → the
+- [x] 10.4 Hover a card → the × button fades in → click it → the
   card is removed without a confirmation dialog. The modal does
   NOT open. Done when verified.
-- [ ] 10.5 Drag a card and release the mouse with the pointer
+- [x] 10.5 Drag a card and release the mouse with the pointer
   over the × button → the card MUST be moved (or returned to its
   original column), NOT deleted. Done when verified.
-- [ ] 10.6 With the CLI in another terminal, `ezida rm <id>` while
+- [x] 10.6 With the CLI in another terminal, `ezida rm <id>` while
   the page is open, then click the × on the (now stale) card →
   the client gets a 404, triggers a refetch, and the card
   disappears from the rendered board. Done when verified.
 
 ## 11. Acceptance gate
 
-- [ ] 11.1 Run `go test ./... && go vet ./...`. Done when exit
+- [x] 11.1 Run `go test ./... && go vet ./...`. Done when exit
   code is 0 and every new test name (`TestDeleteCard_*`,
   `TestHandle_Create_*`, `TestHandle_Delete_*`) appears in the
   output.

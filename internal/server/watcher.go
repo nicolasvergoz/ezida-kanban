@@ -91,15 +91,14 @@ func (w *Watcher) Run(ctx context.Context) {
 			if !ok {
 				return
 			}
-			if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename) == 0 {
+			if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Rename|fsnotify.Remove) == 0 {
 				continue
 			}
-			// On Rename/Create the watched inode may have been
-			// replaced (atomic temp+rename). Re-arm so subsequent
-			// rewrites still fire. Ignore ErrExist-style errors
-			// (already watching) and any other error: missing the
-			// re-add is recoverable by polling on the next event.
-			if ev.Op&(fsnotify.Rename|fsnotify.Create) != 0 {
+			// On Rename/Create/Remove the watched inode may have
+			// been replaced (atomic temp+rename — on Linux this
+			// surfaces as Remove of the old inode, on macOS as
+			// Rename). Re-arm so subsequent rewrites still fire.
+			if ev.Op&(fsnotify.Rename|fsnotify.Create|fsnotify.Remove) != 0 {
 				if err := w.fsw.Add(w.path); err != nil {
 					if !errors.Is(err, fsnotify.ErrEventOverflow) {
 						w.errMu.Lock()

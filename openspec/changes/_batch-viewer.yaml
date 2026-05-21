@@ -1,0 +1,37 @@
+topic: viewer
+brief: refs/VIEWER_BRIEF.md
+created: 2026-05-21
+shared_decisions: openspec/decisions/0002-viewer-batch.md
+verify: "go test ./... && go vet ./..."
+order:
+  - name: add-viewer-server-skeleton
+    title: Viewer V1 — server skeleton (cobra serve, HTTP, /api/board, embed)
+    deps: []
+    agent: general-purpose
+  - name: add-viewer-ui-readonly
+    title: Viewer V1 — UI readonly (HTML/CSS/JS, Alpine, render board)
+    deps: [add-viewer-server-skeleton]
+    agent: general-purpose
+  - name: add-card-move-reorder
+    title: Viewer V2 — drag/move (InsertCardAt refactor, MoveCard, POST move, Sortable.js)
+    deps: [add-viewer-ui-readonly]
+    agent: general-purpose
+  - name: add-card-inline-edit
+    title: Viewer V3 — inline edit (UpdateCard, PATCH endpoint, modal form)
+    deps: [add-card-move-reorder]
+    agent: general-purpose
+  - name: add-viewer-hot-reload
+    title: Viewer V4 — hot reload (fsnotify watcher, SSE, client reconnect)
+    deps: [add-card-inline-edit]
+    agent: general-purpose
+assumptions:
+  - "PATCH body semantics: present key replaces, absent key untouched, empty string/empty list clears the field. (Affects add-card-inline-edit; pinned in ADR 0002 §D8.)"
+  - "Move position is 0-indexed and clamped to [0, len] silently rather than rejected with POSITION_OUT_OF_RANGE. (Affects add-card-move-reorder; pinned in ADR 0002 §D11.)"
+  - "Brief §8 placed web/ at the repo root; we use internal/server/web/ to avoid upward //go:embed paths. (Affects all phases; pinned in ADR 0002 §D2.)"
+  - "No initial-state inlining of the board in GET / for V1 — the page fetches /api/board after load. Defers template wiring until a clear need surfaces. (Affects add-viewer-server-skeleton + add-viewer-ui-readonly.)"
+  - "Capability split: viewer-server (protocol + watcher + SSE) and viewer-ui (page + UX). No third viewer-watch capability. (Pinned in ADR 0002 §D1.)"
+  - "Last-write-wins between CLI and viewer writes; no flock, no optimistic concurrency in v1. (Affects add-card-move-reorder + add-card-inline-edit; pinned in ADR 0002 §D3.)"
+  - "AppendCardToColumn refactored into a delegate of InsertCardAt during V2 — when the second caller (MoveCard) appears. Behavior unchanged externally. (Affects add-card-move-reorder; pinned in ADR 0002 §D4.)"
+  - "Vendored Alpine.js and Sortable.js versions: pick latest stable at implementation time, record version in a leading file comment. (Affects add-viewer-ui-readonly + add-card-move-reorder.)"
+  - "Reuse existing CLI error types/codes (CARD_NOT_FOUND, COLUMN_NOT_FOUND, MISSING_TITLE, INVALID_PRIORITY, INVALID_TAG) for HTTP responses; new code added is INVALID_BODY (V2). (Affects all phases that emit HTTP errors.)"
+  - "V5 polish (toasts, smooth transitions, dark mode, error UI) is excluded from this batch on user instruction — visual design is still in flux."

@@ -19,8 +19,8 @@ checksums.txt
 coverage.out
 coverage.html
 
-# Go module / vendor
-vendor/
+# Go module / vendor (repo-root only — embedded UI vendor stays tracked)
+/vendor/
 
 # Env / local config
 .env

@@ -512,6 +512,75 @@ func TestServe_BindIsLoopbackOnly(t *testing.T) {
 	}
 }
 
+// TestStatic_Vendor_Alpine confirms the vendored Alpine bundle is
+// reachable through the existing FileServerFS-backed /static route
+// and that its body begins with the vendored comment line recorded
+// in tasks 1.1 / 1.2 of add-viewer-ui-readonly.
+func TestStatic_Vendor_Alpine(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/static/vendor/alpine.min.js")
+	if err != nil {
+		t.Fatalf("GET /static/vendor/alpine.min.js: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	body, _ := io.ReadAll(res.Body)
+	const prefix = "/* Alpine.js v3."
+	if !strings.HasPrefix(string(body), prefix) {
+		t.Fatalf("body prefix = %q, want %q…", string(body[:min(len(body), 40)]), prefix)
+	}
+}
+
+// TestIndex_References_VendoredAssets confirms the embedded page
+// links the three local assets the design pinned (stylesheet, vendored
+// Alpine, app script). Substring match keeps the test robust to
+// whitespace / attribute-order changes in the HTML.
+func TestIndex_References_VendoredAssets(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	for _, want := range []string{
+		"/static/style.css",
+		"/static/vendor/alpine.min.js",
+		"/static/app.js",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("index body missing %q", want)
+		}
+	}
+}
+
+// TestIndex_NoExternalScripts enforces ADR 0002 §D5: no runtime CDN
+// dependencies. The page must not carry an http(s)://... URL in any
+// src= attribute. Substring scan is enough — any external <script>
+// or <link rel=preload as=script> would surface.
+func TestIndex_NoExternalScripts(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	for _, bad := range []string{`src="http://`, `src="https://`, `src='http://`, `src='https://`} {
+		if strings.Contains(body, bad) {
+			t.Fatalf("index body contains forbidden external script reference %q", bad)
+		}
+	}
+}
+
 // firstExternalIPv4 returns the first up, non-loopback IPv4 address
 // on the host, or "" if none. Used to probe loopback-only bind.
 func firstExternalIPv4() string {

@@ -1,0 +1,125 @@
+/* Ezida viewer — minimal layout (v1). Color polish deferred. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #222;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  border-bottom: 1px solid #ddd;
+  padding: 0 12px;
+  background: #fafafa;
+}
+
+.project-name {
+  font-weight: 600;
+}
+
+.loading {
+  padding: 12px;
+  color: #999;
+  font-style: italic;
+}
+
+.columns {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  overflow-x: auto;
+  min-height: calc(100vh - 40px);
+}
+
+.column {
+  min-width: 260px;
+  max-width: 320px;
+  flex: 0 0 auto;
+  background: #f4f4f4;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 8px 4px;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 8px;
+}
+
+.column-name {
+  font-weight: 600;
+}
+
+.column-count {
+  font-size: 12px;
+  color: #666;
+  background: #e6e6e6;
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 6px;
+  cursor: default;
+}
+
+.card-title {
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.priority-low    { border-left: 3px solid #999; }
+.priority-medium { border-left: 3px solid #666; }
+.priority-high   { border-left: 3px solid #222; }
+
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  background: #eee;
+  border-radius: 999px;
+  margin-right: 4px;
+  color: #555;
+}
+
+.tags {
+  list-style: none;
+  margin: 4px 0 0 0;
+  padding: 0;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 6px;
+  background: #eee;
+  border-radius: 999px;
+  margin-right: 4px;
+  color: #555;
+}
+
+.empty {
+  color: #999;
+  font-style: italic;
+  padding: 6px;
+  list-style: none;
+}

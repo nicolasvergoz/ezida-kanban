@@ -1,1 +1,46 @@
-<h1>Ezida viewer</h1>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Ezida</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/app.js"></script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <span class="project-name">Ezida</span>
+  </header>
+  <main x-data="board()" x-init="load()">
+    <template x-if="!loaded"><div class="loading">Loading&hellip;</div></template>
+    <div class="columns" x-show="loaded">
+      <template x-for="col in columns" :key="col">
+        <section class="column">
+          <header class="column-header">
+            <span class="column-name" x-text="col"></span>
+            <span class="column-count" x-text="cardsByColumn(col).length"></span>
+          </header>
+          <ul class="cards">
+            <template x-for="card in cardsByColumn(col)" :key="card.id">
+              <li class="card" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at">
+                <div class="card-title" x-text="card.title"></div>
+                <template x-if="card.priority">
+                  <span class="badge" x-text="card.priority"></span>
+                </template>
+                <ul class="tags" x-show="card.tags && card.tags.length">
+                  <template x-for="tag in (card.tags || [])" :key="tag">
+                    <li class="tag" x-text="tag"></li>
+                  </template>
+                </ul>
+              </li>
+            </template>
+            <template x-if="cardsByColumn(col).length === 0">
+              <li class="empty">empty</li>
+            </template>
+          </ul>
+        </section>
+      </template>
+    </div>
+  </main>
+</body>
+</html>

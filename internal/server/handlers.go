@@ -3,12 +3,28 @@ package server
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"time"
 
 	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 )
+
+// InvalidBodyError is returned by handlers that decode a JSON
+// request body when the body is missing, not valid JSON, or fails
+// type-decoding into the expected struct. The HTTP layer surfaces it
+// as 400 INVALID_BODY (ADR 0002 §D7 — error-envelope conventions).
+type InvalidBodyError struct {
+	Reason string
+}
+
+func (e *InvalidBodyError) Error() string {
+	if e.Reason == "" {
+		return "invalid request body"
+	}
+	return fmt.Sprintf("invalid request body: %s", e.Reason)
+}
 
 // routes registers every HTTP route the v1 viewer surface exposes:
 //
@@ -22,8 +38,62 @@ func (s *serverState) routes(mux *http.ServeMux) {
 	staticFS, _ := fs.Sub(webFS, "web")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticFS)))
 	mux.HandleFunc("GET /api/board", s.handleBoard)
+	mux.HandleFunc("POST /api/cards/{id}/move", s.handleMove)
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("/", s.handleNotFound)
+}
+
+// movePayload is the JSON body shape accepted by POST
+// /api/cards/{id}/move. Snake_case per ADR 0002 §D7; Column matches
+// the board's [board].columns names verbatim.
+type movePayload struct {
+	Column   string `json:"column"`
+	Position int    `json:"position"`
+}
+
+// handleMove implements POST /api/cards/{id}/move per the
+// viewer-server delta spec: decode body, load board, call MoveCard,
+// persist via Save, encode {card: ...}. Error mapping is handled by
+// httpError (CARD_NOT_FOUND → 404; COLUMN_NOT_FOUND → 400;
+// INVALID_BODY → 400; load/save failures stay 500).
+func (s *serverState) handleMove(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var p movePayload
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		httpError(w, &InvalidBodyError{Reason: err.Error()})
+		return
+	}
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.MoveCard(b, id, p.Column, p.Position); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	// Locate the moved card so we can return its post-move state.
+	for _, c := range b.Cards {
+		if c.ID == id {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"card": cardToResponse(c),
+			})
+			return
+		}
+	}
+	// Defensive: if MoveCard succeeded but the card vanished from the
+	// slice afterwards, something is very wrong. Fall through to a 500.
+	httpError(w, fmt.Errorf("card %q missing after move", id))
 }
 
 // handleIndex serves the embedded index.html with an explicit
@@ -133,6 +203,26 @@ func (s *serverState) handleNotFound(w http.ResponseWriter, r *http.Request) {
 // problems even when the underlying cause is a missing or invalid
 // file (the user did not "request" a 4xx via the URL).
 func httpError(w http.ResponseWriter, err error) {
+	var ibe *InvalidBodyError
+	if errors.As(err, &ibe) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"INVALID_BODY", err.Error(), nil)
+		return
+	}
+	var cnf *board.CardNotFoundError
+	if errors.As(err, &cnf) {
+		writeErrorJSON(w, http.StatusNotFound,
+			"CARD_NOT_FOUND", err.Error(),
+			map[string]any{"id": cnf.ID})
+		return
+	}
+	var colnf *board.ColumnNotFoundError
+	if errors.As(err, &colnf) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"COLUMN_NOT_FOUND", err.Error(),
+			map[string]any{"column": colnf.Column})
+		return
+	}
 	var sv *board.SchemaVersionError
 	if errors.As(err, &sv) {
 		writeErrorJSON(w, http.StatusInternalServerError,

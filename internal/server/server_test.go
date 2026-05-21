@@ -16,7 +16,12 @@ import (
 	"time"
 
 	"github.com/nicolasvergoz/ezida-kanban/internal/output"
+	"github.com/pelletier/go-toml/v2"
 )
+
+// tomlUnmarshal is a one-line alias used by the test helpers so the
+// import of pelletier/go-toml/v2 is local to test code.
+func tomlUnmarshal(data []byte, v any) error { return toml.Unmarshal(data, v) }
 
 // stubRunner is the commandRunner test seam. It records every Open
 // call without actually exec-ing anything.
@@ -535,6 +540,46 @@ func TestStatic_Vendor_Alpine(t *testing.T) {
 	}
 }
 
+// TestStatic_Vendor_Sortable confirms the vendored Sortable.js
+// bundle is reachable through the existing FileServerFS-backed
+// /static route and that its body begins with the vendored comment
+// line recorded in task 4.1 of add-card-move-reorder.
+func TestStatic_Vendor_Sortable(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/static/vendor/sortable.min.js")
+	if err != nil {
+		t.Fatalf("GET /static/vendor/sortable.min.js: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	body, _ := io.ReadAll(res.Body)
+	const prefix = "/* Sortable.js v1."
+	if !strings.HasPrefix(string(body), prefix) {
+		t.Fatalf("body prefix = %q, want %q…", string(body[:min(len(body), 40)]), prefix)
+	}
+}
+
+// TestIndex_References_Sortable confirms the embedded page links the
+// vendored sortable script so the drag-drop UI loads without a CDN.
+func TestIndex_References_Sortable(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	if !strings.Contains(body, "/static/vendor/sortable.min.js") {
+		t.Fatalf("index body missing /static/vendor/sortable.min.js")
+	}
+}
+
 // TestIndex_References_VendoredAssets confirms the embedded page
 // links the three local assets the design pinned (stylesheet, vendored
 // Alpine, app script). Substring match keeps the test robust to
@@ -579,6 +624,232 @@ func TestIndex_NoExternalScripts(t *testing.T) {
 			t.Fatalf("index body contains forbidden external script reference %q", bad)
 		}
 	}
+}
+
+// writableBoard copies testdata/valid_kanban.toml into t.TempDir so a
+// test can exercise endpoints that mutate the file. Returns the path
+// to the temp copy.
+func writableBoard(t *testing.T) string {
+	t.Helper()
+	src := fixturePath(t, "valid_kanban.toml")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	dst := filepath.Join(t.TempDir(), "kanban.toml")
+	if err := os.WriteFile(dst, data, 0o644); err != nil {
+		t.Fatalf("write temp board: %v", err)
+	}
+	return dst
+}
+
+// postJSON is a tiny helper that POSTs the given body and decodes the
+// JSON response into out (which may be nil to skip decoding).
+func postJSON(t *testing.T, url string, body string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest("POST", url, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("POST %s: %v", url, err)
+	}
+	return res
+}
+
+// columnOf looks up the column of card id by re-reading the on-disk
+// board.toml via the same parser the server uses.
+func columnOf(t *testing.T, boardPath, id string) string {
+	t.Helper()
+	b, err := readBoardFile(boardPath)
+	if err != nil {
+		t.Fatalf("readBoardFile: %v", err)
+	}
+	for _, c := range b.Cards {
+		if c.ID == id {
+			return c.Column
+		}
+	}
+	return ""
+}
+
+// readBoardFile is a tiny TOML reader used in tests to inspect the
+// on-disk file after a mutating call. Kept inline (not importing the
+// board package's Load) so the test verifies bytes-on-disk rather
+// than the in-memory representation the server returned.
+func readBoardFile(path string) (*testBoardSnapshot, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var b testBoardSnapshot
+	if err := tomlUnmarshal(data, &b); err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+type testBoardSnapshot struct {
+	Cards []testCardSnapshot `toml:"cards"`
+}
+
+type testCardSnapshot struct {
+	ID     string `toml:"id"`
+	Column string `toml:"column"`
+}
+
+func TestHandle_Move_Success(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := postJSON(t, ts.URL+"/api/cards/aaaaaa/move",
+		`{"column":"done","position":0}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	if got := res.Header.Get("Content-Type"); got != "application/json" {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+	if got := columnOf(t, path, "aaaaaa"); got != "done" {
+		t.Fatalf("on-disk column for aaaaaa = %q, want done", got)
+	}
+}
+
+func TestHandle_Move_WithinColumn(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	// aaaaaa is the first card in todo; move it to the end (position 1).
+	res := postJSON(t, ts.URL+"/api/cards/aaaaaa/move",
+		`{"column":"todo","position":1}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	// Confirm aaaaaa is still in todo, but now after bbbbbb.
+	b, err := readBoardFile(path)
+	if err != nil {
+		t.Fatalf("readBoardFile: %v", err)
+	}
+	var todoOrder []string
+	for _, c := range b.Cards {
+		if c.Column == "todo" {
+			todoOrder = append(todoOrder, c.ID)
+		}
+	}
+	want := []string{"bbbbbb", "aaaaaa"}
+	if !reflectStringSliceEqual(todoOrder, want) {
+		t.Fatalf("todo order = %v, want %v", todoOrder, want)
+	}
+}
+
+func TestHandle_Move_UnknownCard(t *testing.T) {
+	path := writableBoard(t)
+	// Snapshot the bytes so we can confirm no write happened.
+	before, _ := os.ReadFile(path)
+
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := postJSON(t, ts.URL+"/api/cards/zzzzzz/move",
+		`{"column":"done","position":0}`)
+	defer res.Body.Close()
+	if res.StatusCode != 404 {
+		t.Fatalf("status = %d, want 404", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"CARD_NOT_FOUND"`) {
+		t.Fatalf("body missing CARD_NOT_FOUND: %s", body)
+	}
+	after, _ := os.ReadFile(path)
+	if string(after) != string(before) {
+		t.Fatalf("on-disk file changed despite 404 error")
+	}
+}
+
+func TestHandle_Move_UnknownColumn(t *testing.T) {
+	path := writableBoard(t)
+	before, _ := os.ReadFile(path)
+
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := postJSON(t, ts.URL+"/api/cards/aaaaaa/move",
+		`{"column":"ghost","position":0}`)
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"COLUMN_NOT_FOUND"`) {
+		t.Fatalf("body missing COLUMN_NOT_FOUND: %s", body)
+	}
+	after, _ := os.ReadFile(path)
+	if string(after) != string(before) {
+		t.Fatalf("on-disk file changed despite 400 error")
+	}
+}
+
+func TestHandle_Move_MalformedBody(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := postJSON(t, ts.URL+"/api/cards/aaaaaa/move",
+		`{not valid json`)
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"INVALID_BODY"`) {
+		t.Fatalf("body missing INVALID_BODY: %s", body)
+	}
+}
+
+func TestHandle_Move_ClampsPosition(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	// todo has aaaaaa, bbbbbb; positioning at 999 should clamp to end.
+	res := postJSON(t, ts.URL+"/api/cards/aaaaaa/move",
+		`{"column":"todo","position":999}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	b, err := readBoardFile(path)
+	if err != nil {
+		t.Fatalf("readBoardFile: %v", err)
+	}
+	var todoOrder []string
+	for _, c := range b.Cards {
+		if c.Column == "todo" {
+			todoOrder = append(todoOrder, c.ID)
+		}
+	}
+	want := []string{"bbbbbb", "aaaaaa"}
+	if !reflectStringSliceEqual(todoOrder, want) {
+		t.Fatalf("todo order = %v, want %v (position clamp)", todoOrder, want)
+	}
+}
+
+func reflectStringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // firstExternalIPv4 returns the first up, non-loopback IPv4 address

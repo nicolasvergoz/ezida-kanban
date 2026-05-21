@@ -6,6 +6,7 @@
   <link rel="stylesheet" href="/static/style.css">
   <script defer src="/static/app.js"></script>
   <script defer src="/static/vendor/alpine.min.js"></script>
+  <script defer src="/static/vendor/sortable.min.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -20,9 +21,9 @@
             <span class="column-name" x-text="col"></span>
             <span class="column-count" x-text="cardsByColumn(col).length"></span>
           </header>
-          <ul class="cards">
+          <ul class="cards" :data-column="col">
             <template x-for="card in cardsByColumn(col)" :key="card.id">
-              <li class="card" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at">
+              <li class="card" :data-card-id="card.id" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at">
                 <div class="card-title" x-text="card.title"></div>
                 <template x-if="card.priority">
                   <span class="badge" x-text="card.priority"></span>

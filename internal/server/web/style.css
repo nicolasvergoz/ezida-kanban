@@ -79,7 +79,17 @@ body {
   border-radius: 4px;
   padding: 8px;
   margin-bottom: 6px;
-  cursor: default;
+  cursor: grab;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+/* Sortable.js applies .sortable-ghost to the placeholder element
+   while a drag is in progress (see app.js ghostClass option). */
+.sortable-ghost {
+  opacity: 0.4;
 }
 
 .card-title {

@@ -1,12 +1,42 @@
 package board
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/pelletier/go-toml/v2"
 )
+
+// CardNotFoundError is returned by MoveCard when no card has the
+// requested id. The board package owns its own copy of this typed
+// error so the HTTP layer (and any future board-level helper) can
+// signal "no such card" without depending on internal/commands —
+// which would create an import cycle (commands imports board).
+//
+// The CLI surface continues to use commands.CardNotFoundError for
+// `ezida get` / `ezida rm`; the HTTP layer maps board's flavour to
+// the same wire code CARD_NOT_FOUND in handlers.go.
+type CardNotFoundError struct {
+	ID string
+}
+
+func (e *CardNotFoundError) Error() string {
+	return fmt.Sprintf("board: no card with id %q", e.ID)
+}
+
+// ColumnNotFoundError is returned by MoveCard when the requested
+// destination column is not declared in [board].columns. See the
+// rationale on CardNotFoundError for the duplication versus
+// internal/commands.
+type ColumnNotFoundError struct {
+	Column string
+}
+
+func (e *ColumnNotFoundError) Error() string {
+	return fmt.Sprintf("board: column %q is not declared in [board].columns", e.Column)
+}
 
 // SupportedSchemaVersion is the on-disk kanban.toml schema version this
 // package understands. Load refuses files at any other version with a
@@ -107,21 +137,101 @@ func Save(path string, b *Board) error {
 // card is appended to the end of b.Cards.
 //
 // This codifies the "append to bottom of column" behavior (ADR §D12) so every
-// write phase inherits a single implementation.
+// write phase inherits a single implementation. As of V2 (drag/reorder)
+// the helper delegates to InsertCardAt with position = number of cards
+// already in c.Column; the observable behavior is unchanged.
 func AppendCardToColumn(b *Board, c Card) {
-	lastIdx := -1
-	for i, existing := range b.Cards {
+	count := 0
+	for _, existing := range b.Cards {
 		if existing.Column == c.Column {
-			lastIdx = i
+			count++
 		}
 	}
-	if lastIdx == -1 {
-		b.Cards = append(b.Cards, c)
-		return
+	InsertCardAt(b, c, c.Column, count)
+}
+
+// InsertCardAt inserts c into b.Cards so that, after the call, the
+// card occupies the 0-indexed `position` among cards whose Column
+// equals `column`. Sets c.Column = column before inserting. position
+// is clamped to [0, N] where N is the count of cards in `column`
+// after the insert (excluding any existing card with the same ID —
+// relevant when called from MoveCard mid-relocation). The helper
+// never returns an error: clamping makes the call total over its
+// input (ADR 0002 §D11).
+func InsertCardAt(b *Board, c Card, column string, position int) {
+	c.Column = column
+
+	// Build the list of flat indices currently occupied by `column`,
+	// excluding any matching c.ID (caller may pass an existing card,
+	// e.g. from MoveCard).
+	var colIdx []int
+	for i, x := range b.Cards {
+		if x.Column == column && x.ID != c.ID {
+			colIdx = append(colIdx, i)
+		}
 	}
-	// Insert immediately after lastIdx.
-	insertAt := lastIdx + 1
+
+	// Clamp position to [0, len(colIdx)].
+	if position < 0 {
+		position = 0
+	}
+	if position > len(colIdx) {
+		position = len(colIdx)
+	}
+
+	// Compute insertion point in the flat slice.
+	var insertAt int
+	switch {
+	case len(colIdx) == 0:
+		// First card of an empty column → append to end of slice.
+		insertAt = len(b.Cards)
+	case position == len(colIdx):
+		// Past the last existing same-column card → insert immediately
+		// after it (preserves AppendCardToColumn semantics).
+		insertAt = colIdx[len(colIdx)-1] + 1
+	default:
+		insertAt = colIdx[position]
+	}
+
 	b.Cards = append(b.Cards, Card{}) // grow by one
 	copy(b.Cards[insertAt+1:], b.Cards[insertAt:len(b.Cards)-1])
 	b.Cards[insertAt] = c
+}
+
+// MoveCard relocates the card identified by id to (column, position).
+// It refreshes the moved card's UpdatedAt to the current UTC time at
+// second precision before reinserting. Returns *CardNotFoundError if
+// no card has the given id, or *ColumnNotFoundError if column is not
+// in b.Board.Columns. Position is clamped by the underlying
+// InsertCardAt (ADR 0002 §D11).
+func MoveCard(b *Board, id, column string, position int) error {
+	curIdx := -1
+	for i, c := range b.Cards {
+		if c.ID == id {
+			curIdx = i
+			break
+		}
+	}
+	if curIdx < 0 {
+		return &CardNotFoundError{ID: id}
+	}
+
+	// Validate the destination column against the board config.
+	found := false
+	for _, col := range b.Board.Columns {
+		if col == column {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return &ColumnNotFoundError{Column: column}
+	}
+
+	// Pull the card out, refresh its timestamp, and re-insert.
+	c := b.Cards[curIdx]
+	b.Cards = append(b.Cards[:curIdx], b.Cards[curIdx+1:]...)
+	c.UpdatedAt = time.Now().UTC().Truncate(time.Second)
+	InsertCardAt(b, c, column, position)
+	return nil
 }

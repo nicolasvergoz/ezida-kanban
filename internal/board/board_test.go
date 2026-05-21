@@ -378,6 +378,284 @@ func TestAppendCardToColumn_FirstInColumnAppendsToEnd(t *testing.T) {
 	}
 }
 
+// --- InsertCardAt tests ----------------------------------------------------
+
+func newCard(id, column string) Card {
+	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	return Card{
+		ID:        id,
+		Title:     "Card " + id,
+		Column:    column,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+}
+
+func cardIDs(cards []Card) []string {
+	got := make([]string, len(cards))
+	for i, c := range cards {
+		got[i] = c.ID
+	}
+	return got
+}
+
+func TestInsertCardAt_Middle(t *testing.T) {
+	b := &Board{
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+			newCard("bbbbbb", "todo"),
+			newCard("cccccc", "todo"),
+		},
+	}
+	InsertCardAt(b, newCard("dddddd", "todo"), "todo", 1)
+	want := []string{"aaaaaa", "dddddd", "bbbbbb", "cccccc"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestInsertCardAt_PositionZero(t *testing.T) {
+	b := &Board{
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+		},
+	}
+	InsertCardAt(b, newCard("bbbbbb", "todo"), "todo", 0)
+	want := []string{"bbbbbb", "aaaaaa"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestInsertCardAt_BeyondEnd(t *testing.T) {
+	b := &Board{
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+			newCard("bbbbbb", "todo"),
+		},
+	}
+	InsertCardAt(b, newCard("cccccc", "todo"), "todo", 99)
+	want := []string{"aaaaaa", "bbbbbb", "cccccc"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestInsertCardAt_Negative(t *testing.T) {
+	b := &Board{
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+		},
+	}
+	InsertCardAt(b, newCard("bbbbbb", "todo"), "todo", -5)
+	want := []string{"bbbbbb", "aaaaaa"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestInsertCardAt_EmptyColumn(t *testing.T) {
+	b := &Board{
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+		},
+	}
+	InsertCardAt(b, newCard("bbbbbb", "done"), "done", 0)
+	want := []string{"aaaaaa", "bbbbbb"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	// Confirm the inserted card landed in "done".
+	if b.Cards[1].Column != "done" {
+		t.Fatalf("inserted card column = %q, want %q", b.Cards[1].Column, "done")
+	}
+}
+
+func TestInsertCardAt_SetsColumn(t *testing.T) {
+	b := &Board{
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+		},
+	}
+	// Card claims "todo" but we insert into "done"; the helper MUST
+	// rewrite c.Column to the destination.
+	c := newCard("xxxxxx", "todo")
+	InsertCardAt(b, c, "done", 0)
+	// Locate inserted card in slice.
+	var found *Card
+	for i := range b.Cards {
+		if b.Cards[i].ID == "xxxxxx" {
+			found = &b.Cards[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("inserted card not found in slice")
+	}
+	if found.Column != "done" {
+		t.Fatalf("inserted card column = %q, want %q", found.Column, "done")
+	}
+}
+
+// --- MoveCard tests --------------------------------------------------------
+
+func boardWithThree() *Board {
+	return &Board{
+		Board: BoardConfig{
+			Columns:    []string{"todo", "done"},
+			Priorities: []string{"low"},
+		},
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+			newCard("bbbbbb", "done"),
+			newCard("cccccc", "todo"),
+		},
+	}
+}
+
+func TestMoveCard_CrossColumn(t *testing.T) {
+	b := boardWithThree()
+	// Make CreatedAt strictly earlier than the move's UpdatedAt.
+	old := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	for i := range b.Cards {
+		b.Cards[i].CreatedAt = old
+		b.Cards[i].UpdatedAt = old
+	}
+	if err := MoveCard(b, "cccccc", "done", 0); err != nil {
+		t.Fatalf("MoveCard returned err = %v", err)
+	}
+	want := []string{"aaaaaa", "cccccc", "bbbbbb"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	// The moved card must now belong to "done".
+	for _, c := range b.Cards {
+		if c.ID == "cccccc" {
+			if c.Column != "done" {
+				t.Fatalf("moved card column = %q, want done", c.Column)
+			}
+			if !c.UpdatedAt.After(c.CreatedAt) {
+				t.Fatalf("updated_at (%s) not strictly after created_at (%s)",
+					c.UpdatedAt, c.CreatedAt)
+			}
+		}
+	}
+}
+
+func TestMoveCard_WithinColumn(t *testing.T) {
+	b := &Board{
+		Board: BoardConfig{
+			Columns:    []string{"todo"},
+			Priorities: []string{"low"},
+		},
+		Cards: []Card{
+			newCard("aaaaaa", "todo"),
+			newCard("bbbbbb", "todo"),
+			newCard("cccccc", "todo"),
+		},
+	}
+	if err := MoveCard(b, "aaaaaa", "todo", 2); err != nil {
+		t.Fatalf("MoveCard returned err = %v", err)
+	}
+	want := []string{"bbbbbb", "cccccc", "aaaaaa"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestMoveCard_UnknownCard(t *testing.T) {
+	b := boardWithThree()
+	before := cardIDs(b.Cards)
+	err := MoveCard(b, "zzzzzz", "todo", 0)
+	if err == nil {
+		t.Fatalf("MoveCard returned nil err, want *CardNotFoundError")
+	}
+	var cnf *CardNotFoundError
+	if !errors.As(err, &cnf) {
+		t.Fatalf("got %T, want *CardNotFoundError", err)
+	}
+	if cnf.ID != "zzzzzz" {
+		t.Fatalf("CardNotFoundError.ID = %q, want %q", cnf.ID, "zzzzzz")
+	}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, before) {
+		t.Fatalf("cards mutated on error: got %v, want %v", got, before)
+	}
+}
+
+func TestMoveCard_UnknownColumn(t *testing.T) {
+	b := boardWithThree()
+	before := cardIDs(b.Cards)
+	err := MoveCard(b, "aaaaaa", "ghost", 0)
+	if err == nil {
+		t.Fatalf("MoveCard returned nil err, want *ColumnNotFoundError")
+	}
+	var cnf *ColumnNotFoundError
+	if !errors.As(err, &cnf) {
+		t.Fatalf("got %T, want *ColumnNotFoundError", err)
+	}
+	if cnf.Column != "ghost" {
+		t.Fatalf("ColumnNotFoundError.Column = %q, want %q", cnf.Column, "ghost")
+	}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, before) {
+		t.Fatalf("cards mutated on error: got %v, want %v", got, before)
+	}
+}
+
+func TestMoveCard_NoopRefreshesTimestamp(t *testing.T) {
+	old := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	b := &Board{
+		Board: BoardConfig{
+			Columns:    []string{"todo"},
+			Priorities: []string{"low"},
+		},
+		Cards: []Card{
+			{ID: "aaaaaa", Title: "A", Column: "todo", CreatedAt: old, UpdatedAt: old},
+			{ID: "bbbbbb", Title: "B", Column: "todo", CreatedAt: old, UpdatedAt: old},
+			{ID: "cccccc", Title: "C", Column: "todo", CreatedAt: old, UpdatedAt: old},
+		},
+	}
+	// Move bbbbbb to its current slot (position 1).
+	if err := MoveCard(b, "bbbbbb", "todo", 1); err != nil {
+		t.Fatalf("MoveCard returned err = %v", err)
+	}
+	want := []string{"aaaaaa", "bbbbbb", "cccccc"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for _, c := range b.Cards {
+		if c.ID == "bbbbbb" {
+			if !c.UpdatedAt.After(old) {
+				t.Fatalf("UpdatedAt was not refreshed: got %s, want > %s", c.UpdatedAt, old)
+			}
+		}
+	}
+}
+
+// TestAppendCardToColumn_StillMatchesPriorBehavior pins the V2
+// refactor that re-routed AppendCardToColumn through InsertCardAt: a
+// fresh sequence of appends MUST produce the same final slice the
+// V1 implementation produced for the same inputs.
+func TestAppendCardToColumn_StillMatchesPriorBehavior(t *testing.T) {
+	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	mk := func(id, col string) Card {
+		return Card{ID: id, Title: id, Column: col, CreatedAt: now, UpdatedAt: now}
+	}
+	b := &Board{}
+	// Sequence chosen to exercise both "first card in column"
+	// (empty-column → append to end) and "next card in column" (insert
+	// after the last same-column card) branches in mixed order.
+	AppendCardToColumn(b, mk("aaaaaa", "todo")) // empty → end
+	AppendCardToColumn(b, mk("bbbbbb", "done")) // empty done → end
+	AppendCardToColumn(b, mk("cccccc", "todo")) // after aaaaaa
+	AppendCardToColumn(b, mk("dddddd", "todo")) // after cccccc
+	AppendCardToColumn(b, mk("eeeeee", "done")) // after bbbbbb
+
+	want := []string{"aaaaaa", "cccccc", "dddddd", "bbbbbb", "eeeeee"}
+	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func TestValidate_MultipleViolations(t *testing.T) {
 	// Construct a board in-memory that breaks rule 6 (empty title) and
 	// rule 7 (unknown column) on the same card.

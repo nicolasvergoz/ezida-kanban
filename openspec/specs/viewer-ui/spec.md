@@ -177,13 +177,12 @@ cards container. Columns MUST NOT grow or shrink horizontally.
 
 Each `.card` element SHALL render with `--surface` fill, 1px
 `--border` outline, `--rounded-lg` (10px) corners, `10px 12px`
-padding, and the `--shadow-card-idle` drop shadow (a single soft
-2px-blur `rgba(0,0,0,0.05)` drop). On `:hover`, the card MUST apply
-`--shadow-card-hover` (a three-layer stack: `0 1px 0` rim + `0 1px
-3px` close + `0 4px 12px -2px` distant) and `translateY(-1px)`. The
-hover treatment MUST NOT change the card's outline color away from
-the resting border token unless the card is in an active drag
-state.
+padding, and the `--shadow-card-idle` drop shadow (a subtle 1–2 px
+blur `rgba(0,0,0,~0.03–0.05)` single drop). On `:hover`, the card
+MUST apply `--shadow-card-hover` (a stacked drop — at least one
+close and one distant layer at low opacity to suggest lift) and
+`translateY(-1px)`. The hover treatment MUST NOT change the card's
+outline color away from the resting border token in any state.
 
 #### Scenario: Card idle shadow is shallow
 
@@ -722,13 +721,19 @@ states. The dot MUST be a circle (`--rounded-full`) of fixed size
 
 ### Requirement: Open edit modal closes on external change
 
-If the edit modal (from V3) is open at the moment an external change event arrives, the page SHALL close the modal without prompting and discard any unsaved draft. The page MUST NOT show a confirmation dialog before discarding.
+If the edit modal is open at the moment an external change event arrives, the page SHALL close the modal without prompting and discard any unsaved draft. The page MUST NOT show a confirmation dialog before discarding. The page MAY suppress this close behavior for board-changed events triggered by the viewer's own writes (writes the client itself just issued via PATCH/POST/DELETE) so per-field commits in the redesigned modal do not interrupt the user mid-edit.
 
 #### Scenario: Modal open when external change fires
 
-- **WHEN** the user has the modal open with unsaved edits and an external change event is received
+- **WHEN** the user has the modal open with unsaved edits and an external CLI write arrives (no in-flight client write within the prior ~1500 ms)
 - **THEN** the modal MUST close
 - **AND** the rendered card MUST display the values from the refetched board (not the discarded draft)
+
+#### Scenario: Modal stays open when own write fires board-changed
+
+- **WHEN** the user has the modal open and just issued a PATCH against the open card (per-field commit), and the resulting board-changed SSE event arrives within ~1500 ms of that PATCH
+- **THEN** the modal MUST remain open
+- **AND** the modal's rendered fields MUST reflect the post-write board state
 
 #### Scenario: No prompt before discard
 

@@ -77,7 +77,7 @@
                   :class="renamingColumn === col ? 'is-renaming' : ''">
             <span class="column-name t-list-title"
                   x-show="renamingColumn !== col"
-                  @click="startRename(col)"
+                  @click="startRename(col); const _inp = $event.target.parentElement.querySelector('.column-name--input'); $nextTick(() => { _inp.focus(); _inp.select(); })"
                   x-text="col"></span>
             <input class="column-name column-name--input t-list-title"
                    type="text"
@@ -85,8 +85,7 @@
                    x-model="renameDraft"
                    @keydown.enter.prevent="commitRename()"
                    @keydown.escape.prevent="cancelRename()"
-                   @blur="commitRename()"
-                   x-init="$watch('renamingColumn', v => { if (v === col) { $nextTick(() => { $el.focus(); $el.select(); }); } })">
+                   @blur="commitRename()">
             <span class="rename-error" x-show="renameError && renamingColumn === col" x-text="renameError"></span>
             <span class="column-count t-mono-counter" x-text="cardsByColumn(col).length"></span>
             <button type="button"
@@ -138,6 +137,7 @@
                            if (!title) { this.cancelComposer(); return; }
                            this.submitting = true; this.error = '';
                            try {
+                             $root._lastSelfWriteAt = Date.now();
                              const res = await fetch('/api/cards', {
                                method: 'POST',
                                headers: {'Content-Type': 'application/json'},
@@ -158,13 +158,12 @@
             <button x-show="!composing"
                     type="button"
                     class="button-ghost composer-open"
-                    @click="openComposer()">+ Add a card</button>
+                    @click="openComposer(); $nextTick(() => $refs.composerInput.focus())">+ Add a card</button>
             <form x-show="composing"
                   class="composer"
                   @submit.prevent="submitComposer()">
               <textarea x-model="draft"
                         x-ref="composerInput"
-                        x-init="$watch('composing', v => v && $nextTick(() => $refs.composerInput.focus()))"
                         rows="2"
                         placeholder="Enter a title&hellip;"
                         @keydown.enter.prevent="submitComposer()"
@@ -174,10 +173,12 @@
               <div class="composer-actions">
                 <button type="submit"
                         class="button-primary"
+                        @mousedown.prevent
                         :disabled="submitting"
                         x-text="submitting ? 'Adding…' : 'Add'"></button>
                 <button type="button"
                         class="button-ghost"
+                        @mousedown.prevent
                         @click="cancelComposer()">Cancel</button>
               </div>
               <p class="composer-error" x-show="error" x-text="error"></p>
@@ -188,19 +189,19 @@
       <button type="button"
               class="add-list-placeholder"
               x-show="!composingList"
-              @click="openListComposer()">+ Add list</button>
+              @click="openListComposer(); $nextTick(() => $refs.listInput.focus())">+ Add list</button>
       <div class="list-composer"
            x-show="composingList"
            x-cloak>
         <input type="text"
+               x-ref="listInput"
                x-model="listDraft"
                placeholder="List name"
                @keydown.enter.prevent="submitNewList()"
-               @keydown.escape.prevent="cancelNewList()"
-               x-init="$watch('composingList', v => { if (v) { $nextTick(() => $el.focus()); } })">
+               @keydown.escape.prevent="cancelNewList()">
         <div class="composer-actions">
-          <button type="button" class="button-primary" @click="submitNewList()">Add</button>
-          <button type="button" class="button-ghost" @click="cancelNewList()">Cancel</button>
+          <button type="button" class="button-primary" @mousedown.prevent @click="submitNewList()">Add</button>
+          <button type="button" class="button-ghost" @mousedown.prevent @click="cancelNewList()">Cancel</button>
         </div>
         <p class="composer-error" x-show="listError" x-text="listError"></p>
       </div>

@@ -63,12 +63,11 @@
     /* Elevation. Card idle = single soft 2px-blur drop, almost
        imperceptible. Card hover = three-layer stack. Popover = floating
        composer / modal treatment. */
-    --shadow-card-rim: 0 1px 0 rgba(0, 0, 0, 0.04);
-    --shadow-card-idle: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-card-rim: 0 1px 0 rgba(0, 0, 0, 0.03);
+    --shadow-card-idle: 0 1px 1px rgba(0, 0, 0, 0.03);
     --shadow-card-hover:
-      0 1px 0 rgba(0, 0, 0, 0.04),
-      0 1px 3px rgba(0, 0, 0, 0.08),
-      0 4px 12px -2px rgba(0, 0, 0, 0.10);
+      0 1px 2px rgba(0, 0, 0, 0.05),
+      0 2px 6px -1px rgba(0, 0, 0, 0.06);
     --shadow-popover:
       0 12px 32px -8px rgba(0, 0, 0, 0.22),
       0 2px 8px rgba(0, 0, 0, 0.08);
@@ -513,6 +512,7 @@
   .column {
     width: var(--space-list-width);
     flex: 0 0 var(--space-list-width);
+    align-self: flex-start;
     background: color-mix(in oklab, var(--surface) 75%, transparent);
     backdrop-filter: blur(14px) saturate(140%);
     -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -521,21 +521,19 @@
     padding: var(--space-sm);
     display: flex;
     flex-direction: column;
-    max-height: 100%;
   }
 
   .column-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    gap: var(--space-xs);
     padding: var(--space-sm) var(--space-sm) var(--space-md);
     margin-bottom: var(--space-xs);
     color: var(--text);
   }
 
   .column-name {
-    /* Composed via .t-list-title — keep selector-level rule minimal. */
-    color: var(--text);
+    margin-right: auto;
   }
 
   .column-count {
@@ -571,7 +569,6 @@
   .card:hover {
     transform: translateY(-1px);
     box-shadow: var(--shadow-card-hover);
-    border-color: var(--border-strong);
   }
   .card:active {
     cursor: grabbing;
@@ -581,6 +578,15 @@
      while a drag is in progress (see app.js ghostClass option). */
   .sortable-ghost {
     opacity: 0.35;
+  }
+
+  /* When Sortable inserts the ghost into a previously empty column,
+     hide the "empty" placeholder so the drop affordance is the only
+     thing visible. Uses :has() — falls back to no-op on browsers
+     without support (the placeholder simply stays, which is the
+     current behavior, not a regression). */
+  .cards:has(.sortable-ghost) .empty {
+    display: none;
   }
 
   .card-title {
@@ -618,17 +624,7 @@
     line-height: 1;
   }
 
-  /* --- Priorities (token-driven; no hex literals here) ------------------ */
-
-  .priority-low {
-    border-left: 3px solid var(--text-faint);
-  }
-  .priority-medium {
-    border-left: 3px solid var(--text-muted);
-  }
-  .priority-high {
-    border-left: 3px solid var(--text);
-  }
+  /* --- Priorities (badge-only; visual distinction comes from .badge) ---- */
 
   .badge {
     display: inline-block;
@@ -644,6 +640,18 @@
     border-radius: var(--rounded-md);
     margin-top: 6px;
     color: var(--text-muted);
+  }
+  .priority-low .badge {
+    color: var(--text-faint);
+  }
+  .priority-medium .badge {
+    color: var(--text-muted);
+    border-color: var(--border-strong);
+  }
+  .priority-high .badge {
+    background: var(--text);
+    color: var(--surface);
+    border-color: var(--text);
   }
 
   /* --- Empty-column placeholder ----------------------------------------- */

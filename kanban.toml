@@ -6,9 +6,28 @@ priorities = ['low', 'medium', 'high']
 
 [[cards]]
 id = 'ietxfe'
-title = 'Build viewer'
-column = 'backlog'
-description = 'Read-only TUI/web viewer for the kanban board'
+title = 'Make a viewer'
+column = 'ongoing'
+description = 'Web viewer for the kanban board'
 created_at = 2026-05-20T21:34:57Z
-updated_at = 2026-05-20T21:34:57Z
+updated_at = 2026-05-21T20:49:46Z
+tags = []
+priority = 'high'
+
+[[cards]]
+id = '7ie3qb'
+title = 'Make Github page for SEO'
+column = 'backlog'
+description = ''
+created_at = 2026-05-21T20:50:47Z
+updated_at = 2026-05-21T20:50:47Z
+tags = []
+
+[[cards]]
+id = 'flgccn'
+title = 'SKILL can serve and open link in default browser'
+column = 'todo'
+description = ''
+created_at = 2026-05-21T20:59:10Z
+updated_at = 2026-05-21T20:59:27Z
 tags = []

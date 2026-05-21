@@ -366,7 +366,7 @@ The server SHALL start a `fsnotify`-based watcher on the resolved board file at 
 
 ### Requirement: `GET /api/events` exposes a Server-Sent Events stream
 
-`GET /api/events` SHALL return `Content-Type: text/event-stream` and keep the connection open. On connect, the server MUST send a `retry: 2000` directive so browsers reconnect at 2 s on disconnect. The server MUST emit `: ping` heartbeat comments every 30 s. When the watcher fires, the server MUST emit `event: board-changed\ndata: \n\n` to every connected client.
+`GET /api/events` SHALL return `Content-Type: text/event-stream` and keep the connection open. On connect, the server MUST send a `retry: 2000` directive so browsers reconnect at 2 s on disconnect. The server MAY pad the initial frame with a comment line and/or send a dummy named event so Safari dispatches subsequent events without buffering. The server MUST emit `: ping` heartbeat comments every 30 s. When the watcher fires, the server MUST emit an `event: board-changed` frame (with a non-empty `data:` line — content is irrelevant since clients refetch `/api/board` on receipt) to every connected client.
 
 #### Scenario: Client receives connect headers and retry directive
 

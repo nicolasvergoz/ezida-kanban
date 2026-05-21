@@ -717,11 +717,23 @@ func (s *serverState) handleEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Cache-Control", "no-cache, no-transform")
 	w.Header().Set("Connection", "keep-alive")
+	// X-Accel-Buffering disables proxy buffering (nginx, etc.).
+	// Safari quirk: even on localhost, Safari sometimes waits for
+	// ~1 KB or a flush before dispatching the first EventSource
+	// event. The initial comment line below + this header keeps the
+	// stream interactive.
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	// Initial directive: 2 s reconnect delay (ADR 0002 §D9).
-	_, _ = fmt.Fprintf(w, "retry: 2000\n\n")
+	// Padding comment + dummy `hello` event force Safari to dispatch
+	// the open event immediately AND warm the EventSource parser so
+	// the first real `board-changed` event isn't dropped. Safari
+	// requires named events to carry a non-empty `data:` line and
+	// often drops the very first named event before any other event
+	// has been delivered.
+	_, _ = fmt.Fprintf(w, "retry: 2000\n: padding %s\nevent: hello\ndata: 1\n\n", strings.Repeat(" ", 2048))
 	flusher.Flush()
 
 	if s.broker == nil {
@@ -747,7 +759,7 @@ func (s *serverState) handleEvents(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				return
 			}
-			_, _ = fmt.Fprintf(w, "event: board-changed\ndata: \n\n")
+			_, _ = fmt.Fprintf(w, "event: board-changed\ndata: 1\n\n")
 			flusher.Flush()
 		case <-heartbeat.C:
 			_, _ = fmt.Fprintf(w, ": ping\n\n")

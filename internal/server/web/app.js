@@ -52,6 +52,13 @@ function board() {
     // reconnect after server restart re-uses the same handle).
     connected: false,
     eventSource: null,
+    // Own-write suppression: any write we issue (PATCH/POST/DELETE)
+    // also triggers the fsnotify watcher and a board-changed SSE
+    // event. We don't want our own writes to close the open modal or
+    // tear down an in-flight rename — they would interrupt the user
+    // mid-edit. _lastSelfWriteAt is bumped right before every write;
+    // handleExternalChange treats events within ~1500ms as own.
+    _lastSelfWriteAt: 0,
     // UI-3 filter state. `filter` is the current substring query
     // (trimmed/lowercased per-match). `filterOpen` toggles the
     // popover. Both are transient — never written to localStorage
@@ -199,7 +206,8 @@ function board() {
     // open modal — if any — closes without prompting (spec D9, V4);
     // then we refetch the board so the rendered DOM reflects disk.
     handleExternalChange() {
-      if (this.open) this.closeModal();
+      const isOwn = (Date.now() - this._lastSelfWriteAt) < 1500;
+      if (this.open && !isOwn) this.closeModal();
       this.load();
     },
     cardsByColumn(name) {
@@ -315,6 +323,7 @@ function board() {
         return;
       }
       try {
+        this._lastSelfWriteAt = Date.now();
         const res = await fetch('/api/columns/' + encodeURIComponent(from), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -354,6 +363,7 @@ function board() {
     async deleteList(col) {
       this.menuError = '';
       try {
+        this._lastSelfWriteAt = Date.now();
         const res = await fetch('/api/columns/' + encodeURIComponent(col), {
           method: 'DELETE',
         });
@@ -388,6 +398,7 @@ function board() {
       }
       this.listError = '';
       try {
+        this._lastSelfWriteAt = Date.now();
         const res = await fetch('/api/columns', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -419,6 +430,11 @@ function board() {
         group: 'lists',
         handle: '.list-header',
         filter: '.is-renaming, .list-menu-btn, .list-menu, .column-name--input, .add-list-placeholder, .list-composer',
+        // Without preventOnFilter: false, Sortable calls
+        // preventDefault on mousedown for filter-matched elements,
+        // which kills native focus on the rename <input> — the field
+        // appears open but is not editable.
+        preventOnFilter: false,
         animation: 0,
         ghostClass: 'sortable-ghost-list',
         draggable: '.column',
@@ -436,6 +452,7 @@ function board() {
         return;
       }
       try {
+        this._lastSelfWriteAt = Date.now();
         const res = await fetch('/api/columns/move', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -491,6 +508,7 @@ function board() {
       if (evt) evt.stopPropagation();
       if (this._dragJustEnded) return;
       try {
+        this._lastSelfWriteAt = Date.now();
         const res = await fetch('/api/cards/' + encodeURIComponent(id), {
           method: 'DELETE',
         });
@@ -560,6 +578,10 @@ function board() {
       this.$nextTick(function () {
         const ref = refMap[name];
         if (ref && self.$refs && self.$refs[ref]) {
+          // $nextTick is a microtask, which Safari treats as a
+          // continuation of the originating user gesture (the field
+          // click). setTimeout(0) would be a macrotask and break the
+          // gesture chain — Safari then refuses programmatic focus.
           self.$refs[ref].focus();
         }
       });
@@ -595,6 +617,7 @@ function board() {
       try {
         const body = {};
         body[name] = value;
+        this._lastSelfWriteAt = Date.now();
         const res = await fetch('/api/cards/' + encodeURIComponent(id), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -675,6 +698,7 @@ function board() {
         return;
       }
       try {
+        this._lastSelfWriteAt = Date.now();
         const res = await fetch('/api/cards/' + encodeURIComponent(id) + '/move', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

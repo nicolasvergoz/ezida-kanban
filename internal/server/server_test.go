@@ -363,7 +363,7 @@ func TestHandle_Board_Valid(t *testing.T) {
 		Columns        []string       `json:"columns"`
 		Priorities     []string       `json:"priorities"`
 		CardsPerColumn map[string]int `json:"cards_per_column"`
-		Cards []struct {
+		Cards          []struct {
 			ID          string `json:"id"`
 			Title       string `json:"title"`
 			Column      string `json:"column"`

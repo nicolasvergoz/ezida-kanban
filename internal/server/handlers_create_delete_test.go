@@ -49,11 +49,11 @@ func TestHandle_Create_Success_TitleOnly(t *testing.T) {
 
 	var body struct {
 		Card struct {
-			ID         string    `json:"id"`
-			Title      string    `json:"title"`
-			Column     string    `json:"column"`
-			CreatedAt  time.Time `json:"created_at"`
-			UpdatedAt  time.Time `json:"updated_at"`
+			ID        string    `json:"id"`
+			Title     string    `json:"title"`
+			Column    string    `json:"column"`
+			CreatedAt time.Time `json:"created_at"`
+			UpdatedAt time.Time `json:"updated_at"`
 		} `json:"card"`
 	}
 	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {

@@ -300,6 +300,130 @@
     gap: var(--space-xl);
   }
 
+  /* --- Filter button + popover (UI-3) ---------------------------------- */
+
+  /* Anchor wrapper so the popover can be position:absolute relative to
+     the Filter button cluster (top:100% drops it below the topbar). */
+  .filter-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .topbar-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    height: 28px;
+    padding: 0 var(--space-lg);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--rounded-full);
+    cursor: pointer;
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+  }
+  .topbar-btn:hover {
+    color: var(--text);
+    border-color: var(--border-strong);
+  }
+
+  /* Active state — surface fill while the filter is non-empty, matching
+     refs/design.md §"TopBar" active affordance. */
+  .filter-btn.state-active {
+    background: var(--surface);
+    color: var(--text);
+    border-color: var(--border-strong);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Inline mono-counter pill sitting to the right of the Filter label. */
+  .filter-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 6px;
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-full);
+    margin-left: var(--space-xs);
+  }
+
+  .filter-popover {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: var(--space-md);
+    width: 280px;
+    padding: var(--space-2xl);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-xl);
+    box-shadow: var(--shadow-popover);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .filter-popover label.t-mono-label {
+    color: var(--text-muted);
+  }
+
+  .filter-popover input[type="text"] {
+    display: block;
+    width: 100%;
+    padding: var(--space-md) var(--space-lg);
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-md);
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 120ms ease;
+  }
+  .filter-popover input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  .clear-link {
+    align-self: flex-start;
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .clear-link:hover,
+  .clear-link:focus {
+    color: var(--text);
+    text-decoration: underline;
+  }
+
+  /* In-column placeholder when filter hides all cards in this column. */
+  .no-matches {
+    list-style: none;
+    text-align: center;
+    padding: var(--space-3xl) var(--space-sm);
+    color: var(--text-faint);
+    font-style: italic;
+    background: transparent;
+    border: 0;
+  }
+
   /* --- Theme toggle (3-segment segmented control) ---------------------- */
 
   .theme-toggle {

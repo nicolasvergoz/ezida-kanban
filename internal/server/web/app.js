@@ -39,6 +39,12 @@ function board() {
     // reconnect after server restart re-uses the same handle).
     connected: false,
     eventSource: null,
+    // UI-3 filter state. `filter` is the current substring query
+    // (trimmed/lowercased per-match). `filterOpen` toggles the
+    // popover. Both are transient — never written to localStorage
+    // (ADR 0003 §D8). A page reload clears both.
+    filter: '',
+    filterOpen: false,
     // UI-2 theme controller state. `theme` is the user's *choice*
     // ('light' | 'system' | 'dark') and drives the toggle's
     // aria-pressed state. `_mediaQuery` is the cached MediaQueryList
@@ -47,6 +53,17 @@ function board() {
     // flips while the user is in system mode (ADR 0003 §D7).
     theme: 'system',
     _mediaQuery: null,
+    // init wires component-level $watch handlers that need the Alpine
+    // proxy in scope (and so cannot be declared as inline expressions
+    // on x-init). The filter watch retriggers mountSortable() after
+    // the DOM has reflowed (ADR 0003 §D9 — Sortable must re-bind to
+    // the visible <ul> children when the filter changes).
+    init() {
+      const self = this;
+      this.$watch('filter', function () {
+        self.$nextTick(function () { self.mountSortable(); });
+      });
+    },
     // initTheme reads localStorage["ezida.theme"], validates against
     // the whitelist, wires the matchMedia listener, and paints the
     // initial effective theme. Guarded so localStorage exceptions
@@ -153,6 +170,44 @@ function board() {
     },
     cardsByColumn(name) {
       return this.cards.filter(function (c) { return c.column === name; });
+    },
+    // filterMatches returns true when the current filter is empty
+    // (after trim+lowercase), otherwise tests a single lowercased
+    // haystack built from card.title + description + tags. indexOf
+    // is used over .includes for parity with the rest of app.js
+    // (ADR 0003 §D2: no ES2015+ features beyond what Alpine needs).
+    filterMatches(card) {
+      const q = (this.filter || '').trim().toLowerCase();
+      if (!q) return true;
+      const hay = (
+        (card.title || '') + ' ' +
+        (card.description || '') + ' ' +
+        ((card.tags || []).join(' '))
+      ).toLowerCase();
+      return hay.indexOf(q) !== -1;
+    },
+    // filteredCardsByColumn returns cardsByColumn(name) verbatim when
+    // the filter is empty/whitespace; otherwise the same list reduced
+    // to cards matching filterMatches. Column templates iterate this
+    // accessor; cardsByColumn(name) stays the source of truth for the
+    // list-count badge (ADR 0003 §D8 / design.md §"List").
+    filteredCardsByColumn(name) {
+      const all = this.cardsByColumn(name);
+      if (!(this.filter || '').trim()) return all;
+      const self = this;
+      return all.filter(function (c) { return self.filterMatches(c); });
+    },
+    // openFilter flips filterOpen true and focuses the input on the
+    // next Alpine tick so x-show has rendered the popover by the time
+    // focus() runs.
+    openFilter() {
+      this.filterOpen = true;
+      const self = this;
+      this.$nextTick(function () {
+        if (self.$refs && self.$refs.filterInput) {
+          self.$refs.filterInput.focus();
+        }
+      });
     },
     // setupDragScroll wires pointerdown/pointermove/pointerup listeners
     // on the .board element so a user can drag the empty board surface

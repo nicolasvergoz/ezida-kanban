@@ -1285,6 +1285,47 @@ func TestIndex_ContainsThemeToggleButtons(t *testing.T) {
 	}
 }
 
+// TestIndex_ContainsFilterButton confirms the rendered topbar includes
+// the UI-3 Filter button — both the `filter-btn` class selector and the
+// literal `Filter` label must appear in the embedded markup.
+func TestIndex_ContainsFilterButton(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	for _, want := range []string{
+		"filter-btn",
+		"Filter",
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("index body missing %q", want)
+		}
+	}
+}
+
+// TestIndex_ContainsFilterPopover confirms the rendered topbar includes
+// the UI-3 filter popover container (gated by x-show but always
+// embedded in the static HTML).
+func TestIndex_ContainsFilterPopover(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	if !strings.Contains(body, "filter-popover") {
+		t.Fatalf("index body missing filter-popover")
+	}
+}
+
 // firstExternalIPv4 returns the first up, non-loopback IPv4 address
 // on the host, or "" if none. Used to probe loopback-only bind.
 func firstExternalIPv4() string {

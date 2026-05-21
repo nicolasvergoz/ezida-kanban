@@ -9,10 +9,39 @@
   <script defer src="/static/vendor/sortable.min.js"></script>
 </head>
 <body>
-  <main x-data="board()" x-init="initTheme(); load()">
+  <main x-data="board()" x-init="init(); initTheme(); load()">
   <header class="topbar">
     <span class="brand t-brand" x-text="project_name">Ezida</span>
     <div class="topbar-right">
+      <div class="filter-wrap">
+        <button type="button"
+                class="topbar-btn filter-btn"
+                :class="{ 'state-active': filter !== '' }"
+                @click="filterOpen ? (filterOpen = false) : openFilter()"
+                aria-label="Filter cards">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <span>Filter</span>
+          <span class="t-mono-counter filter-badge"
+                x-show="filter.trim() !== ''"
+                x-text="cards.filter(c => filterMatches(c)).length"></span>
+        </button>
+        <div class="filter-popover"
+             x-show="filterOpen"
+             x-cloak
+             @click.outside="filterOpen = false"
+             @keydown.escape.window="filterOpen = false">
+          <label class="t-mono-label" for="filter-input">FILTER CARDS</label>
+          <input id="filter-input"
+                 type="text"
+                 x-ref="filterInput"
+                 x-model="filter"
+                 placeholder="Type to filter...">
+          <a class="clear-link"
+             href="#"
+             x-show="filter !== ''"
+             @click.prevent="filter = ''">Clear filter</a>
+        </div>
+      </div>
       <div class="theme-toggle" role="group" aria-label="Theme">
         <button type="button"
                 data-theme-choice="light"
@@ -49,7 +78,7 @@
             <span class="column-count t-mono-counter" x-text="cardsByColumn(col).length"></span>
           </header>
           <ul class="cards" :data-column="col">
-            <template x-for="card in cardsByColumn(col)" :key="card.id">
+            <template x-for="card in filteredCardsByColumn(col)" :key="card.id">
               <li class="card" :data-card-id="card.id" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at" @click="openCard(card)">
                 <div class="card-title t-card-text" x-text="card.title"></div>
                 <template x-if="card.priority">
@@ -64,6 +93,9 @@
             </template>
             <template x-if="cardsByColumn(col).length === 0">
               <li class="empty t-body-md">empty</li>
+            </template>
+            <template x-if="filter !== '' && cardsByColumn(col).length > 0 && filteredCardsByColumn(col).length === 0">
+              <li class="no-matches t-body-md">No matches</li>
             </template>
           </ul>
         </section>

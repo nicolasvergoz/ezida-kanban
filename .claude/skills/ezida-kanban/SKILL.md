@@ -66,6 +66,23 @@ ezida move <id> <column>
 ezida rm <id>
 ```
 
+### Viewer (browser UI)
+```bash
+ezida serve                          # bind 127.0.0.1:7777, open default browser
+ezida serve --no-open                # bind without opening the browser
+ezida serve --port=9000              # custom starting port (auto-fallback +10)
+```
+
+The viewer is a single-page web UI for the same `kanban.toml`. It supports drag-to-move cards, click-to-edit fields in a detail modal, inline column-foot composer (`+ Add a card`), hover-to-delete `×` on cards, an inline column rename / add / delete / drag-reorder, a topbar substring filter, and a 3-state light / system / dark theme toggle. Edits to `kanban.toml` from any source (CLI in another terminal, manual file edit) propagate to the open viewer via SSE within ~1 s.
+
+The server binds 127.0.0.1 only — never exposed to the network. It exits on `SIGINT` / `SIGTERM` with a 5 s drain.
+
+If the user asks "show me my board in the browser" or similar, offer:
+
+> "Want me to start the viewer? It binds 127.0.0.1:7777 and opens your browser automatically."
+
+If the user has already started the server in another terminal and just wants the URL opened, prefer `open http://127.0.0.1:7777` (macOS) / `xdg-open http://127.0.0.1:7777` (Linux) over re-running `ezida serve`.
+
 ### Board config
 ```bash
 ezida init [--columns="a,b,c"] [--priorities="low,med,high"]

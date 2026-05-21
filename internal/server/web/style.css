@@ -547,7 +547,7 @@
   .cards {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 2px 0;
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
@@ -598,60 +598,55 @@
     word-break: break-word;
   }
 
-  /* --- Tags (card surface, readonly here; modal reuses this skin) ------- */
+  /* --- Card meta row (icon + priority badge + tag chips) --------------- */
 
-  .tags {
+  .card-meta {
     list-style: none;
     margin: 6px 0 0 0;
     padding: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    align-items: center;
+    gap: 6px;
   }
 
-  .tag {
+  .card-meta-icon {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .card-desc-icon {
+    display: block;
+    color: var(--text-faint);
+  }
+
+  /* --- Tag / badge chips (shared pill skin; only color differs) -------- */
+
+  .tag,
+  .badge {
     display: inline-flex;
     align-items: center;
     height: 20px;
     padding: 0 7px;
     border-radius: var(--rounded-full);
-    background: color-mix(in oklab, var(--text) 3%, transparent);
-    color: var(--text-faint);
-    border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
     font-family: 'Geist', system-ui, sans-serif;
     font-size: 11px;
     font-weight: 500;
     line-height: 1;
+    letter-spacing: 0;
+    text-transform: none;
   }
 
-  /* --- Priorities (badge-only; visual distinction comes from .badge) ---- */
+  .tag {
+    background: color-mix(in oklab, var(--text) 3%, transparent);
+    color: var(--text-faint);
+    border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
+  }
 
   .badge {
-    display: inline-block;
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    padding: 2px 7px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-md);
-    margin-top: 6px;
-    color: var(--text-muted);
-  }
-  .priority-low .badge {
-    color: var(--text-faint);
-  }
-  .priority-medium .badge {
-    color: var(--text-muted);
-    border-color: var(--border-strong);
-  }
-  .priority-high .badge {
     background: var(--text);
     color: var(--surface);
-    border-color: var(--text);
+    border: 1px solid var(--text);
   }
 
   /* --- Empty-column placeholder ----------------------------------------- */

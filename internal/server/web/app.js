@@ -169,6 +169,7 @@ function board() {
         const data = await res.json();
         this.schema_version = data.schema_version;
         this.project_name = data.project_name || 'Ezida';
+        document.title = `Kanban - ${this.project_name}`;
         this.columns = data.columns || [];
         this.priorities = data.priorities || [];
         this.cards = data.cards || [];

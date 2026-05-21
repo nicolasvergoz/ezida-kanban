@@ -1,0 +1,182 @@
+package server
+
+import (
+	"encoding/json"
+	"errors"
+	"io/fs"
+	"net/http"
+	"time"
+
+	"github.com/nicolasvergoz/ezida-kanban/internal/board"
+)
+
+// routes registers every HTTP route the v1 viewer surface exposes:
+//
+//   - GET /              → embedded web/index.html
+//   - GET /static/...    → embedded web subtree
+//   - GET /api/board     → JSON snapshot of kanban.toml
+//
+// Any unrecognised path falls through to a JSON 404 envelope so the
+// client side sees the same shape it gets from real API errors.
+func (s *serverState) routes(mux *http.ServeMux) {
+	staticFS, _ := fs.Sub(webFS, "web")
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticFS)))
+	mux.HandleFunc("GET /api/board", s.handleBoard)
+	mux.HandleFunc("GET /{$}", s.handleIndex)
+	mux.HandleFunc("/", s.handleNotFound)
+}
+
+// handleIndex serves the embedded index.html with an explicit
+// Content-Type. Reading from webFS keeps the byte payload stable
+// across runs; tests assert on the exact bytes.
+func (s *serverState) handleIndex(w http.ResponseWriter, r *http.Request) {
+	data, err := webFS.ReadFile("web/index.html")
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(data)
+}
+
+// boardResponse is the JSON envelope returned by GET /api/board.
+// Field order and snake_case names match ADR 0002 §D7 — the viewer
+// UI consumes this shape directly.
+type boardResponse struct {
+	SchemaVersion  int            `json:"schema_version"`
+	Columns        []string       `json:"columns"`
+	Priorities     []string       `json:"priorities"`
+	CardsPerColumn map[string]int `json:"cards_per_column"`
+	Cards          []cardResponse `json:"cards"`
+}
+
+// cardResponse is the per-card JSON shape returned inside
+// boardResponse. Snake_case keys match ADR 0002 §D7; the
+// description field is always present (empty string when unset)
+// because the UI's edit modal renders it without a second fetch.
+type cardResponse struct {
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	Column      string    `json:"column"`
+	Priority    string    `json:"priority,omitempty"`
+	Tags        []string  `json:"tags"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// cardToResponse converts a board.Card to its wire shape. nil tags
+// become an empty slice so JSON renders `"tags":[]` rather than
+// `"tags":null` (keeps client code simpler).
+func cardToResponse(c board.Card) cardResponse {
+	tags := c.Tags
+	if tags == nil {
+		tags = []string{}
+	}
+	return cardResponse{
+		ID:          c.ID,
+		Title:       c.Title,
+		Column:      c.Column,
+		Priority:    c.Priority,
+		Tags:        tags,
+		Description: c.Description,
+		CreatedAt:   c.CreatedAt,
+		UpdatedAt:   c.UpdatedAt,
+	}
+}
+
+// handleBoard loads kanban.toml and returns the full board JSON. The
+// cards array carries every field (including description) so the
+// edit modal can render without a second fetch (ADR 0002 §D7).
+func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	counts := make(map[string]int, len(b.Board.Columns))
+	for _, col := range b.Board.Columns {
+		counts[col] = 0
+	}
+	for _, c := range b.Cards {
+		counts[c.Column]++
+	}
+
+	cards := make([]cardResponse, 0, len(b.Cards))
+	for _, c := range b.Cards {
+		cards = append(cards, cardToResponse(c))
+	}
+	resp := boardResponse{
+		SchemaVersion:  b.SchemaVersion,
+		Columns:        b.Board.Columns,
+		Priorities:     b.Board.Priorities,
+		CardsPerColumn: counts,
+		Cards:          cards,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// handleNotFound returns the JSON 404 envelope used for any path
+// that does not match a registered route. The wire shape matches
+// ADR 0001 §D8 so CLI and HTTP consumers see the same error shape.
+func (s *serverState) handleNotFound(w http.ResponseWriter, r *http.Request) {
+	writeErrorJSON(w, http.StatusNotFound, "NOT_FOUND",
+		"no route matches "+r.Method+" "+r.URL.Path, nil)
+}
+
+// httpError maps a Go error returned by board.Load (or by the
+// embed FS) onto the matching HTTP error envelope. The status code
+// is always 500 for board-related failures — these are server-side
+// problems even when the underlying cause is a missing or invalid
+// file (the user did not "request" a 4xx via the URL).
+func httpError(w http.ResponseWriter, err error) {
+	var sv *board.SchemaVersionError
+	if errors.As(err, &sv) {
+		writeErrorJSON(w, http.StatusInternalServerError,
+			"SCHEMA_VERSION_MISMATCH", err.Error(),
+			map[string]any{
+				"file_version":      sv.FileVersion,
+				"supported_version": sv.SupportedVersion,
+			})
+		return
+	}
+	var ve *board.ValidationError
+	if errors.As(err, &ve) {
+		writeErrorJSON(w, http.StatusInternalServerError,
+			"VALIDATION_FAILED", err.Error(), nil)
+		return
+	}
+	if errors.Is(err, fs.ErrNotExist) {
+		writeErrorJSON(w, http.StatusInternalServerError,
+			"BOARD_NOT_FOUND",
+			"kanban.toml not found in this directory; run `ezida init` to create one",
+			nil)
+		return
+	}
+	writeErrorJSON(w, http.StatusInternalServerError,
+		"IO_ERROR", err.Error(), nil)
+}
+
+// writeErrorJSON renders the canonical error envelope at the given
+// status code. The body shape is
+//
+//	{"error":{"code":"<CODE>","message":"<msg>","details":{...}}}
+//
+// matching the CLI's JSON-mode error contract (ADR 0001 §D8).
+func writeErrorJSON(w http.ResponseWriter, status int, code, message string, details any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	body := map[string]any{
+		"error": map[string]any{
+			"code":    code,
+			"message": message,
+		},
+	}
+	if details != nil {
+		body["error"].(map[string]any)["details"] = details
+	}
+	_ = json.NewEncoder(w).Encode(body)
+}

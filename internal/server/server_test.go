@@ -76,11 +76,23 @@ func silenceRunOutput(t *testing.T) {
 // test is exercising the BOARD_NOT_FOUND branch).
 func startTestServer(t *testing.T, boardPath string) (*httptest.Server, func()) {
 	t.Helper()
-	s := &serverState{boardPath: boardPath}
+	s := &serverState{boardPath: boardPath, broker: NewBroker()}
 	mux := http.NewServeMux()
 	s.routes(mux)
 	ts := httptest.NewServer(mux)
 	return ts, ts.Close
+}
+
+// startTestServerWithBroker is like startTestServer but returns the
+// broker so SSE tests can fire broadcasts directly.
+func startTestServerWithBroker(t *testing.T, boardPath string) (*httptest.Server, *Broker, func()) {
+	t.Helper()
+	b := NewBroker()
+	s := &serverState{boardPath: boardPath, broker: b}
+	mux := http.NewServeMux()
+	s.routes(mux)
+	ts := httptest.NewServer(mux)
+	return ts, b, ts.Close
 }
 
 // fixturePath returns the absolute path to testdata/<name>.

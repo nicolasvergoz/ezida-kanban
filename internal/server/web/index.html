@@ -9,10 +9,12 @@
   <script defer src="/static/vendor/sortable.min.js"></script>
 </head>
 <body>
+  <main x-data="board()" x-init="load()">
   <header class="topbar">
     <span class="project-name">Ezida</span>
+    <span class="status-dot" :class="connected ? 'on' : 'off'"
+          :title="connected ? 'live updates connected' : 'live updates disconnected'"></span>
   </header>
-  <main x-data="board()" x-init="load()">
     <template x-if="!loaded"><div class="loading">Loading&hellip;</div></template>
     <div class="columns" x-show="loaded">
       <template x-for="col in columns" :key="col">

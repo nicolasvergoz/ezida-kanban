@@ -84,16 +84,29 @@ func runWithContext(ctx context.Context, opts Options) error {
 		start = defaultStartPort
 	}
 
-	ln, port, err := bindWithFallback(start, portFallbackWindow)
-	if err != nil {
-		return err
-	}
-
 	boardPath := opts.Board
 	if boardPath == "" {
 		boardPath = "kanban.toml"
 	}
-	s := &serverState{boardPath: boardPath}
+
+	// Build the watcher BEFORE binding the listener so a missing
+	// board file fails fast without occupying a port (ADR 0002 §D9 —
+	// watcher startup is part of the bring-up contract).
+	watcher, err := NewWatcher(boardPath)
+	if err != nil {
+		return err
+	}
+
+	ln, port, err := bindWithFallback(start, portFallbackWindow)
+	if err != nil {
+		// Release the watcher's fsnotify handle since we won't be
+		// starting Run; Watcher.Run normally closes it on exit.
+		watcher.fsw.Close()
+		return err
+	}
+
+	broker := NewBroker()
+	s := &serverState{boardPath: boardPath, broker: broker}
 
 	mux := http.NewServeMux()
 	s.routes(mux)
@@ -113,9 +126,29 @@ func runWithContext(ctx context.Context, opts Options) error {
 		}
 	}
 
+	// Watcher → broker pump. Watcher.Run closes its events channel
+	// only indirectly (the channel itself is owned for the
+	// lifetime); we stop the pump when ctx is cancelled by relying
+	// on Run returning, after which no further events can fire.
+	go watcher.Run(ctx)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-watcher.Events():
+				broker.Broadcast()
+			}
+		}
+	}()
+
 	shutdownDone := make(chan struct{})
 	go func() {
 		<-ctx.Done()
+		// Evict every SSE client first so Shutdown's drain does not
+		// block on long-lived event streams (each handler returns as
+		// soon as its broker channel closes).
+		broker.Close()
 		sdCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 		_ = srv.Shutdown(sdCtx)
@@ -166,11 +199,12 @@ func isAddrInUse(err error) bool {
 }
 
 // serverState carries the per-server dependencies the HTTP handlers
-// close over: the board file path and any future seams (clocks,
-// loaders, etc.). Kept private so tests share construction via the
-// startTestServer helper.
+// close over: the board file path, the SSE broker (V4), and any
+// future seams (clocks, loaders, etc.). Kept private so tests share
+// construction via the startTestServer helper.
 type serverState struct {
 	boardPath string
+	broker    *Broker
 }
 
 // PortUnavailableError is returned by Run when every port in the

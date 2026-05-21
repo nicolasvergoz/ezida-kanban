@@ -11,6 +11,11 @@ import (
 	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 )
 
+// heartbeatInterval is how often the SSE handler emits a `: ping`
+// comment line on an idle stream (ADR 0002 §D9). Exposed as a
+// package variable so tests can shrink it.
+var heartbeatInterval = 30 * time.Second
+
 // InvalidBodyError is returned by handlers that decode a JSON
 // request body when the body is missing, not valid JSON, or fails
 // type-decoding into the expected struct. The HTTP layer surfaces it
@@ -40,6 +45,7 @@ func (s *serverState) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/board", s.handleBoard)
 	mux.HandleFunc("POST /api/cards/{id}/move", s.handleMove)
 	mux.HandleFunc("PATCH /api/cards/{id}", s.handlePatch)
+	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("/", s.handleNotFound)
 }
@@ -315,6 +321,63 @@ func httpError(w http.ResponseWriter, err error) {
 	}
 	writeErrorJSON(w, http.StatusInternalServerError,
 		"IO_ERROR", err.Error(), nil)
+}
+
+// handleEvents implements `GET /api/events`, the Server-Sent Events
+// stream the UI subscribes to for live updates (ADR 0002 §D9). On
+// connect the handler writes the `retry: 2000` directive (so browsers
+// reconnect with a 2 s delay), then loops on the broker channel and a
+// 30 s heartbeat ticker. The loop exits when the client closes the
+// connection (r.Context().Done()) or when the broker channel is
+// closed during shutdown.
+//
+// The handler does NOT emit `data:` payloads — the spec emits a
+// single event type `board-changed` with an empty data line. Clients
+// refetch `/api/board` on receipt.
+func (s *serverState) handleEvents(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	// Initial directive: 2 s reconnect delay (ADR 0002 §D9).
+	_, _ = fmt.Fprintf(w, "retry: 2000\n\n")
+	flusher.Flush()
+
+	if s.broker == nil {
+		// Defensive: a serverState constructed without a broker (e.g.
+		// in older tests) should still close cleanly. Block on the
+		// request context so the connection stays open until the
+		// client disconnects.
+		<-r.Context().Done()
+		return
+	}
+
+	ch, unsubscribe := s.broker.Subscribe()
+	defer unsubscribe()
+
+	heartbeat := time.NewTicker(heartbeatInterval)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case _, ok := <-ch:
+			if !ok {
+				return
+			}
+			_, _ = fmt.Fprintf(w, "event: board-changed\ndata: \n\n")
+			flusher.Flush()
+		case <-heartbeat.C:
+			_, _ = fmt.Fprintf(w, ": ping\n\n")
+			flusher.Flush()
+		}
+	}
 }
 
 // writeErrorJSON renders the canonical error envelope at the given

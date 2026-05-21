@@ -21,6 +21,18 @@ body {
   font-weight: 600;
 }
 
+/* V4 live-connection indicator. Sits beside .project-name in the
+   topbar and flips color between connected/disconnected states. */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 8px;
+}
+.status-dot.on  { background: #2a8; }
+.status-dot.off { background: #aaa; }
+
 .loading {
   padding: 12px;
   color: #999;

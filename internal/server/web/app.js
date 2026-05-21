@@ -24,6 +24,13 @@ function board() {
     draft: null,
     tagInput: '',
     error: '',
+    // V4 SSE state. `connected` drives the topbar status dot;
+    // `eventSource` holds the active EventSource handle so a future
+    // reconnect can tear down the previous one (the browser's
+    // built-in retry handles transient disconnects, but a hard
+    // reconnect after server restart re-uses the same handle).
+    connected: false,
+    eventSource: null,
     async load() {
       try {
         const res = await fetch('/api/board');
@@ -41,9 +48,33 @@ function board() {
         // Defer until Alpine has flushed the new DOM, then attach
         // Sortable to each freshly-rendered column.
         this.$nextTick(() => this.mountSortable());
+        // V4: open the SSE connection once, after the very first
+        // successful board fetch, so initial render and live updates
+        // share the same code path.
+        if (!this.eventSource) this.connectEvents();
       } catch (e) {
         console.error('failed to fetch /api/board', e);
       }
+    },
+    // connectEvents subscribes to the server's SSE stream. Browsers
+    // auto-reconnect on disconnect honoring the server's
+    // `retry: 2000` directive, so we only need to track the open
+    // state (`connected`) and react to `board-changed` events.
+    connectEvents() {
+      const es = new EventSource('/api/events');
+      const self = this;
+      es.addEventListener('board-changed', function () { self.handleExternalChange(); });
+      es.onopen = function () { self.connected = true; };
+      es.onerror = function () { self.connected = false; };
+      this.eventSource = es;
+    },
+    // handleExternalChange is invoked when the server fires a
+    // `board-changed` SSE event (e.g. CLI write, manual save). The
+    // open modal — if any — closes without prompting (spec D9, V4);
+    // then we refetch the board so the rendered DOM reflects disk.
+    handleExternalChange() {
+      if (this.editing) this.closeCard();
+      this.load();
     },
     cardsByColumn(name) {
       return this.cards.filter(function (c) { return c.column === name; });

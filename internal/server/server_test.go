@@ -696,8 +696,44 @@ type testBoardSnapshot struct {
 }
 
 type testCardSnapshot struct {
-	ID     string `toml:"id"`
-	Column string `toml:"column"`
+	ID          string    `toml:"id"`
+	Title       string    `toml:"title"`
+	Column      string    `toml:"column"`
+	Description string    `toml:"description"`
+	Tags        []string  `toml:"tags"`
+	Priority    string    `toml:"priority"`
+	UpdatedAt   time.Time `toml:"updated_at"`
+}
+
+// findCardOnDisk returns the on-disk card with the given id, or nil
+// if none. Used by the PATCH tests to verify field-level state.
+func findCardOnDisk(t *testing.T, path, id string) *testCardSnapshot {
+	t.Helper()
+	b, err := readBoardFile(path)
+	if err != nil {
+		t.Fatalf("readBoardFile: %v", err)
+	}
+	for i := range b.Cards {
+		if b.Cards[i].ID == id {
+			return &b.Cards[i]
+		}
+	}
+	return nil
+}
+
+// patchJSON is the PATCH counterpart of postJSON.
+func patchJSON(t *testing.T, url string, body string) *http.Response {
+	t.Helper()
+	req, err := http.NewRequest("PATCH", url, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("PATCH %s: %v", url, err)
+	}
+	return res
 }
 
 func TestHandle_Move_Success(t *testing.T) {
@@ -850,6 +886,217 @@ func reflectStringSliceEqual(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// --- PATCH /api/cards/{id} tests -------------------------------------------
+
+func TestHandle_Patch_TitleOnly(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{"title":"New title"}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	if got := res.Header.Get("Content-Type"); !strings.HasPrefix(got, "application/json") {
+		t.Fatalf("Content-Type = %q, want application/json", got)
+	}
+	var body struct {
+		Card struct {
+			Title       string `json:"title"`
+			Description string `json:"description"`
+		} `json:"card"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if body.Card.Title != "New title" {
+		t.Fatalf("response title = %q, want %q", body.Card.Title, "New title")
+	}
+	if body.Card.Description != "First card description." {
+		t.Fatalf("description should be unchanged, got %q", body.Card.Description)
+	}
+	disk := findCardOnDisk(t, path, "aaaaaa")
+	if disk == nil || disk.Title != "New title" {
+		t.Fatalf("on-disk title = %q, want %q", disk.Title, "New title")
+	}
+}
+
+func TestHandle_Patch_MultipleFields(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa",
+		`{"title":"Renamed","tags":["x","y"],"priority":"low"}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	disk := findCardOnDisk(t, path, "aaaaaa")
+	if disk == nil {
+		t.Fatalf("card not on disk")
+	}
+	if disk.Title != "Renamed" {
+		t.Fatalf("title = %q, want Renamed", disk.Title)
+	}
+	if len(disk.Tags) != 2 || disk.Tags[0] != "x" || disk.Tags[1] != "y" {
+		t.Fatalf("tags = %v, want [x y]", disk.Tags)
+	}
+	if disk.Priority != "low" {
+		t.Fatalf("priority = %q, want low", disk.Priority)
+	}
+}
+
+func TestHandle_Patch_ClearPriority(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{"priority":""}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	disk := findCardOnDisk(t, path, "aaaaaa")
+	if disk.Priority != "" {
+		t.Fatalf("priority on disk = %q, want empty", disk.Priority)
+	}
+}
+
+func TestHandle_Patch_ClearTags(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{"tags":[]}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	disk := findCardOnDisk(t, path, "aaaaaa")
+	if len(disk.Tags) != 0 {
+		t.Fatalf("tags on disk = %v, want empty", disk.Tags)
+	}
+}
+
+func TestHandle_Patch_EmptyTitle(t *testing.T) {
+	path := writableBoard(t)
+	before, _ := os.ReadFile(path)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{"title":""}`)
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"MISSING_TITLE"`) {
+		t.Fatalf("body missing MISSING_TITLE: %s", body)
+	}
+	after, _ := os.ReadFile(path)
+	if string(after) != string(before) {
+		t.Fatalf("on-disk file changed despite 400 error")
+	}
+}
+
+func TestHandle_Patch_UnknownPriority(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{"priority":"urgent"}`)
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"INVALID_PRIORITY"`) {
+		t.Fatalf("body missing INVALID_PRIORITY: %s", body)
+	}
+}
+
+func TestHandle_Patch_EmptyTag(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{"tags":["good",""]}`)
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"INVALID_TAG"`) {
+		t.Fatalf("body missing INVALID_TAG: %s", body)
+	}
+}
+
+func TestHandle_Patch_UnknownCard(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/zzzzzz", `{"title":"x"}`)
+	defer res.Body.Close()
+	if res.StatusCode != 404 {
+		t.Fatalf("status = %d, want 404", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"CARD_NOT_FOUND"`) {
+		t.Fatalf("body missing CARD_NOT_FOUND: %s", body)
+	}
+}
+
+func TestHandle_Patch_MalformedBody(t *testing.T) {
+	path := writableBoard(t)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{not valid json`)
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", res.StatusCode)
+	}
+	body := readString(res.Body)
+	if !strings.Contains(body, `"INVALID_BODY"`) {
+		t.Fatalf("body missing INVALID_BODY: %s", body)
+	}
+}
+
+func TestHandle_Patch_RefreshesUpdatedAt(t *testing.T) {
+	path := writableBoard(t)
+	before := findCardOnDisk(t, path, "aaaaaa")
+	if before == nil {
+		t.Fatalf("seed card missing")
+	}
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/cards/aaaaaa", `{"title":"Bumped"}`)
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	var body struct {
+		Card struct {
+			UpdatedAt time.Time `json:"updated_at"`
+		} `json:"card"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	if !body.Card.UpdatedAt.After(before.UpdatedAt) {
+		t.Fatalf("response updated_at (%s) not strictly after pre-patch (%s)",
+			body.Card.UpdatedAt, before.UpdatedAt)
+	}
+	disk := findCardOnDisk(t, path, "aaaaaa")
+	if disk == nil || !disk.UpdatedAt.After(before.UpdatedAt) {
+		t.Fatalf("on-disk updated_at not refreshed")
+	}
 }
 
 // firstExternalIPv4 returns the first up, non-loopback IPv4 address

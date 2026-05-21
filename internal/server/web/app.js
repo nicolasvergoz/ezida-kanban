@@ -16,6 +16,14 @@ function board() {
     // so they can be destroyed before being remounted after a refetch
     // (Alpine reuses the <ul> nodes across renders).
     _sortables: [],
+    // V3 edit-modal state. `editing` toggles the overlay; `draft` is
+    // a shallow-cloned card under edit; `tagInput` is the chip-input
+    // buffer; `error` carries the last server-side validation
+    // message (or fetch error) so it can render inside the modal.
+    editing: false,
+    draft: null,
+    tagInput: '',
+    error: '',
     async load() {
       try {
         const res = await fetch('/api/board');
@@ -58,6 +66,62 @@ function board() {
         });
         self._sortables.push(s);
       });
+    },
+    // openCard clones the clicked card into `draft` and flips the
+    // modal open. The shallow clone (plus an explicit tags-slice
+    // copy) means edits in the modal cannot mutate the rendered
+    // board state until Save commits via PATCH.
+    openCard(card) {
+      this.draft = Object.assign({}, card, { tags: (card.tags || []).slice() });
+      this.tagInput = '';
+      this.error = '';
+      this.editing = true;
+    },
+    closeCard() {
+      this.editing = false;
+      this.draft = null;
+      this.tagInput = '';
+      this.error = '';
+    },
+    addTag() {
+      if (!this.draft) return;
+      const t = (this.tagInput || '').trim();
+      if (!t) return;
+      if (!this.draft.tags.includes(t)) this.draft.tags.push(t);
+      this.tagInput = '';
+    },
+    removeTag(t) {
+      if (!this.draft) return;
+      this.draft.tags = this.draft.tags.filter(function (x) { return x !== t; });
+    },
+    // saveCard sends the full editable field set to the server.
+    // Spec D8 still allows partial patches; the UI sends all four
+    // fields because it always has the full state in `draft`.
+    async saveCard() {
+      if (!this.draft) return;
+      this.error = '';
+      const body = {
+        title: this.draft.title,
+        description: this.draft.description,
+        tags: this.draft.tags,
+        priority: this.draft.priority || '',
+      };
+      try {
+        const res = await fetch('/api/cards/' + encodeURIComponent(this.draft.id), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(function () { return {}; });
+          this.error = (err && err.error && err.error.message) || ('HTTP ' + res.status);
+          return;
+        }
+        this.closeCard();
+        await this.load();
+      } catch (e) {
+        this.error = e.message || String(e);
+      }
     },
     async handleDrop(evt) {
       const id = evt.item && evt.item.dataset ? evt.item.dataset.cardId : '';

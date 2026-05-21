@@ -23,7 +23,7 @@
           </header>
           <ul class="cards" :data-column="col">
             <template x-for="card in cardsByColumn(col)" :key="card.id">
-              <li class="card" :data-card-id="card.id" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at">
+              <li class="card" :data-card-id="card.id" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at" @click="openCard(card)">
                 <div class="card-title" x-text="card.title"></div>
                 <template x-if="card.priority">
                   <span class="badge" x-text="card.priority"></span>
@@ -41,6 +41,62 @@
           </ul>
         </section>
       </template>
+    </div>
+    <div class="modal-overlay"
+         x-show="editing"
+         x-cloak
+         @keydown.escape.window="closeCard()"
+         @click.self="closeCard()">
+      <div class="modal" role="dialog" aria-modal="true" x-show="editing">
+        <header class="modal-header">
+          <h2>Edit card</h2>
+          <span class="modal-id" x-text="draft && draft.id"></span>
+        </header>
+        <form @submit.prevent="saveCard()" x-show="draft">
+          <label>Title
+            <input type="text" x-model="draft.title" required
+                   @keydown.enter.prevent="saveCard()">
+          </label>
+          <label>Description
+            <textarea x-model="draft.description" rows="6"
+                      @keydown.meta.enter.prevent="saveCard()"
+                      @keydown.ctrl.enter.prevent="saveCard()"></textarea>
+          </label>
+          <label>Priority
+            <select x-model="draft.priority">
+              <option value="">no priority</option>
+              <template x-for="p in priorities" :key="p">
+                <option :value="p" x-text="p"></option>
+              </template>
+            </select>
+          </label>
+          <fieldset class="tags-field">
+            <legend>Tags</legend>
+            <ul class="tag-chips">
+              <template x-for="t in draft.tags" :key="t">
+                <li class="tag">
+                  <span x-text="t"></span>
+                  <button type="button" @click="removeTag(t)" aria-label="remove tag">&times;</button>
+                </li>
+              </template>
+            </ul>
+            <input type="text" x-model="tagInput"
+                   @keydown.enter.prevent="addTag()"
+                   @keydown.comma.prevent="addTag()"
+                   placeholder="add tag, press Enter">
+          </fieldset>
+          <p class="modal-error" x-show="error" x-text="error"></p>
+          <div class="modal-readonly">
+            <span>column: <code x-text="draft.column"></code></span>
+            <span>created: <code x-text="draft.created_at"></code></span>
+            <span>updated: <code x-text="draft.updated_at"></code></span>
+          </div>
+          <footer class="modal-footer">
+            <button type="button" @click="closeCard()">Cancel</button>
+            <button type="submit">Save</button>
+          </footer>
+        </form>
+      </div>
     </div>
   </main>
 </body>

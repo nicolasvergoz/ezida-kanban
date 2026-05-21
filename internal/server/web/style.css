@@ -133,3 +133,145 @@ body {
   padding: 6px;
   list-style: none;
 }
+
+/* x-cloak hides the modal until Alpine has initialized so the
+   overlay does not flash on first paint. */
+[x-cloak] { display: none !important; }
+
+/* --- Edit modal (V3) ----------------------------------------------------- */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 6px;
+  padding: 16px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.modal-id {
+  font-family: monospace;
+  font-size: 12px;
+  color: #888;
+}
+
+.modal form label {
+  display: block;
+  font-size: 12px;
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.modal form input[type="text"],
+.modal form textarea,
+.modal form select {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 6px 8px;
+  font: inherit;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.modal form textarea {
+  resize: vertical;
+}
+
+.tags-field {
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+  margin: 0 0 8px 0;
+}
+
+.tags-field legend {
+  font-size: 12px;
+  color: #555;
+  padding: 0 4px;
+}
+
+.tag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.tag-chips .tag button {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  margin-left: 4px;
+  font-size: 12px;
+  color: #555;
+}
+
+.modal-error {
+  color: #b00020;
+  margin: 8px 0;
+}
+
+.modal-readonly {
+  font-size: 11px;
+  color: #666;
+  display: flex;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.modal-readonly code {
+  font-family: monospace;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.modal-footer button {
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  background: #f4f4f4;
+  border-radius: 4px;
+}
+
+.modal-footer button[type="submit"] {
+  background: #222;
+  color: #fff;
+  border-color: #222;
+}

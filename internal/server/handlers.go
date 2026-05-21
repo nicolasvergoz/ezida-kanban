@@ -39,6 +39,7 @@ func (s *serverState) routes(mux *http.ServeMux) {
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticFS)))
 	mux.HandleFunc("GET /api/board", s.handleBoard)
 	mux.HandleFunc("POST /api/cards/{id}/move", s.handleMove)
+	mux.HandleFunc("PATCH /api/cards/{id}", s.handlePatch)
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("/", s.handleNotFound)
 }
@@ -94,6 +95,52 @@ func (s *serverState) handleMove(w http.ResponseWriter, r *http.Request) {
 	// Defensive: if MoveCard succeeded but the card vanished from the
 	// slice afterwards, something is very wrong. Fall through to a 500.
 	httpError(w, fmt.Errorf("card %q missing after move", id))
+}
+
+// handlePatch implements PATCH /api/cards/{id} per the viewer-server
+// delta spec: decode the JSON body into a board.CardPatch (pointer
+// fields distinguish absent vs. set-to-empty per ADR 0002 §D8), load
+// the board, apply via board.UpdateCard, persist via board.Save, then
+// return {card: ...} with the post-update card. Error mapping is
+// handled by httpError (MISSING_TITLE / INVALID_PRIORITY /
+// INVALID_TAG → 400; CARD_NOT_FOUND → 404; INVALID_BODY → 400;
+// load/save failures stay 500).
+func (s *serverState) handlePatch(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var patch board.CardPatch
+	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+		httpError(w, &InvalidBodyError{Reason: err.Error()})
+		return
+	}
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.UpdateCard(b, id, patch); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	for _, c := range b.Cards {
+		if c.ID == id {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"card": cardToResponse(c),
+			})
+			return
+		}
+	}
+	// Defensive: UpdateCard succeeded but the card vanished afterwards.
+	httpError(w, fmt.Errorf("card %q missing after patch", id))
 }
 
 // handleIndex serves the embedded index.html with an explicit
@@ -221,6 +268,26 @@ func httpError(w http.ResponseWriter, err error) {
 		writeErrorJSON(w, http.StatusBadRequest,
 			"COLUMN_NOT_FOUND", err.Error(),
 			map[string]any{"column": colnf.Column})
+		return
+	}
+	var mte *board.MissingTitleError
+	if errors.As(err, &mte) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"MISSING_TITLE", err.Error(), nil)
+		return
+	}
+	var ipe *board.InvalidPriorityError
+	if errors.As(err, &ipe) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"INVALID_PRIORITY", err.Error(),
+			map[string]any{"priority": ipe.Priority})
+		return
+	}
+	var ite *board.InvalidTagError
+	if errors.As(err, &ite) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"INVALID_TAG", err.Error(),
+			map[string]any{"tag": ite.Tag})
 		return
 	}
 	var sv *board.SchemaVersionError

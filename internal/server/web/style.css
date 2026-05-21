@@ -987,3 +987,161 @@
   margin: 0;
   font-size: 12px;
 }
+
+/* ---------------------------------------------------------------------------
+ * UI-6: inline column ops — Add-list placeholder, list composer,
+ * 3-dots menu, list-header inline rename input. Rules live outside
+ * the @layer components block so they slot into the existing
+ * .columns / .column-header surfaces without re-opening the layer.
+ * Token-only (ADR 0003 §D5): no hex literals.
+ * --------------------------------------------------------------------------- */
+
+/* Dashed Add-list placeholder, rendered after the last column. */
+.add-list-placeholder {
+  width: var(--space-list-width);
+  height: 48px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: var(--rounded-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  flex: 0 0 auto;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.add-list-placeholder:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+}
+
+/* List composer (swaps in when the placeholder is clicked). */
+.list-composer {
+  width: var(--space-list-width);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: var(--rounded-xl);
+  padding: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 0 0 auto;
+}
+
+.list-composer input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-sm);
+  padding: var(--space-xs) var(--space-sm);
+  color: var(--text);
+  font: inherit;
+}
+
+.list-composer .composer-actions {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.list-composer .composer-error {
+  color: var(--danger);
+  font-size: var(--space-xl);
+  margin: 0;
+}
+
+/* 3-dots button on the right end of every list header. */
+.list-menu-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-muted);
+  border: 0;
+  cursor: pointer;
+  border-radius: var(--rounded-md);
+  padding: 0;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.list-menu-btn:hover {
+  color: var(--text);
+  background: color-mix(in oklab, var(--text) 6%, transparent);
+}
+
+/* Popover that opens below the 3-dots button. */
+.list-menu {
+  position: absolute;
+  top: calc(100% + var(--space-xs));
+  right: var(--space-xs);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--rounded-md);
+  box-shadow: var(--shadow-popover);
+  padding: var(--space-xs);
+  min-width: 160px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.list-menu .menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--rounded-sm);
+  font: inherit;
+  color: var(--text);
+  transition: background-color 120ms ease;
+}
+
+.list-menu .menu-item.danger {
+  color: var(--danger);
+}
+
+.list-menu .menu-item.danger:hover {
+  background: color-mix(in oklab, var(--danger) 8%, transparent);
+}
+
+.list-menu .menu-error {
+  color: var(--danger);
+  font-size: var(--space-xl);
+  padding: var(--space-xs) var(--space-sm);
+  margin: 0;
+}
+
+/* The list-header is now the positioning anchor for the popover. */
+.list-header {
+  position: relative;
+}
+
+/* Inline rename input variant (when .list-header.is-renaming). */
+.list-header .column-name--input {
+  background: var(--surface-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--rounded-sm);
+  padding: 2px 6px;
+  color: var(--text);
+  font: inherit;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.list-header .rename-error {
+  color: var(--danger);
+  font-size: var(--space-xl);
+}
+
+/* Sortable ghost styling for the list-drag instance. */
+.sortable-ghost-list {
+  opacity: 0.5;
+}

@@ -48,6 +48,10 @@ func (s *serverState) routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/cards/{id}/move", s.handleMove)
 	mux.HandleFunc("PATCH /api/cards/{id}", s.handlePatch)
 	mux.HandleFunc("DELETE /api/cards/{id}", s.handleDelete)
+	mux.HandleFunc("POST /api/columns", s.handleColumnCreate)
+	mux.HandleFunc("POST /api/columns/move", s.handleColumnMove)
+	mux.HandleFunc("PATCH /api/columns/{name}", s.handleColumnRename)
+	mux.HandleFunc("DELETE /api/columns/{name}", s.handleColumnDelete)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("/", s.handleNotFound)
@@ -311,6 +315,184 @@ func (s *serverState) handleDelete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// --- Column endpoints (UI-6) ------------------------------------------------
+
+// columnCreatePayload is the JSON body shape accepted by
+// POST /api/columns. Snake_case per ADR 0002 §D7.
+type columnCreatePayload struct {
+	Name string `json:"name"`
+}
+
+// columnRenamePayload is the JSON body shape accepted by
+// PATCH /api/columns/{name}.
+type columnRenamePayload struct {
+	Name string `json:"name"`
+}
+
+// columnMovePayload is the JSON body shape accepted by
+// POST /api/columns/move.
+type columnMovePayload struct {
+	Name     string `json:"name"`
+	Position int    `json:"position"`
+}
+
+// handleColumnCreate implements POST /api/columns (UI-6 design.md).
+// Decode → trim → load → AddColumn → save → 201 with the post-add
+// column list.
+func (s *serverState) handleColumnCreate(w http.ResponseWriter, r *http.Request) {
+	var p columnCreatePayload
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		httpError(w, &InvalidBodyError{Reason: err.Error()})
+		return
+	}
+	trimmed := strings.TrimSpace(p.Name)
+	if trimmed == "" {
+		httpError(w, &board.EmptyColumnNameError{})
+		return
+	}
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.AddColumn(b, trimmed); err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"columns": b.Board.Columns,
+	})
+}
+
+// handleColumnRename implements PATCH /api/columns/{name} (UI-6).
+// Decode → trim → load → RenameColumn → save → 200 with the post-rename
+// column list and the `renamed: {from, to}` echo.
+func (s *serverState) handleColumnRename(w http.ResponseWriter, r *http.Request) {
+	from := r.PathValue("name")
+
+	var p columnRenamePayload
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		httpError(w, &InvalidBodyError{Reason: err.Error()})
+		return
+	}
+	// Empty/whitespace-only post-trim is rejected as INVALID_BODY by
+	// the board.RenameColumn helper itself (via EmptyColumnNameError).
+	// We pass the raw value through trim so a same-name no-op (without
+	// surrounding whitespace) succeeds before the helper trims.
+	trimmed := strings.TrimSpace(p.Name)
+	if trimmed == "" {
+		httpError(w, &board.EmptyColumnNameError{})
+		return
+	}
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.RenameColumn(b, from, trimmed); err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"columns": b.Board.Columns,
+		"renamed": map[string]any{
+			"from": from,
+			"to":   trimmed,
+		},
+	})
+}
+
+// handleColumnDelete implements DELETE /api/columns/{name} (UI-6).
+// Short-circuits the COLUMN_NOT_FOUND case before calling
+// board.DeleteColumn so the 404 status code is emitted inline (design
+// TD4); other refusals (CANNOT_DELETE_LAST_COLUMN, COLUMN_HAS_CARDS)
+// flow through httpError as 400.
+func (s *serverState) handleColumnDelete(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	// 404 short-circuit per design TD4: handleColumnDelete owns the
+	// "not found" status code for this one route.
+	found := false
+	for _, col := range b.Board.Columns {
+		if col == name {
+			found = true
+			break
+		}
+	}
+	if !found {
+		writeErrorJSON(w, http.StatusNotFound,
+			"COLUMN_NOT_FOUND",
+			fmt.Sprintf("board: column %q is not declared in [board].columns", name),
+			map[string]any{"column": name})
+		return
+	}
+
+	if err := board.DeleteColumn(b, name); err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"columns": b.Board.Columns,
+	})
+}
+
+// handleColumnMove implements POST /api/columns/move (UI-6). Decode →
+// load → MoveColumn → save → 200 with the post-move column list.
+// Position out-of-range is silently clamped by the board helper.
+func (s *serverState) handleColumnMove(w http.ResponseWriter, r *http.Request) {
+	var p columnMovePayload
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		httpError(w, &InvalidBodyError{Reason: err.Error()})
+		return
+	}
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.MoveColumn(b, p.Name, p.Position); err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"columns": b.Board.Columns,
+	})
+}
+
 // handleIndex serves the embedded index.html with an explicit
 // Content-Type. Reading from webFS keeps the byte payload stable
 // across runs; tests assert on the exact bytes.
@@ -461,6 +643,33 @@ func httpError(w http.ResponseWriter, err error) {
 		writeErrorJSON(w, http.StatusBadRequest,
 			"INVALID_TAG", err.Error(),
 			map[string]any{"tag": ite.Tag})
+		return
+	}
+	var ene *board.EmptyColumnNameError
+	if errors.As(err, &ene) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"INVALID_BODY", "column name must be non-empty", nil)
+		return
+	}
+	var caee *board.ColumnAlreadyExistsError
+	if errors.As(err, &caee) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"COLUMN_ALREADY_EXISTS", err.Error(),
+			map[string]any{"name": caee.Name})
+		return
+	}
+	var cdle *board.CannotDeleteLastColumnError
+	if errors.As(err, &cdle) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"CANNOT_DELETE_LAST_COLUMN", err.Error(),
+			map[string]any{"name": cdle.Name})
+		return
+	}
+	var che *board.ColumnHasCardsError
+	if errors.As(err, &che) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"COLUMN_HAS_CARDS", err.Error(),
+			map[string]any{"column": che.Name, "cards": che.Cards})
 		return
 	}
 	var sv *board.SchemaVersionError

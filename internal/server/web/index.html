@@ -72,10 +72,40 @@
     <template x-if="!loaded"><div class="loading t-body-md">Loading&hellip;</div></template>
     <div class="board columns" x-show="loaded">
       <template x-for="col in columns" :key="col">
-        <section class="column">
-          <header class="column-header">
-            <span class="column-name t-list-title" x-text="col"></span>
+        <section class="column" :data-column="col">
+          <header class="column-header list-header"
+                  :class="renamingColumn === col ? 'is-renaming' : ''">
+            <span class="column-name t-list-title"
+                  x-show="renamingColumn !== col"
+                  @click="startRename(col)"
+                  x-text="col"></span>
+            <input class="column-name column-name--input t-list-title"
+                   type="text"
+                   x-show="renamingColumn === col"
+                   x-model="renameDraft"
+                   @keydown.enter.prevent="commitRename()"
+                   @keydown.escape.prevent="cancelRename()"
+                   @blur="commitRename()"
+                   x-init="$watch('renamingColumn', v => { if (v === col) { $nextTick(() => { $el.focus(); $el.select(); }); } })">
+            <span class="rename-error" x-show="renameError && renamingColumn === col" x-text="renameError"></span>
             <span class="column-count t-mono-counter" x-text="cardsByColumn(col).length"></span>
+            <button type="button"
+                    class="list-menu-btn"
+                    @click.stop="toggleListMenu(col)"
+                    :aria-expanded="openMenuColumn === col"
+                    aria-label="List actions">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+            </button>
+            <div class="list-menu"
+                 x-show="openMenuColumn === col"
+                 x-cloak
+                 @click.outside="closeListMenu()"
+                 @keydown.escape.window="closeListMenu()">
+              <button type="button"
+                      class="menu-item danger"
+                      @click="deleteList(col)">Delete list</button>
+              <p class="menu-error" x-show="menuError" x-text="menuError"></p>
+            </div>
           </header>
           <ul class="cards" :data-column="col">
             <template x-for="card in filteredCardsByColumn(col)" :key="card.id">
@@ -155,6 +185,25 @@
           </div>
         </section>
       </template>
+      <button type="button"
+              class="add-list-placeholder"
+              x-show="!composingList"
+              @click="openListComposer()">+ Add list</button>
+      <div class="list-composer"
+           x-show="composingList"
+           x-cloak>
+        <input type="text"
+               x-model="listDraft"
+               placeholder="List name"
+               @keydown.enter.prevent="submitNewList()"
+               @keydown.escape.prevent="cancelNewList()"
+               x-init="$watch('composingList', v => { if (v) { $nextTick(() => $el.focus()); } })">
+        <div class="composer-actions">
+          <button type="button" class="button-primary" @click="submitNewList()">Add</button>
+          <button type="button" class="button-ghost" @click="cancelNewList()">Cancel</button>
+        </div>
+        <p class="composer-error" x-show="listError" x-text="listError"></p>
+      </div>
     </div>
     <div class="modal-overlay"
          x-show="open"

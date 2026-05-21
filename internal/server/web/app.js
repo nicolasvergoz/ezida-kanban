@@ -66,6 +66,26 @@ function board() {
     // flips while the user is in system mode (ADR 0003 §D7).
     theme: 'system',
     _mediaQuery: null,
+    // UI-6 inline-column-ops state. `renamingColumn` is the column
+    // currently being inline-renamed (single rename at a time across
+    // the page) or null. `renameDraft` holds the in-flight value;
+    // `renameError` carries the server's error message when a PATCH
+    // refuses the rename (keeps the input open per design TD10).
+    renamingColumn: null,
+    renameDraft: '',
+    renameError: '',
+    // List-menu state (3-dots delete). Single menu open at a time.
+    openMenuColumn: null,
+    menuError: '',
+    // Add-list composer state (placeholder/composer pair at the end
+    // of the column strip, design TD9).
+    composingList: false,
+    listDraft: '',
+    listError: '',
+    // _listSortable holds the single Sortable instance bound to the
+    // .columns container; tear-down + re-mount happens on every
+    // load() refetch so Alpine's re-rendered DOM gets re-bound.
+    _listSortable: null,
     // init wires component-level $watch handlers that need the Alpine
     // proxy in scope (and so cannot be declared as inline expressions
     // on x-init). The filter watch retriggers mountSortable() after
@@ -151,6 +171,7 @@ function board() {
         // drag-scroll affordance on the .board element (one-shot).
         this.$nextTick(() => {
           this.mountSortable();
+          this.mountListSortable();
           this.setupDragScroll();
         });
         // V4: open the SSE connection once, after the very first
@@ -264,6 +285,173 @@ function board() {
       };
       board.addEventListener('pointerup', endDrag);
       board.addEventListener('pointercancel', endDrag);
+    },
+    // --- UI-6 inline column ops --------------------------------------------
+    // startRename flips the list-header span into its input variant for
+    // the clicked column. The Alpine x-show toggles do the swap; we
+    // seed the draft and clear any error so the input opens clean.
+    startRename(col) {
+      this.renamingColumn = col;
+      this.renameDraft = col;
+      this.renameError = '';
+    },
+    // cancelRename reverts without firing a PATCH (Esc or blur with
+    // unchanged/empty value).
+    cancelRename() {
+      this.renamingColumn = null;
+      this.renameDraft = '';
+      this.renameError = '';
+    },
+    // commitRename trims the draft, no-ops on same-name/empty, else
+    // PATCH /api/columns/<old>. On 2xx clears all three fields (SSE
+    // refetch updates the rendered name). On non-2xx leaves the input
+    // open with the server's error message visible.
+    async commitRename() {
+      if (this.renamingColumn === null) return;
+      const from = this.renamingColumn;
+      const trimmed = (this.renameDraft || '').trim();
+      if (trimmed === from || trimmed === '') {
+        this.cancelRename();
+        return;
+      }
+      try {
+        const res = await fetch('/api/columns/' + encodeURIComponent(from), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: trimmed }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.renameError = (err && err.error && err.error.message) || ('HTTP ' + res.status);
+          return;
+        }
+        this.renamingColumn = null;
+        this.renameDraft = '';
+        this.renameError = '';
+      } catch (e) {
+        this.renameError = e.message || String(e);
+      }
+    },
+    // toggleListMenu opens the menu for col, or closes it if already
+    // open. Clears any prior menuError so a fresh open never reuses a
+    // stale message.
+    toggleListMenu(col) {
+      if (this.openMenuColumn === col) {
+        this.openMenuColumn = null;
+      } else {
+        this.openMenuColumn = col;
+      }
+      this.menuError = '';
+    },
+    closeListMenu() {
+      this.openMenuColumn = null;
+      this.menuError = '';
+    },
+    // deleteList issues DELETE /api/columns/<col>. On 2xx closes the
+    // menu (SSE refetch picks up the deletion). On non-2xx (e.g.
+    // COLUMN_HAS_CARDS, CANNOT_DELETE_LAST_COLUMN) keeps the menu open
+    // and surfaces the server's message inline.
+    async deleteList(col) {
+      this.menuError = '';
+      try {
+        const res = await fetch('/api/columns/' + encodeURIComponent(col), {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.menuError = (err && err.error && err.error.message) || ('HTTP ' + res.status);
+          return;
+        }
+        this.closeListMenu();
+      } catch (e) {
+        this.menuError = e.message || String(e);
+      }
+    },
+    // openListComposer / cancelNewList / submitNewList drive the
+    // dashed Add-list placeholder ↔ composer state machine (design
+    // TD9).
+    openListComposer() {
+      this.composingList = true;
+      this.listDraft = '';
+      this.listError = '';
+    },
+    cancelNewList() {
+      this.composingList = false;
+      this.listDraft = '';
+      this.listError = '';
+    },
+    async submitNewList() {
+      const trimmed = (this.listDraft || '').trim();
+      if (!trimmed) {
+        this.listError = 'name required';
+        return;
+      }
+      this.listError = '';
+      try {
+        const res = await fetch('/api/columns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: trimmed }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          this.listError = (err && err.error && err.error.message) || ('HTTP ' + res.status);
+          return;
+        }
+        this.cancelNewList();
+      } catch (e) {
+        this.listError = e.message || String(e);
+      }
+    },
+    // mountListSortable binds the column-strip Sortable instance to
+    // .columns with a distinct group from the cards instance (TD8) so
+    // the two cannot interfere. Re-mounts on every load() refetch.
+    mountListSortable() {
+      if (this._listSortable && typeof this._listSortable.destroy === 'function') {
+        this._listSortable.destroy();
+      }
+      this._listSortable = null;
+      if (typeof Sortable === 'undefined') return;
+      const container = document.querySelector('.columns');
+      if (!container) return;
+      const self = this;
+      this._listSortable = Sortable.create(container, {
+        group: 'lists',
+        handle: '.list-header',
+        filter: '.is-renaming, .list-menu-btn, .list-menu, .column-name--input, .add-list-placeholder, .list-composer',
+        animation: 0,
+        ghostClass: 'sortable-ghost-list',
+        draggable: '.column',
+        onEnd: (evt) => self.handleListDrop(evt),
+      });
+    },
+    // handleListDrop posts the move. On success refetch; on failure
+    // log + refetch so the server stays source of truth (ADR 0002 §D3).
+    async handleListDrop(evt) {
+      const name = evt.item && evt.item.dataset ? evt.item.dataset.column : '';
+      const position = typeof evt.newIndex === 'number' ? evt.newIndex : 0;
+      if (!name) {
+        console.error('list drop missing name', evt);
+        await this.load();
+        return;
+      }
+      try {
+        const res = await fetch('/api/columns/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, position: position }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('list move failed, refetching', err);
+          await this.load();
+          return;
+        }
+        await this.load();
+      } catch (e) {
+        console.error('list move errored, refetching', e);
+        await this.load();
+      }
     },
     mountSortable() {
       // Tear down any previous instances so re-renders do not leak

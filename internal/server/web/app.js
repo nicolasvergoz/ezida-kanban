@@ -29,14 +29,22 @@ function board() {
     // drag-end mouseup that happens to land on the .card-delete
     // button does NOT fire a stray DELETE (UI-4 design.md §D5).
     _dragJustEnded: false,
-    // V3 edit-modal state. `editing` toggles the overlay; `draft` is
-    // a shallow-cloned card under edit; `tagInput` is the chip-input
-    // buffer; `error` carries the last server-side validation
-    // message (or fetch error) so it can render inside the modal.
-    editing: false,
-    draft: null,
+    // UI-5 detail-modal state. The modal renders each editable field
+    // as rendered text by default; clicking a field flips its
+    // `editing.<name>` flag and swaps in the matching inline editor.
+    // `saving.<name>` and `errors.<name>` are sibling maps. `drafts`
+    // holds the in-flight value while a field is in editing mode;
+    // tags has no draft slot because the chip editor mutates
+    // `openCardData.tags` directly via PATCH (per-action commit).
+    // `openCardData` is the source-of-truth card object, replaced
+    // wholesale from the server response after each successful PATCH.
+    open: false,
+    openCardData: null,
+    editing: { title: false, description: false, priority: false, tags: false },
+    saving: { title: false, description: false, priority: false, tags: false },
+    errors: { title: '', description: '', priority: '', tags: '' },
+    drafts: { title: '', description: '', priority: '' },
     tagInput: '',
-    error: '',
     // V4 SSE state. `connected` drives the topbar status dot;
     // `eventSource` holds the active EventSource handle so a future
     // reconnect can tear down the previous one (the browser's
@@ -170,7 +178,7 @@ function board() {
     // open modal — if any — closes without prompting (spec D9, V4);
     // then we refetch the board so the rendered DOM reflects disk.
     handleExternalChange() {
-      if (this.editing) this.closeCard();
+      if (this.open) this.closeModal();
       this.load();
     },
     cardsByColumn(name) {
@@ -309,61 +317,165 @@ function board() {
         await this.load();
       }
     },
-    // openCard clones the clicked card into `draft` and flips the
-    // modal open. The shallow clone (plus an explicit tags-slice
-    // copy) means edits in the modal cannot mutate the rendered
-    // board state until Save commits via PATCH.
+    // UI-5: openCard seeds `openCardData` from the clicked card and
+    // flips the modal open. Per-field `editing` / `saving` flags reset
+    // to false; `errors` and `drafts` reset to empty strings; tags
+    // array is cloned so removeTag's PATCH (which sends a new array)
+    // cannot accidentally alias the rendered board state.
     openCard(card) {
-      this.draft = Object.assign({}, card, { tags: (card.tags || []).slice() });
+      this.openCardData = Object.assign({}, card, { tags: (card.tags || []).slice() });
+      this.editing = { title: false, description: false, priority: false, tags: false };
+      this.saving = { title: false, description: false, priority: false, tags: false };
+      this.errors = { title: '', description: '', priority: '', tags: '' };
+      this.drafts = { title: '', description: '', priority: '' };
       this.tagInput = '';
-      this.error = '';
-      this.editing = true;
+      this.open = true;
     },
-    closeCard() {
-      this.editing = false;
-      this.draft = null;
+    // closeModal tears down the per-field state and hides the modal.
+    // No prompt, no in-flight cancellation — overlay-click / Esc
+    // (with no active field) reach this path; field-revert lives in
+    // revertField. SSE board-changed also routes through here.
+    closeModal() {
+      this.open = false;
+      this.openCardData = null;
+      this.editing = { title: false, description: false, priority: false, tags: false };
+      this.saving = { title: false, description: false, priority: false, tags: false };
+      this.errors = { title: '', description: '', priority: '', tags: '' };
+      this.drafts = { title: '', description: '', priority: '' };
       this.tagInput = '';
-      this.error = '';
     },
-    addTag() {
-      if (!this.draft) return;
-      const t = (this.tagInput || '').trim();
-      if (!t) return;
-      if (!this.draft.tags.includes(t)) this.draft.tags.push(t);
-      this.tagInput = '';
-    },
-    removeTag(t) {
-      if (!this.draft) return;
-      this.draft.tags = this.draft.tags.filter(function (x) { return x !== t; });
-    },
-    // saveCard sends the full editable field set to the server.
-    // Spec D8 still allows partial patches; the UI sends all four
-    // fields because it always has the full state in `draft`.
-    async saveCard() {
-      if (!this.draft) return;
-      this.error = '';
-      const body = {
-        title: this.draft.title,
-        description: this.draft.description,
-        tags: this.draft.tags,
-        priority: this.draft.priority || '',
+    // startEdit flips a single field into edit mode (design MD2: one
+    // field at a time). Any other currently-editing field is committed
+    // (blur-style) first. The current rendered value is copied into
+    // `drafts[name]` and focus moves to the swapped-in editor on the
+    // next tick.
+    async startEdit(name) {
+      if (!this.openCardData) return;
+      // Commit any other field that is currently in editing.
+      const names = ['title', 'description', 'priority'];
+      for (let i = 0; i < names.length; i++) {
+        const other = names[i];
+        if (other !== name && this.editing[other]) {
+          await this.commitField(other);
+        }
+      }
+      const current = this.openCardData[name];
+      this.drafts[name] = (current === undefined || current === null) ? '' : current;
+      this.errors[name] = '';
+      this.editing[name] = true;
+      const self = this;
+      const refMap = {
+        title: 'titleInput',
+        description: 'descriptionInput',
+        priority: 'priorityInput',
       };
+      this.$nextTick(function () {
+        const ref = refMap[name];
+        if (ref && self.$refs && self.$refs[ref]) {
+          self.$refs[ref].focus();
+        }
+      });
+    },
+    // commitField is the thin wrapper bound to blur / Enter / change
+    // events on the inline editors — it forwards the current draft to
+    // saveField. Declarative bindings stay readable; the network
+    // logic lives in saveField.
+    async commitField(name) {
+      if (!this.editing[name]) return;
+      await this.saveField(name, this.drafts[name]);
+    },
+    // revertField discards the in-flight draft and clears any field
+    // error without firing a PATCH (design MD5 Esc semantics). The
+    // last-saved value is the rendered span's source, so flipping
+    // editing[name] back to false restores it visually.
+    revertField(name) {
+      this.drafts[name] = '';
+      this.errors[name] = '';
+      this.editing[name] = false;
+    },
+    // saveField issues a single-key PATCH per design MD3/MD4. On 2xx
+    // the server response card replaces `openCardData` and the field
+    // flips back to rendered mode. On non-2xx the editor stays open
+    // with its in-flight value preserved and the server message
+    // renders in `.field-error` under the field. On any path
+    // `saving[name]` flips back to false in finally.
+    async saveField(name, value) {
+      if (!this.openCardData) return;
+      const id = this.openCardData.id;
+      this.errors[name] = '';
+      this.saving[name] = true;
       try {
-        const res = await fetch('/api/cards/' + encodeURIComponent(this.draft.id), {
+        const body = {};
+        body[name] = value;
+        const res = await fetch('/api/cards/' + encodeURIComponent(id), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
         });
         if (!res.ok) {
           const err = await res.json().catch(function () { return {}; });
-          this.error = (err && err.error && err.error.message) || ('HTTP ' + res.status);
-          return;
+          this.errors[name] = (err && err.error && err.error.message) || ('HTTP ' + res.status);
+          return; // leave editing[name] true so the user can fix and retry
         }
-        this.closeCard();
+        const data = await res.json().catch(function () { return {}; });
+        if (data && data.card) {
+          this.openCardData = Object.assign({}, data.card, {
+            tags: (data.card.tags || []).slice(),
+          });
+        }
+        this.editing[name] = false;
+        if (name === 'tags') {
+          this.tagInput = '';
+        } else {
+          this.drafts[name] = '';
+        }
         await this.load();
       } catch (e) {
-        this.error = e.message || String(e);
+        this.errors[name] = e.message || String(e);
+      } finally {
+        this.saving[name] = false;
       }
+    },
+    // onEscape is the modal-overlay Esc handler — context-sensitive
+    // per design MD5: if any field is in editing, revert that one;
+    // otherwise close the modal. Inline editors also stop.prevent on
+    // their own Esc (defense in depth) so the bubbled handler is
+    // only reached when no field is active.
+    onEscape() {
+      if (!this.open) return;
+      const names = ['title', 'description', 'priority'];
+      for (let i = 0; i < names.length; i++) {
+        if (this.editing[names[i]]) {
+          this.revertField(names[i]);
+          return;
+        }
+      }
+      this.closeModal();
+    },
+    // addTag commits a per-action PATCH with the new tags array.
+    // Trims, dedups, and clears the input on no-op. Server response
+    // (via saveField) replaces openCardData, keeping the chip list
+    // and tag input in sync.
+    async addTag() {
+      if (!this.openCardData) return;
+      const t = (this.tagInput || '').trim();
+      if (!t) return;
+      const existing = this.openCardData.tags || [];
+      if (existing.indexOf(t) >= 0) {
+        this.tagInput = '';
+        return; // dedup, no PATCH
+      }
+      const next = existing.concat([t]);
+      this.tagInput = '';
+      await this.saveField('tags', next);
+    },
+    // removeTag commits a per-action PATCH with the tag filtered out.
+    // The chip list reflects the server response after the PATCH
+    // settles (no optimistic update).
+    async removeTag(t) {
+      if (!this.openCardData) return;
+      const next = (this.openCardData.tags || []).filter(function (x) { return x !== t; });
+      await this.saveField('tags', next);
     },
     async handleDrop(evt) {
       const id = evt.item && evt.item.dataset ? evt.item.dataset.cardId : '';

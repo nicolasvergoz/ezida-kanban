@@ -157,59 +157,102 @@
       </template>
     </div>
     <div class="modal-overlay"
-         x-show="editing"
+         x-show="open"
          x-cloak
-         @keydown.escape.window="closeCard()"
-         @click.self="closeCard()">
-      <div class="modal" role="dialog" aria-modal="true" x-show="editing">
-        <header class="modal-header">
-          <h2 class="t-list-title">Edit card</h2>
-          <span class="modal-id" x-text="draft && draft.id"></span>
-        </header>
-        <form @submit.prevent="saveCard()" x-show="draft">
-          <label>Title
-            <input type="text" x-model="draft.title" required
-                   @keydown.enter.prevent="saveCard()">
-          </label>
-          <label>Description
-            <textarea x-model="draft.description" rows="6"
-                      @keydown.meta.enter.prevent="saveCard()"
-                      @keydown.ctrl.enter.prevent="saveCard()"></textarea>
-          </label>
-          <label>Priority
-            <select x-model="draft.priority">
-              <option value="">no priority</option>
-              <template x-for="p in priorities" :key="p">
-                <option :value="p" x-text="p"></option>
-              </template>
-            </select>
-          </label>
-          <fieldset class="tags-field">
-            <legend>Tags</legend>
-            <ul class="tag-chips">
-              <template x-for="t in draft.tags" :key="t">
-                <li class="tag t-tag">
-                  <span x-text="t"></span>
-                  <button type="button" @click="removeTag(t)" aria-label="remove tag">&times;</button>
-                </li>
-              </template>
-            </ul>
-            <input type="text" x-model="tagInput"
-                   @keydown.enter.prevent="addTag()"
-                   @keydown.comma.prevent="addTag()"
-                   placeholder="add tag, press Enter">
-          </fieldset>
-          <p class="modal-error" x-show="error" x-text="error"></p>
-          <div class="modal-readonly">
-            <span>column: <code x-text="draft.column"></code></span>
-            <span>created: <code x-text="draft.created_at"></code></span>
-            <span>updated: <code x-text="draft.updated_at"></code></span>
+         @keydown.escape.window="onEscape()"
+         @click.self="closeModal()">
+      <div class="modal" role="dialog" aria-modal="true" x-show="open">
+        <template x-if="openCardData">
+          <div>
+            <header class="modal-header">
+              <span class="modal-id t-mono-label" x-text="openCardData.id"></span>
+            </header>
+
+            <!-- Title field -->
+            <div class="field-row field-row--title">
+              <span class="field t-list-title"
+                    x-show="!editing.title"
+                    @click="startEdit('title')"
+                    x-text="openCardData.title"></span>
+              <input type="text"
+                     class="field--input"
+                     :class="{ 'field--saving': saving.title }"
+                     x-show="editing.title"
+                     x-model="drafts.title"
+                     x-ref="titleInput"
+                     @blur="commitField('title')"
+                     @keydown.enter.prevent="commitField('title')"
+                     @keydown.escape.stop.prevent="revertField('title')">
+              <p class="field-error" x-show="errors.title" x-text="errors.title"></p>
+            </div>
+
+            <!-- Description field -->
+            <div class="field-row field-row--description">
+              <p class="field field--multiline"
+                 x-show="!editing.description"
+                 @click="startEdit('description')"
+                 x-text="openCardData.description || 'Add a description'"></p>
+              <textarea class="field--textarea"
+                        :class="{ 'field--saving': saving.description }"
+                        x-show="editing.description"
+                        x-model="drafts.description"
+                        x-ref="descriptionInput"
+                        rows="6"
+                        @blur="commitField('description')"
+                        @keydown.meta.enter.prevent="commitField('description')"
+                        @keydown.ctrl.enter.prevent="commitField('description')"
+                        @keydown.escape.stop.prevent="revertField('description')"></textarea>
+              <p class="field-error" x-show="errors.description" x-text="errors.description"></p>
+            </div>
+
+            <!-- Priority field -->
+            <div class="field-row field-row--priority">
+              <span class="field"
+                    x-show="!editing.priority"
+                    @click="startEdit('priority')"
+                    x-text="openCardData.priority || 'no priority'"></span>
+              <select class="field--select"
+                      :class="{ 'field--saving': saving.priority }"
+                      x-show="editing.priority"
+                      x-model="drafts.priority"
+                      x-ref="priorityInput"
+                      @change="commitField('priority')"
+                      @blur="commitField('priority')"
+                      @keydown.escape.stop.prevent="revertField('priority')">
+                <option value="">no priority</option>
+                <template x-for="p in priorities" :key="p">
+                  <option :value="p" x-text="p"></option>
+                </template>
+              </select>
+              <p class="field-error" x-show="errors.priority" x-text="errors.priority"></p>
+            </div>
+
+            <!-- Tag chips (always live, no rendered-vs-editing split) -->
+            <div class="field-row field-row--tags">
+              <ul class="tag-chips" :class="{ 'field--saving': saving.tags }">
+                <template x-for="t in openCardData.tags" :key="t">
+                  <li class="tag t-tag">
+                    <span x-text="t"></span>
+                    <button type="button" @click="removeTag(t)" aria-label="remove tag">&times;</button>
+                  </li>
+                </template>
+              </ul>
+              <input type="text" class="tag-add"
+                     x-model="tagInput"
+                     @keydown.enter.prevent="addTag()"
+                     @keydown.comma.prevent="addTag()"
+                     placeholder="add tag">
+              <p class="field-error" x-show="errors.tags" x-text="errors.tags"></p>
+            </div>
+
+            <!-- Read-only metadata -->
+            <footer class="modal-readonly t-mono-label">
+              <span>column: <code x-text="openCardData.column"></code></span>
+              <span>created: <code x-text="openCardData.created_at"></code></span>
+              <span>updated: <code x-text="openCardData.updated_at"></code></span>
+            </footer>
           </div>
-          <footer class="modal-footer">
-            <button type="button" class="t-button" @click="closeCard()">Cancel</button>
-            <button type="submit" class="t-button">Save</button>
-          </footer>
-        </form>
+        </template>
       </div>
     </div>
   </main>

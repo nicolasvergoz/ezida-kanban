@@ -716,64 +716,71 @@
     color: var(--text-faint);
   }
 
-  .modal form label {
-    display: block;
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: var(--space-xl);
+  /* --- UI-5 per-field click-to-edit detail (design MD12) --------------- */
+
+  .field-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding: var(--space-sm) 0;
   }
 
-  .modal form input[type="text"],
-  .modal form textarea,
-  .modal form select {
+  .field {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--rounded-sm);
+    cursor: text;
+    color: var(--text);
+    transition: background-color 120ms ease;
+  }
+
+  .field:hover {
+    background: color-mix(in oklab, var(--surface) 85%, var(--accent) 15%);
+  }
+
+  /* Multi-line variant for the description rendered cell — preserves
+     whitespace so newlines from the textarea survive at rest. */
+  .field--multiline {
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .field--input,
+  .field--textarea,
+  .field--select {
     display: block;
     width: 100%;
-    margin-top: var(--space-xs);
-    padding: var(--space-md) var(--space-lg);
+    padding: var(--space-xs) var(--space-sm);
     font-family: 'Geist', system-ui, sans-serif;
     font-size: 14px;
     font-weight: 400;
     line-height: 1.45;
     color: var(--text);
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-md);
+    border: 1px solid var(--accent);
+    border-radius: var(--rounded-sm);
     box-sizing: border-box;
     outline: none;
-    transition: border-color 120ms ease;
   }
 
-  .modal form input[type="text"]:focus,
-  .modal form textarea:focus,
-  .modal form select:focus {
-    border-color: var(--accent);
-  }
-
-  .modal form textarea {
+  .field--textarea {
     resize: vertical;
+    min-height: 88px;
   }
 
-  .tags-field {
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-md);
-    padding: var(--space-md) var(--space-lg);
-    margin: 0 0 var(--space-xl) 0;
+  /* Subtle in-flight affordance — opacity + pointer-events:none so a
+     second click can't queue a duplicate PATCH (design MD6: CSS-only,
+     no spinner). */
+  .field--saving {
+    opacity: 0.6;
+    pointer-events: none;
   }
 
-  .tags-field legend {
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    padding: 0 var(--space-xs);
+  .field-error {
+    color: var(--danger);
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13px;
+    margin: 0;
   }
 
   .tag-chips {
@@ -804,11 +811,25 @@
     color: var(--text);
   }
 
-  .modal-error {
-    color: var(--danger);
-    margin: var(--space-md) 0;
+  .tag-add {
+    display: block;
+    width: 100%;
+    padding: var(--space-xs) var(--space-sm);
     font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13px;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-sm);
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 120ms ease;
+  }
+
+  .tag-add:focus {
+    border-color: var(--accent);
   }
 
   .modal-readonly {
@@ -821,49 +842,12 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-xl);
-    margin: var(--space-md) 0;
+    margin: var(--space-md) 0 0;
   }
 
   .modal-readonly code {
     font-family: 'Geist Mono', ui-monospace, monospace;
     color: var(--text-muted);
-  }
-
-  .modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-md);
-    margin-top: var(--space-xl);
-  }
-
-  .modal-footer button {
-    padding: var(--space-sm) var(--space-2xl);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1;
-    cursor: pointer;
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text-muted);
-    border-radius: var(--rounded-md);
-    transition: background-color 120ms ease, color 120ms ease;
-  }
-
-  .modal-footer button:hover {
-    color: var(--text);
-    background: color-mix(in oklab, var(--text) 3%, transparent);
-  }
-
-  .modal-footer button[type="submit"] {
-    background: var(--text);
-    color: var(--bg-base);
-    border-color: var(--text);
-  }
-
-  .modal-footer button[type="submit"]:hover {
-    background: color-mix(in oklab, var(--text) 92%, transparent);
-    color: var(--bg-base);
   }
 }
 

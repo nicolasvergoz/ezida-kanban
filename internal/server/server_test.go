@@ -668,6 +668,54 @@ func TestIndex_NoExternalScripts(t *testing.T) {
 	}
 }
 
+// TestIndex_ModalUsesFieldPlaceholders confirms UI-5's modal markup
+// rewrite landed: the rendered HTML carries the per-field click-to-edit
+// scaffold (field-row--title, the description Cmd/Ctrl+Enter binding,
+// and the priority @change commit) instead of V3's always-open form.
+func TestIndex_ModalUsesFieldPlaceholders(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	for _, want := range []string{
+		`class="field-row field-row--title"`,
+		`@keydown.meta.enter.prevent="commitField('description')"`,
+		`@keydown.ctrl.enter.prevent="commitField('description')"`,
+		`@change="commitField('priority')"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("index body missing %q", want)
+		}
+	}
+}
+
+// TestIndex_ModalHasNoSaveCancelFooter confirms UI-5 removed the V3
+// modal-footer Save / Cancel pair. The composer (UI-4) still has its
+// own Cancel inside .column-footer, so this test scopes the assertion
+// to <footer class="modal-footer">.
+func TestIndex_ModalHasNoSaveCancelFooter(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	if strings.Contains(body, `class="modal-footer"`) {
+		t.Fatalf("index body still contains V3 modal-footer block")
+	}
+	if strings.Contains(body, `<button type="submit" class="t-button"`) {
+		t.Fatalf("index body still contains V3 modal Save submit button")
+	}
+}
+
 // writableBoard copies testdata/valid_kanban.toml into t.TempDir so a
 // test can exercise endpoints that mutate the file. Returns the path
 // to the temp copy.

@@ -76,7 +76,11 @@ func silenceRunOutput(t *testing.T) {
 // test is exercising the BOARD_NOT_FOUND branch).
 func startTestServer(t *testing.T, boardPath string) (*httptest.Server, func()) {
 	t.Helper()
-	s := &serverState{boardPath: boardPath, broker: NewBroker()}
+	s := &serverState{
+		boardPath:   boardPath,
+		projectName: resolveProjectName(boardPath),
+		broker:      NewBroker(),
+	}
 	mux := http.NewServeMux()
 	s.routes(mux)
 	ts := httptest.NewServer(mux)
@@ -88,7 +92,11 @@ func startTestServer(t *testing.T, boardPath string) (*httptest.Server, func()) 
 func startTestServerWithBroker(t *testing.T, boardPath string) (*httptest.Server, *Broker, func()) {
 	t.Helper()
 	b := NewBroker()
-	s := &serverState{boardPath: boardPath, broker: b}
+	s := &serverState{
+		boardPath:   boardPath,
+		projectName: resolveProjectName(boardPath),
+		broker:      b,
+	}
 	mux := http.NewServeMux()
 	s.routes(mux)
 	ts := httptest.NewServer(mux)
@@ -1109,6 +1117,125 @@ func TestHandle_Patch_RefreshesUpdatedAt(t *testing.T) {
 	if disk == nil || !disk.UpdatedAt.After(before.UpdatedAt) {
 		t.Fatalf("on-disk updated_at not refreshed")
 	}
+}
+
+// TestHandle_Board_ProjectName confirms /api/board includes the
+// top-level `project_name` field set to the parent-directory name of
+// the resolved board path. The test writes a board into a temp dir
+// whose basename is the asserted value.
+func TestHandle_Board_ProjectName(t *testing.T) {
+	dir := t.TempDir()
+	projectDir := filepath.Join(dir, "my-project")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	src := fixturePath(t, "valid_kanban.toml")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	path := filepath.Join(projectDir, "kanban.toml")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/api/board")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	var payload struct {
+		ProjectName string `json:"project_name"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if payload.ProjectName != "my-project" {
+		t.Fatalf("project_name = %q, want %q", payload.ProjectName, "my-project")
+	}
+}
+
+// TestResolveProjectName_Fallback exercises the fallback branch of
+// resolveProjectName via a filesystem-root board path (the basename of
+// the parent directory is `/`, which equals filepath.Separator). The
+// helper is the right seam — it encapsulates the entire fallback
+// logic so we don't need to synthesize a real root-of-filesystem
+// scenario.
+func TestResolveProjectName_Fallback(t *testing.T) {
+	// `/kanban.toml` → Dir is "/", Base("/") is "/" — fallback path.
+	rootPath := string(filepath.Separator) + "kanban.toml"
+	if got := resolveProjectName(rootPath); got != "Ezida" {
+		t.Fatalf("resolveProjectName(%q) = %q, want %q", rootPath, got, "Ezida")
+	}
+	// Real parent directory → its basename.
+	dir := t.TempDir()
+	projectDir := filepath.Join(dir, "alpha")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	path := filepath.Join(projectDir, "kanban.toml")
+	if got := resolveProjectName(path); got != "alpha" {
+		t.Fatalf("resolveProjectName(%q) = %q, want %q", path, got, "alpha")
+	}
+}
+
+// TestHandle_Board_ProjectName_Stable confirms project_name is the
+// same across two consecutive /api/board requests (immutability for
+// the lifetime of the process — ADR 0003 §D4).
+func TestHandle_Board_ProjectName_Stable(t *testing.T) {
+	dir := t.TempDir()
+	projectDir := filepath.Join(dir, "stable-project")
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	src := fixturePath(t, "valid_kanban.toml")
+	data, err := os.ReadFile(src)
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	path := filepath.Join(projectDir, "kanban.toml")
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	first := fetchProjectName(t, ts.URL)
+	// Rewrite the board file between requests — project_name must not
+	// re-evaluate.
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	second := fetchProjectName(t, ts.URL)
+	if first != second {
+		t.Fatalf("project_name drifted: first=%q second=%q", first, second)
+	}
+	if first != "stable-project" {
+		t.Fatalf("project_name = %q, want %q", first, "stable-project")
+	}
+}
+
+func fetchProjectName(t *testing.T, baseURL string) string {
+	t.Helper()
+	res, err := http.Get(baseURL + "/api/board")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer res.Body.Close()
+	var payload struct {
+		ProjectName string `json:"project_name"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return payload.ProjectName
 }
 
 // firstExternalIPv4 returns the first up, non-loopback IPv4 address

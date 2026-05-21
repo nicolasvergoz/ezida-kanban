@@ -1,8 +1,8 @@
 ## 1. Font vendoring
 
-- [ ] 1.1 Create directory `internal/server/web/vendor/fonts/`.
+- [x] 1.1 Create directory `internal/server/web/vendor/fonts/`.
   Done when `test -d internal/server/web/vendor/fonts` exits 0.
-- [ ] 1.2 Add Geist `.woff2` files for weights 300, 400, 500, 600,
+- [x] 1.2 Add Geist `.woff2` files for weights 300, 400, 500, 600,
   700, 800 under `internal/server/web/vendor/fonts/` (file names
   e.g. `Geist-Light.woff2`, `Geist-Regular.woff2`,
   `Geist-Medium.woff2`, `Geist-SemiBold.woff2`, `Geist-Bold.woff2`,
@@ -10,11 +10,11 @@
   distribution (OFL license). Done when `ls
   internal/server/web/vendor/fonts/Geist-*.woff2 | wc -l` returns
   `6`.
-- [ ] 1.3 Add Geist Mono `.woff2` files for weights 400 and 500
+- [x] 1.3 Add Geist Mono `.woff2` files for weights 400 and 500
   (`GeistMono-Regular.woff2`, `GeistMono-Medium.woff2`). Done when
   `ls internal/server/web/vendor/fonts/GeistMono-*.woff2 | wc -l`
   returns `2`.
-- [ ] 1.4 Verify the existing `//go:embed` directive picks up the
+- [x] 1.4 Verify the existing `//go:embed` directive picks up the
   new font files. Done when `go build ./...` succeeds AND a quick
   manual probe (start the server, `curl -sI
   http://127.0.0.1:7777/static/vendor/fonts/Geist-Regular.woff2`)
@@ -24,7 +24,7 @@
 
 ## 2. Token system in style.css
 
-- [ ] 2.1 Replace `internal/server/web/style.css` with a token-driven
+- [x] 2.1 Replace `internal/server/web/style.css` with a token-driven
   Redacto stylesheet organized via `@layer tokens, typography,
   components`. The `@layer tokens` block MUST define on `:root`
   every token enumerated in the viewer-ui delta (Design Tokens
@@ -38,7 +38,7 @@
   grep -vE '^[^:]*:\s*[0-9]+:[[:space:]]*(--|/\*|\*|@font-face)'`
   returns no matches outside the `@layer tokens` block (manual
   diff review; the smoke task captures this).
-- [ ] 2.2 Inside `@layer typography`, define `@font-face` rules for
+- [x] 2.2 Inside `@layer typography`, define `@font-face` rules for
   every weight vendored in section 1 with `font-display: swap` and
   relative `url('/static/vendor/fonts/...')` paths. Then define
   utility classes `.t-brand`, `.t-list-title`, `.t-card-text`,
@@ -49,13 +49,13 @@
 
 ## 3. Page surfaces (background, grain, top-shade)
 
-- [ ] 3.1 In `@layer components`, set `body` background to
+- [x] 3.1 In `@layer components`, set `body` background to
   `var(--bg-base)` and add a fixed `body::before` (or a dedicated
   `.grain` overlay div) bearing a tiled SVG noise data-URI with
   `opacity: 0.04`, `pointer-events: none`, `z-index: -1`. Done
   when the served page's `body` computed `background-color`
   resolves to the bg-base value AND a grain pseudo-element exists.
-- [ ] 3.2 Add a `.topshade` decorative element (either a `body::after`
+- [x] 3.2 Add a `.topshade` decorative element (either a `body::after`
   pseudo or a `<div class="topshade">` in `index.html` if pseudo-
   element layering conflicts with `position: fixed`) — a 64px-tall
   `linear-gradient` from `color-mix(in oklab, var(--bg-base) 90%,
@@ -66,21 +66,21 @@
 
 ## 4. Topbar restyle and project-name binding
 
-- [ ] 4.1 Update `internal/server/web/index.html`: change the
+- [x] 4.1 Update `internal/server/web/index.html`: change the
   `.project-name` span to a `.brand` element with class `t-brand`,
   bound via `x-text="project_name"`. Keep the `.status-dot` in the
   right zone. Set the topbar's structural classes so the `.t-brand`
   typography applies. Done when the served `index.html` contains
   `class="brand t-brand"` (or similar) and an `x-text="project_name"`
   binding on the brand element.
-- [ ] 4.2 Update `internal/server/web/app.js`: add `project_name: ''`
+- [x] 4.2 Update `internal/server/web/app.js`: add `project_name: ''`
   to the Alpine component's data; assign
   `this.project_name = data.project_name || 'Ezida'` inside
   `load()` after the JSON decode. Done when `grep -n
   "project_name" internal/server/web/app.js` returns at least two
   matches (declaration + assignment) and the file still passes a
   manual sanity read.
-- [ ] 4.3 Style `.status-dot` per Redacto: 8px circle,
+- [x] 4.3 Style `.status-dot` per Redacto: 8px circle,
   `var(--rounded-full)`, `--accent` family fill when `.on`,
   `--text-faint` family when `.off`. No hex literals in the rule.
   Done when the served page's status dot renders with the token-
@@ -88,12 +88,12 @@
 
 ## 5. Column glass panels and card chrome
 
-- [ ] 5.1 Rename `.columns` to `.board` in `index.html` and
+- [x] 5.1 Rename `.columns` to `.board` in `index.html` and
   `style.css` (or add `.board` as a parallel class). Wire the
   outer wrapper as `<div class="board">` so the drag-scroll
   handler in section 9 has a stable target. Done when the served
   page contains `class="board"` on the columns wrapper.
-- [ ] 5.2 Style `.column` as a 296px-wide glass panel: width
+- [x] 5.2 Style `.column` as a 296px-wide glass panel: width
   `var(--space-list-width, 296px)` (define if needed),
   `background: color-mix(in oklab, var(--surface) 75%,
   transparent)`, `backdrop-filter: blur(14px) saturate(140%)`,
@@ -101,7 +101,7 @@
   var(--rounded-xl)`, `padding: var(--space-sm)`. Done when a
   `.column` element's computed `backdrop-filter` is non-empty and
   contains both `blur` and `saturate`.
-- [ ] 5.3 Style `.card` per Redacto chrome: `background:
+- [x] 5.3 Style `.card` per Redacto chrome: `background:
   var(--surface)`, `border: 1px solid var(--border)`,
   `border-radius: var(--rounded-lg)`, `padding: 10px 12px`,
   `box-shadow: var(--shadow-card-idle)`, `transition: transform
@@ -109,7 +109,7 @@
   state), `transform: translateY(-1px)`, `box-shadow:
   var(--shadow-card-hover)`. Done when a card's hover state
   produces a translated transform and a multi-layer shadow.
-- [ ] 5.4 Style `.column-header` with `.t-list-title` (uppercase,
+- [x] 5.4 Style `.column-header` with `.t-list-title` (uppercase,
   tracked), and `.column-count` with `.t-mono-counter` plus a
   small `var(--surface)` background, `var(--rounded-md)` corners,
   1px `var(--border)`. Done when the column header renders the
@@ -117,13 +117,13 @@
 
 ## 6. Tag chips and priorities (visual only)
 
-- [ ] 6.1 Style `.tag` chips on the card surface per Redacto: pill
+- [x] 6.1 Style `.tag` chips on the card surface per Redacto: pill
   shape (`var(--rounded-full)`), `.t-tag` typography, faint
   background `color-mix(in oklab, var(--text) 3%, transparent)`,
   `var(--text-faint)` text color, 1px subtle border. Behavior
   unchanged — readonly on the card body. Done when card tags
   render as rounded-full pills with the Redacto tag typography.
-- [ ] 6.2 Rewrite `.priority-low`, `.priority-medium`,
+- [x] 6.2 Rewrite `.priority-low`, `.priority-medium`,
   `.priority-high` to use token-driven border / background
   combinations only (no hex literals in component rules). Each
   priority MUST produce a visually distinguishable card border or
@@ -133,10 +133,10 @@
 
 ## 7. Modal restyle
 
-- [ ] 7.1 Restyle `.modal-overlay` with backdrop `color-mix(in
+- [x] 7.1 Restyle `.modal-overlay` with backdrop `color-mix(in
   oklab, var(--bg-base) 10%, transparent)` and no blur. Done when
   the overlay renders as a low-tint scrim over the board.
-- [ ] 7.2 Restyle `.modal` with `background: var(--surface)`,
+- [x] 7.2 Restyle `.modal` with `background: var(--surface)`,
   `border-radius: var(--rounded-xl)`, `box-shadow:
   var(--shadow-popover)`, `padding: var(--space-3xl)`, max-width
   ~520px. Header `h2` carries `.t-list-title`. Inputs and textareas
@@ -146,18 +146,18 @@
   and its shadow resolves to multiple layers consistent with
   `--shadow-popover`. Behavior unchanged (V3 fields and Save/Cancel
   flow preserved).
-- [ ] 7.3 Restyle modal tag chips with the same Redacto chip skin
+- [x] 7.3 Restyle modal tag chips with the same Redacto chip skin
   as card tags but keeping V3's editable `×` remove button and tag
   input. Done when modal tag chips visually match the card tag
   treatment.
 
 ## 8. Loading and empty-column states
 
-- [ ] 8.1 Style `.loading` per Redacto: `.t-body-md` typography,
+- [x] 8.1 Style `.loading` per Redacto: `.t-body-md` typography,
   `color: var(--text-muted)`, centered horizontally and vertically
   in the board surface. Done when the loading placeholder renders
   with the muted-text token and the body-md type.
-- [ ] 8.2 Style `.empty` (the per-column empty placeholder) per
+- [x] 8.2 Style `.empty` (the per-column empty placeholder) per
   Redacto: `.t-body-md` typography, italic, `color:
   var(--text-faint)`, centered inside the column body, no border,
   no fill. Done when `.empty` renders as faint italic centered
@@ -165,10 +165,10 @@
 
 ## 9. Drag-scroll affordance
 
-- [ ] 9.1 Add a `.is-scrolling .card { pointer-events: none }` rule
+- [x] 9.1 Add a `.is-scrolling .card { pointer-events: none }` rule
   in `@layer components` so cards do not intercept clicks mid-
   drag-scroll. Done when the rule exists in `style.css`.
-- [ ] 9.2 Add a `setupDragScroll()` method to the Alpine component
+- [x] 9.2 Add a `setupDragScroll()` method to the Alpine component
   in `app.js`. Call it from `$nextTick` inside `load()` after the
   first successful fetch, guarded by an `_dragScrollMounted` flag
   so it only attaches once. The handler:
@@ -185,26 +185,26 @@
   Done when `grep -n "setupDragScroll\|is-scrolling" app.js`
   returns at least three matches (declaration, body-class add,
   body-class remove) and the file parses (manual read).
-- [ ] 9.3 Verify the drag-scroll does not interfere with Sortable
+- [x] 9.3 Verify the drag-scroll does not interfere with Sortable
   card drags — Sortable's own pointer listener still fires because
   the drag-scroll handler bails on `closest('.card')`. Automated
   proof via Chrome MCP smoke in the final gate.
 
 ## 10. Server: project_name field
 
-- [ ] 10.1 In `internal/server/server.go`, inside `runWithContext`,
+- [x] 10.1 In `internal/server/server.go`, inside `runWithContext`,
   compute `projectName` from the resolved board path using
   `filepath.Abs` then `filepath.Base(filepath.Dir(abs))`, with
   fallback to `"Ezida"` when the result is empty, `"."`, or the
   platform separator. Pass the value into the `serverState`
   constructor. Done when `serverState` carries a `projectName
   string` field and `runWithContext` populates it.
-- [ ] 10.2 In `internal/server/handlers.go`, add `ProjectName
+- [x] 10.2 In `internal/server/handlers.go`, add `ProjectName
   string \`json:"project_name"\`` as the last field of
   `boardResponse`. In `handleBoard`, set `resp.ProjectName =
   s.projectName`. Done when `go vet ./...` passes and `go build
   ./...` succeeds.
-- [ ] 10.3 In `internal/server/server_test.go` (or a sibling test
+- [x] 10.3 In `internal/server/server_test.go` (or a sibling test
   file), add or update at least two test cases for `/api/board`:
   one asserting `project_name` equals the parent-directory basename
   of the temp board path, and one asserting the `"Ezida"` fallback
@@ -216,11 +216,11 @@
 
 ## 11. Verify gate and smoke
 
-- [ ] 11.1 Run `go test ./...` and confirm the entire suite passes
+- [x] 11.1 Run `go test ./...` and confirm the entire suite passes
   (the configured verify gate). Done when the command exits 0.
-- [ ] 11.2 Run `go vet ./...` and confirm clean output. Done when
+- [x] 11.2 Run `go vet ./...` and confirm clean output. Done when
   the command exits 0 with no diagnostics.
-- [ ] 11.3 Automated proof via Chrome MCP smoke (orchestrator-run):
+- [x] 11.3 Automated proof via Chrome MCP smoke (orchestrator-run):
   start `ezida serve --no-open --port=7777` against a temp board
   named e.g. `redacto-smoke/kanban.toml`, then:
   - `curl -s http://127.0.0.1:7777/api/board | jq -r .project_name`
@@ -234,7 +234,7 @@
     drag-scroll affordance scrolls the board horizontally on
     pointer-drag of empty surface, and the status dot is round.
   Done when the orchestrator confirms each sub-check.
-- [ ] 11.4 Sanity grep: `grep -nE '#[0-9a-fA-F]{3,6}'
+- [x] 11.4 Sanity grep: `grep -nE '#[0-9a-fA-F]{3,6}'
   internal/server/web/style.css | grep -v '@layer tokens' | grep -v
   '@font-face'` returns no matches outside the tokens / font-face
   blocks (visual review of remaining hits if any). Done when the

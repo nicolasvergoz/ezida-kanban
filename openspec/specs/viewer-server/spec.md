@@ -110,9 +110,18 @@ in-flight requests with a 5 s timeout, then exit with code `0`.
 
 `GET /api/board` SHALL load `kanban.toml` from the current working
 directory at request time and respond with a JSON object containing
-`schema_version`, `columns`, `priorities`, `cards_per_column`, and
-`cards`. The `cards` array MUST include the full `description` field
-for every card. Response `Content-Type` MUST be `application/json`.
+`schema_version`, `columns`, `priorities`, `cards_per_column`,
+`cards`, and `project_name`. The `cards` array MUST include the
+full `description` field for every card. Response `Content-Type`
+MUST be `application/json`.
+
+The top-level `project_name` field is a string set at server start
+to `filepath.Base(filepath.Dir(<resolved boardPath>))` — i.e. the
+parent-directory name of the resolved `kanban.toml` path. It MUST
+fall back to the literal string `"Ezida"` when the computed
+basename is empty, equal to `"."`, or equal to the platform path
+separator. The value MUST NOT change for the lifetime of the
+process (it is not re-evaluated when the board file changes).
 
 #### Scenario: Valid board
 
@@ -124,6 +133,26 @@ for every card. Response `Content-Type` MUST be `application/json`.
 - **AND** `cards_per_column` reflects the per-column count
 - **AND** each card in `cards` has a `description` field (may be
   empty string)
+- **AND** the body contains a top-level string field `project_name`
+
+#### Scenario: Project name reflects parent directory
+
+- **WHEN** `GET /api/board` is called against a server whose
+  resolved board path is `/tmp/my-project/kanban.toml`
+- **THEN** the response body's `project_name` equals `"my-project"`
+
+#### Scenario: Project name falls back to "Ezida" at filesystem root
+
+- **WHEN** `GET /api/board` is called against a server whose
+  resolved board path produces an empty or `"."` parent-directory
+  basename
+- **THEN** the response body's `project_name` equals `"Ezida"`
+
+#### Scenario: Project name is stable across requests
+
+- **WHEN** `GET /api/board` is called twice against the same
+  running server with a board file rewritten in between
+- **THEN** both responses contain the same `project_name` value
 
 #### Scenario: Board file missing
 

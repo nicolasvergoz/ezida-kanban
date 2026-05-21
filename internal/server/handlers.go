@@ -171,6 +171,10 @@ type boardResponse struct {
 	Priorities     []string       `json:"priorities"`
 	CardsPerColumn map[string]int `json:"cards_per_column"`
 	Cards          []cardResponse `json:"cards"`
+	// ProjectName is the server-resolved name of the project (parent-
+	// directory of the board path, with "Ezida" fallback). Computed
+	// once at server start; immutable for the process lifetime.
+	ProjectName string `json:"project_name"`
 }
 
 // cardResponse is the per-card JSON shape returned inside
@@ -236,6 +240,7 @@ func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
 		Priorities:     b.Board.Priorities,
 		CardsPerColumn: counts,
 		Cards:          cards,
+		ProjectName:    s.projectName,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

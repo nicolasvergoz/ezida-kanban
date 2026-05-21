@@ -11,34 +11,34 @@
 <body>
   <main x-data="board()" x-init="load()">
   <header class="topbar">
-    <span class="project-name">Ezida</span>
+    <span class="brand t-brand" x-text="project_name">Ezida</span>
     <span class="status-dot" :class="connected ? 'on' : 'off'"
           :title="connected ? 'live updates connected' : 'live updates disconnected'"></span>
   </header>
-    <template x-if="!loaded"><div class="loading">Loading&hellip;</div></template>
-    <div class="columns" x-show="loaded">
+    <template x-if="!loaded"><div class="loading t-body-md">Loading&hellip;</div></template>
+    <div class="board columns" x-show="loaded">
       <template x-for="col in columns" :key="col">
         <section class="column">
           <header class="column-header">
-            <span class="column-name" x-text="col"></span>
-            <span class="column-count" x-text="cardsByColumn(col).length"></span>
+            <span class="column-name t-list-title" x-text="col"></span>
+            <span class="column-count t-mono-counter" x-text="cardsByColumn(col).length"></span>
           </header>
           <ul class="cards" :data-column="col">
             <template x-for="card in cardsByColumn(col)" :key="card.id">
               <li class="card" :data-card-id="card.id" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at" @click="openCard(card)">
-                <div class="card-title" x-text="card.title"></div>
+                <div class="card-title t-card-text" x-text="card.title"></div>
                 <template x-if="card.priority">
-                  <span class="badge" x-text="card.priority"></span>
+                  <span class="badge t-mono-label" x-text="card.priority"></span>
                 </template>
                 <ul class="tags" x-show="card.tags && card.tags.length">
                   <template x-for="tag in (card.tags || [])" :key="tag">
-                    <li class="tag" x-text="tag"></li>
+                    <li class="tag t-tag" x-text="tag"></li>
                   </template>
                 </ul>
               </li>
             </template>
             <template x-if="cardsByColumn(col).length === 0">
-              <li class="empty">empty</li>
+              <li class="empty t-body-md">empty</li>
             </template>
           </ul>
         </section>
@@ -51,7 +51,7 @@
          @click.self="closeCard()">
       <div class="modal" role="dialog" aria-modal="true" x-show="editing">
         <header class="modal-header">
-          <h2>Edit card</h2>
+          <h2 class="t-list-title">Edit card</h2>
           <span class="modal-id" x-text="draft && draft.id"></span>
         </header>
         <form @submit.prevent="saveCard()" x-show="draft">
@@ -76,7 +76,7 @@
             <legend>Tags</legend>
             <ul class="tag-chips">
               <template x-for="t in draft.tags" :key="t">
-                <li class="tag">
+                <li class="tag t-tag">
                   <span x-text="t"></span>
                   <button type="button" @click="removeTag(t)" aria-label="remove tag">&times;</button>
                 </li>
@@ -94,8 +94,8 @@
             <span>updated: <code x-text="draft.updated_at"></code></span>
           </div>
           <footer class="modal-footer">
-            <button type="button" @click="closeCard()">Cancel</button>
-            <button type="submit">Save</button>
+            <button type="button" class="t-button" @click="closeCard()">Cancel</button>
+            <button type="submit" class="t-button">Save</button>
           </footer>
         </form>
       </div>

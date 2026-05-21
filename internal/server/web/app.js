@@ -9,9 +9,17 @@ function board() {
   return {
     loaded: false,
     schema_version: 0,
+    // project_name comes from /api/board (filepath.Base of parent dir,
+    // computed once on the server at boot). Bound to the topbar brand
+    // via x-text; CSS handles uppercasing.
+    project_name: '',
     columns: [],
     priorities: [],
     cards: [],
+    // _dragScrollMounted guards setupDragScroll() so the pointer
+    // listeners attach exactly once even though load() runs on every
+    // SSE-triggered refetch.
+    _dragScrollMounted: false,
     // _sortables holds the Sortable instances mounted on each column
     // so they can be destroyed before being remounted after a refetch
     // (Alpine reuses the <ul> nodes across renders).
@@ -41,13 +49,18 @@ function board() {
         }
         const data = await res.json();
         this.schema_version = data.schema_version;
+        this.project_name = data.project_name || 'Ezida';
         this.columns = data.columns || [];
         this.priorities = data.priorities || [];
         this.cards = data.cards || [];
         this.loaded = true;
         // Defer until Alpine has flushed the new DOM, then attach
-        // Sortable to each freshly-rendered column.
-        this.$nextTick(() => this.mountSortable());
+        // Sortable to each freshly-rendered column and wire the
+        // drag-scroll affordance on the .board element (one-shot).
+        this.$nextTick(() => {
+          this.mountSortable();
+          this.setupDragScroll();
+        });
         // V4: open the SSE connection once, after the very first
         // successful board fetch, so initial render and live updates
         // share the same code path.
@@ -78,6 +91,49 @@ function board() {
     },
     cardsByColumn(name) {
       return this.cards.filter(function (c) { return c.column === name; });
+    },
+    // setupDragScroll wires pointerdown/pointermove/pointerup listeners
+    // on the .board element so a user can drag the empty board surface
+    // horizontally. Guarded by _dragScrollMounted so the listeners
+    // attach exactly once. Skips interactive descendants
+    // (.card, .column-header, button, form controls, .modal) so
+    // Sortable's card drags and click handlers keep working.
+    //
+    // While a drag is active, body.is-scrolling is set; CSS uses that
+    // class to disable pointer-events on .card so the gesture isn't
+    // hijacked by a child click.
+    setupDragScroll() {
+      if (this._dragScrollMounted) return;
+      const board = this.$el.querySelector('.board');
+      if (!board) return;
+      this._dragScrollMounted = true;
+      let isDragging = false;
+      let startX = 0;
+      let startScroll = 0;
+      board.addEventListener('pointerdown', function (e) {
+        if (e.button !== 0) return;
+        const t = e.target;
+        if (t && t.closest && t.closest('.card, .column-header, button, input, textarea, select, .modal, .modal-overlay')) {
+          return;
+        }
+        isDragging = true;
+        startX = e.clientX;
+        startScroll = board.scrollLeft;
+        document.body.classList.add('is-scrolling');
+        try { board.setPointerCapture(e.pointerId); } catch (_) {}
+      });
+      board.addEventListener('pointermove', function (e) {
+        if (!isDragging) return;
+        board.scrollLeft = startScroll - (e.clientX - startX);
+      });
+      const endDrag = function (e) {
+        if (!isDragging) return;
+        isDragging = false;
+        document.body.classList.remove('is-scrolling');
+        try { board.releasePointerCapture(e.pointerId); } catch (_) {}
+      };
+      board.addEventListener('pointerup', endDrag);
+      board.addEventListener('pointercancel', endDrag);
     },
     mountSortable() {
       // Tear down any previous instances so re-renders do not leak

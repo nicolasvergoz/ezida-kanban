@@ -1,289 +1,685 @@
-/* Ezida viewer — minimal layout (v1). Color polish deferred. */
+/* Ezida viewer — Redacto stylesheet (UI-1).
+ *
+ * Organized into three `@layer` blocks so the override predictability
+ * mirrors the design intent:
+ *
+ *   1. tokens     — :root custom properties (hex literals live HERE
+ *                   only).
+ *   2. typography — @font-face rules + .t-* utility classes.
+ *   3. components — every selector that styles a UI surface.
+ *
+ * Visual truth: refs/design.md. ADR: openspec/decisions/0003-ui-redesign-batch.md.
+ */
 
-* { box-sizing: border-box; }
+@layer tokens, typography, components;
 
-body {
-  margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #222;
+/* ============================================================================
+ * @layer tokens — design-system custom properties (light theme).
+ *
+ * Dark-theme overrides land in a subsequent phase (add-dark-theme).
+ * Hex literals are ONLY allowed inside this block.
+ * ============================================================================ */
+
+@layer tokens {
+  :root {
+    /* Base color ramp — derived from a single bg-base per the Redacto
+       tonal system. Pre-computed values match refs/design.md. */
+    --bg-base: #fbfaf8;
+    --surface: #fefdfb;
+    --surface-2: #e8e6e2;
+    --border: #dedbd6;
+    --border-strong: #c8c4be;
+    --text: #1b1c1e;
+    --text-muted: #74726d;
+    --text-faint: #9a988f;
+
+    /* Semantic palette — accent reserved for focus / composer borders /
+       drop indicators. Danger reserved for destructive hover states. */
+    --accent: #2f6fd1;
+    --accent-soft: #82a8e3;
+    --danger: #c34a3a;
+
+    /* Spacing scale (non-doubling on purpose). */
+    --space-xxs: 2px;
+    --space-xs: 4px;
+    --space-sm: 6px;
+    --space-md: 8px;
+    --space-lg: 10px;
+    --space-xl: 12px;
+    --space-2xl: 14px;
+    --space-3xl: 18px;
+    --space-4xl: 28px;
+    --space-list-width: 296px;
+    --space-topbar-height: 64px;
+
+    /* Rounded scale. */
+    --rounded-xs: 4px;
+    --rounded-sm: 6px;
+    --rounded-md: 8px;
+    --rounded-lg: 10px;
+    --rounded-xl: 14px;
+    --rounded-full: 999px;
+
+    /* Elevation. Card idle = single soft 2px-blur drop, almost
+       imperceptible. Card hover = three-layer stack. Popover = floating
+       composer / modal treatment. */
+    --shadow-card-rim: 0 1px 0 rgba(0, 0, 0, 0.04);
+    --shadow-card-idle: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-card-hover:
+      0 1px 0 rgba(0, 0, 0, 0.04),
+      0 1px 3px rgba(0, 0, 0, 0.08),
+      0 4px 12px -2px rgba(0, 0, 0, 0.10);
+    --shadow-popover:
+      0 12px 32px -8px rgba(0, 0, 0, 0.22),
+      0 2px 8px rgba(0, 0, 0, 0.08);
+
+    /* Page-surface knobs. */
+    --grain-opacity: 0.04;
+    --topshade-strength: 10%;
+  }
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  height: 40px;
-  border-bottom: 1px solid #ddd;
-  padding: 0 12px;
-  background: #fafafa;
+/* ============================================================================
+ * @layer typography — vendored Geist + Geist Mono and .t-* utilities.
+ * ============================================================================ */
+
+@layer typography {
+  /* --- Geist sans @font-face declarations --------------------------------- */
+  @font-face {
+    font-family: 'Geist';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('/static/vendor/fonts/Geist-Light.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Geist';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/static/vendor/fonts/Geist-Regular.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Geist';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/static/vendor/fonts/Geist-Medium.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Geist';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('/static/vendor/fonts/Geist-SemiBold.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Geist';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/static/vendor/fonts/Geist-Bold.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Geist';
+    font-style: normal;
+    font-weight: 800;
+    font-display: swap;
+    src: url('/static/vendor/fonts/Geist-ExtraBold.woff2') format('woff2');
+  }
+
+  /* --- Geist Mono @font-face declarations --------------------------------- */
+  @font-face {
+    font-family: 'Geist Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('/static/vendor/fonts/GeistMono-Regular.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Geist Mono';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/static/vendor/fonts/GeistMono-Medium.woff2') format('woff2');
+  }
+
+  /* --- Utility classes — type ramp ---------------------------------------- */
+  .t-brand {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .t-list-title {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .t-card-text {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13.5px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+  .t-body-md {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
+  .t-button {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .t-tag {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+  }
+  .t-mono-counter {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .t-mono-label {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
 }
 
-.project-name {
-  font-weight: 600;
-}
+/* ============================================================================
+ * @layer components — every UI surface.
+ *
+ * No hex literals allowed outside this block's references to var(--…).
+ * ============================================================================ */
 
-/* V4 live-connection indicator. Sits beside .project-name in the
-   topbar and flips color between connected/disconnected states. */
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-  margin-left: 8px;
-}
-.status-dot.on  { background: #2a8; }
-.status-dot.off { background: #aaa; }
+@layer components {
+  * { box-sizing: border-box; }
 
-.loading {
-  padding: 12px;
-  color: #999;
-  font-style: italic;
-}
+  /* Alpine cloak: hide modal until x-init has run so it does not flash. */
+  [x-cloak] { display: none !important; }
 
-.columns {
-  display: flex;
-  gap: 12px;
-  padding: 12px;
-  overflow-x: auto;
-  min-height: calc(100vh - 40px);
-}
+  /* --- Page surfaces (background, grain, top-shade) --------------------- */
 
-.column {
-  min-width: 260px;
-  max-width: 320px;
-  flex: 0 0 auto;
-  background: #f4f4f4;
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  flex-direction: column;
-}
+  body {
+    margin: 0;
+    background-color: var(--bg-base);
+    color: var(--text);
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+    position: relative;
+  }
 
-.column-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 4px 8px 4px;
-  border-bottom: 1px solid #e0e0e0;
-  margin-bottom: 8px;
-}
+  /* Grain overlay — non-interactive SVG noise data-URI tile sitting
+     behind everything (z-index: -1). Opacity is keyed to the token. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    opacity: var(--grain-opacity);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    background-size: 160px 160px;
+  }
 
-.column-name {
-  font-weight: 600;
-}
+  /* Top-shade — 64px linear gradient from 10%-bg-base at the very top
+     to transparent at the bottom edge of the topbar. Non-interactive. */
+  .topshade,
+  body::after {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--space-topbar-height);
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--bg-base) 90%, transparent) 0%,
+      transparent 100%
+    );
+  }
 
-.column-count {
-  font-size: 12px;
-  color: #666;
-  background: #e6e6e6;
-  border-radius: 999px;
-  padding: 1px 8px;
-}
+  /* --- Topbar ----------------------------------------------------------- */
 
-.cards {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
+  .topbar {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: var(--space-topbar-height);
+    padding: 0 var(--space-4xl);
+    background: transparent;
+    color: var(--text);
+  }
 
-.card {
-  background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 8px;
-  margin-bottom: 6px;
-  cursor: grab;
-}
+  .brand {
+    color: var(--text);
+    user-select: none;
+  }
 
-.card:active {
-  cursor: grabbing;
-}
+  /* V4 live-connection indicator — round, accent when on, faint when off. */
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--rounded-full);
+    display: inline-block;
+    background: var(--text-faint);
+    transition: background-color 120ms ease;
+  }
+  .status-dot.on  { background: var(--accent); }
+  .status-dot.off { background: var(--text-faint); }
 
-/* Sortable.js applies .sortable-ghost to the placeholder element
-   while a drag is in progress (see app.js ghostClass option). */
-.sortable-ghost {
-  opacity: 0.4;
-}
+  /* --- Loading / board scaffold ----------------------------------------- */
 
-.card-title {
-  font-weight: 500;
-  margin-bottom: 4px;
-}
+  .loading {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - var(--space-topbar-height));
+    color: var(--text-muted);
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.45;
+  }
 
-.priority-low    { border-left: 3px solid #999; }
-.priority-medium { border-left: 3px solid #666; }
-.priority-high   { border-left: 3px solid #222; }
+  .board {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    gap: var(--space-3xl);
+    padding: var(--space-md) var(--space-4xl) var(--space-4xl);
+    overflow-x: auto;
+    overflow-y: hidden;
+    min-height: calc(100vh - var(--space-topbar-height));
+    cursor: grab;
+  }
+  .board:active {
+    cursor: grabbing;
+  }
 
-.badge {
-  display: inline-block;
-  font-size: 11px;
-  padding: 1px 6px;
-  background: #eee;
-  border-radius: 999px;
-  margin-right: 4px;
-  color: #555;
-}
+  /* When drag-scroll is active, disable pointer events on cards so the
+     drag-scroll gesture is not hijacked by a child click. */
+  body.is-scrolling .card {
+    pointer-events: none;
+  }
 
-.tags {
-  list-style: none;
-  margin: 4px 0 0 0;
-  padding: 0;
-}
+  /* --- Columns (glass panels) ------------------------------------------- */
 
-.tag {
-  display: inline-block;
-  font-size: 11px;
-  padding: 1px 6px;
-  background: #eee;
-  border-radius: 999px;
-  margin-right: 4px;
-  color: #555;
-}
+  .column {
+    width: var(--space-list-width);
+    flex: 0 0 var(--space-list-width);
+    background: color-mix(in oklab, var(--surface) 75%, transparent);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-xl);
+    padding: var(--space-sm);
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+  }
 
-.empty {
-  color: #999;
-  font-style: italic;
-  padding: 6px;
-  list-style: none;
-}
+  .column-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-sm) var(--space-sm) var(--space-md);
+    margin-bottom: var(--space-xs);
+    color: var(--text);
+  }
 
-/* x-cloak hides the modal until Alpine has initialized so the
-   overlay does not flash on first paint. */
-[x-cloak] { display: none !important; }
+  .column-name {
+    /* Composed via .t-list-title — keep selector-level rule minimal. */
+    color: var(--text);
+  }
 
-/* --- Edit modal (V3) ----------------------------------------------------- */
+  .column-count {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-md);
+    padding: 2px 7px;
+  }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
+  .cards {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    overflow-y: auto;
+  }
 
-.modal {
-  background: #fff;
-  border-radius: 6px;
-  padding: 16px;
-  max-width: 480px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
+  /* --- Cards ------------------------------------------------------------ */
 
-.modal-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-lg);
+    padding: 10px 12px;
+    color: var(--text);
+    box-shadow: var(--shadow-card-idle);
+    transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+    cursor: grab;
+  }
+  .card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-card-hover);
+    border-color: var(--border-strong);
+  }
+  .card:active {
+    cursor: grabbing;
+  }
 
-.modal-header h2 {
-  margin: 0;
-  font-size: 16px;
-}
+  /* Sortable.js applies .sortable-ghost to the placeholder element
+     while a drag is in progress (see app.js ghostClass option). */
+  .sortable-ghost {
+    opacity: 0.35;
+  }
 
-.modal-id {
-  font-family: monospace;
-  font-size: 12px;
-  color: #888;
-}
+  .card-title {
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    line-height: 1.45;
+    color: var(--text);
+    word-break: break-word;
+  }
 
-.modal form label {
-  display: block;
-  font-size: 12px;
-  color: #555;
-  margin-bottom: 8px;
-}
+  /* --- Tags (card surface, readonly here; modal reuses this skin) ------- */
 
-.modal form input[type="text"],
-.modal form textarea,
-.modal form select {
-  display: block;
-  width: 100%;
-  margin-top: 4px;
-  padding: 6px 8px;
-  font: inherit;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-}
+  .tags {
+    list-style: none;
+    margin: 6px 0 0 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
 
-.modal form textarea {
-  resize: vertical;
-}
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: var(--rounded-full);
+    background: color-mix(in oklab, var(--text) 3%, transparent);
+    color: var(--text-faint);
+    border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+  }
 
-.tags-field {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  padding: 6px 8px;
-  margin: 0 0 8px 0;
-}
+  /* --- Priorities (token-driven; no hex literals here) ------------------ */
 
-.tags-field legend {
-  font-size: 12px;
-  color: #555;
-  padding: 0 4px;
-}
+  .priority-low {
+    border-left: 3px solid var(--text-faint);
+  }
+  .priority-medium {
+    border-left: 3px solid var(--text-muted);
+  }
+  .priority-high {
+    border-left: 3px solid var(--text);
+  }
 
-.tag-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  padding: 0;
-  margin: 0;
-  list-style: none;
-}
+  .badge {
+    display: inline-block;
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-md);
+    margin-top: 6px;
+    color: var(--text-muted);
+  }
 
-.tag-chips .tag button {
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  margin-left: 4px;
-  font-size: 12px;
-  color: #555;
-}
+  /* --- Empty-column placeholder ----------------------------------------- */
 
-.modal-error {
-  color: #b00020;
-  margin: 8px 0;
-}
+  .empty {
+    list-style: none;
+    text-align: center;
+    padding: var(--space-3xl) var(--space-sm);
+    color: var(--text-faint);
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.45;
+    font-style: italic;
+    background: transparent;
+    border: 0;
+  }
 
-.modal-readonly {
-  font-size: 11px;
-  color: #666;
-  display: flex;
-  gap: 12px;
-  margin: 8px 0;
-}
+  /* --- Edit modal (V3 markup, Redacto chrome) --------------------------- */
 
-.modal-readonly code {
-  font-family: monospace;
-}
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: color-mix(in oklab, var(--bg-base) 10%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
 
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
-}
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-xl);
+    padding: var(--space-3xl);
+    max-width: 520px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-popover);
+    color: var(--text);
+  }
 
-.modal-footer button {
-  padding: 6px 12px;
-  font: inherit;
-  cursor: pointer;
-  border: 1px solid #ccc;
-  background: #f4f4f4;
-  border-radius: 4px;
-}
+  .modal-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: var(--space-xl);
+  }
 
-.modal-footer button[type="submit"] {
-  background: #222;
-  color: #fff;
-  border-color: #222;
+  .modal-header h2 {
+    margin: 0;
+    /* .t-list-title equivalent — keep utility composition explicit in
+       the markup; selector mirror here for headings without a class. */
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .modal-id {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--text-faint);
+  }
+
+  .modal form label {
+    display: block;
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: var(--space-xl);
+  }
+
+  .modal form input[type="text"],
+  .modal form textarea,
+  .modal form select {
+    display: block;
+    width: 100%;
+    margin-top: var(--space-xs);
+    padding: var(--space-md) var(--space-lg);
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.45;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-md);
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 120ms ease;
+  }
+
+  .modal form input[type="text"]:focus,
+  .modal form textarea:focus,
+  .modal form select:focus {
+    border-color: var(--accent);
+  }
+
+  .modal form textarea {
+    resize: vertical;
+  }
+
+  .tags-field {
+    border: 1px solid var(--border);
+    border-radius: var(--rounded-md);
+    padding: var(--space-md) var(--space-lg);
+    margin: 0 0 var(--space-xl) 0;
+  }
+
+  .tags-field legend {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0 var(--space-xs);
+  }
+
+  .tag-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+    padding: 0;
+    margin: 0 0 var(--space-sm);
+    list-style: none;
+  }
+
+  .tag-chips .tag {
+    gap: var(--space-xs);
+  }
+
+  .tag-chips .tag button {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    margin-left: var(--space-xs);
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-faint);
+    padding: 0;
+  }
+
+  .tag-chips .tag button:hover {
+    color: var(--text);
+  }
+
+  .modal-error {
+    color: var(--danger);
+    margin: var(--space-md) 0;
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13px;
+  }
+
+  .modal-readonly {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.04em;
+    color: var(--text-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xl);
+    margin: var(--space-md) 0;
+  }
+
+  .modal-readonly code {
+    font-family: 'Geist Mono', ui-monospace, monospace;
+    color: var(--text-muted);
+  }
+
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-md);
+    margin-top: var(--space-xl);
+  }
+
+  .modal-footer button {
+    padding: var(--space-sm) var(--space-2xl);
+    font-family: 'Geist', system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    border-radius: var(--rounded-md);
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+
+  .modal-footer button:hover {
+    color: var(--text);
+    background: color-mix(in oklab, var(--text) 3%, transparent);
+  }
+
+  .modal-footer button[type="submit"] {
+    background: var(--text);
+    color: var(--bg-base);
+    border-color: var(--text);
+  }
+
+  .modal-footer button[type="submit"]:hover {
+    background: color-mix(in oklab, var(--text) 92%, transparent);
+    color: var(--bg-base);
+  }
 }

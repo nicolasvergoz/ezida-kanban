@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -106,7 +107,11 @@ func runWithContext(ctx context.Context, opts Options) error {
 	}
 
 	broker := NewBroker()
-	s := &serverState{boardPath: boardPath, broker: broker}
+	s := &serverState{
+		boardPath:   boardPath,
+		projectName: resolveProjectName(boardPath),
+		broker:      broker,
+	}
 
 	mux := http.NewServeMux()
 	s.routes(mux)
@@ -204,7 +209,29 @@ func isAddrInUse(err error) bool {
 // construction via the startTestServer helper.
 type serverState struct {
 	boardPath string
-	broker    *Broker
+	// projectName is computed once at boot from the resolved board
+	// path's parent-directory name, with fallback to "Ezida". Surfaced
+	// via /api/board.project_name and consumed by the topbar brand.
+	// Immutable for the lifetime of the process — fsnotify events do
+	// not re-evaluate it (ADR 0003 §D4).
+	projectName string
+	broker      *Broker
+}
+
+// resolveProjectName returns the parent-directory name of the resolved
+// board path. Falls back to "Ezida" when the basename is empty, ".",
+// or the platform separator. Best-effort: a failing filepath.Abs is
+// treated as a non-fatal hiccup and the original path is used.
+func resolveProjectName(boardPath string) string {
+	abs, err := filepath.Abs(boardPath)
+	if err != nil {
+		abs = boardPath
+	}
+	name := filepath.Base(filepath.Dir(abs))
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		return "Ezida"
+	}
+	return name
 }
 
 // PortUnavailableError is returned by Run when every port in the

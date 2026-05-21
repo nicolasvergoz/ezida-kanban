@@ -39,6 +39,68 @@ function board() {
     // reconnect after server restart re-uses the same handle).
     connected: false,
     eventSource: null,
+    // UI-2 theme controller state. `theme` is the user's *choice*
+    // ('light' | 'system' | 'dark') and drives the toggle's
+    // aria-pressed state. `_mediaQuery` is the cached MediaQueryList
+    // for `(prefers-color-scheme: dark)`; the change listener wired
+    // in initTheme() re-applies the effective theme when the OS
+    // flips while the user is in system mode (ADR 0003 §D7).
+    theme: 'system',
+    _mediaQuery: null,
+    // initTheme reads localStorage["ezida.theme"], validates against
+    // the whitelist, wires the matchMedia listener, and paints the
+    // initial effective theme. Guarded so localStorage exceptions
+    // (private browsing / blocked storage) do not break the page —
+    // the toggle still works in-session.
+    initTheme() {
+      let stored = null;
+      try {
+        stored = localStorage.getItem('ezida.theme');
+      } catch (_) {
+        stored = null;
+      }
+      const whitelist = ['light', 'system', 'dark'];
+      this.theme = whitelist.indexOf(stored) >= 0 ? stored : 'system';
+      try {
+        this._mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const self = this;
+        const onChange = () => { self.applyTheme(); };
+        if (typeof this._mediaQuery.addEventListener === 'function') {
+          this._mediaQuery.addEventListener('change', onChange);
+        } else if (typeof this._mediaQuery.addListener === 'function') {
+          // Safari < 14 fallback.
+          this._mediaQuery.addListener(onChange);
+        }
+      } catch (_) {
+        this._mediaQuery = null;
+      }
+      this.applyTheme();
+    },
+    // applyTheme resolves the effective theme from `this.theme`
+    // (and matchMedia when in system mode) and writes it to
+    // <html data-theme="...">, which triggers the CSS variable swap.
+    applyTheme() {
+      let effective;
+      if (this.theme === 'system') {
+        effective = (this._mediaQuery && this._mediaQuery.matches) ? 'dark' : 'light';
+      } else {
+        effective = this.theme;
+      }
+      document.documentElement.setAttribute('data-theme', effective);
+    },
+    // setTheme is the click handler for the 3 toggle segments.
+    // Validates against the whitelist (no-op on invalid), persists
+    // the choice to localStorage (swallowing throws), and re-applies
+    // the effective theme.
+    setTheme(choice) {
+      const whitelist = ['light', 'system', 'dark'];
+      if (whitelist.indexOf(choice) < 0) return;
+      this.theme = choice;
+      try {
+        localStorage.setItem('ezida.theme', choice);
+      } catch (_) { /* swallow — session-only choice */ }
+      this.applyTheme();
+    },
     async load() {
       try {
         const res = await fetch('/api/board');

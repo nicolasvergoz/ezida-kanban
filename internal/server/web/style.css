@@ -77,6 +77,23 @@
     --grain-opacity: 0.04;
     --topshade-strength: 10%;
   }
+
+  /* Dark-theme overrides — same custom-property names reassigned to
+     the dark palette from refs/design.md §"Colors". Activated by
+     setting `<html data-theme="dark">` via the Alpine theme
+     controller. No component selector outside :root /
+     [data-theme="dark"] embeds a hex literal (ADR 0003 §D5). */
+  [data-theme="dark"] {
+    --bg-base: #25282e;
+    --surface: #33363d;
+    --surface-2: #414448;
+    --border: #454850;
+    --border-strong: #5d5f66;
+    --text: #f1f1f2;
+    --text-muted: #a9aaad;
+    --text-faint: #7b7c81;
+    --accent: #82a8e3;
+  }
 }
 
 /* ============================================================================
@@ -274,6 +291,48 @@
   .brand {
     color: var(--text);
     user-select: none;
+  }
+
+  /* Right-side container for topbar controls (theme toggle + status). */
+  .topbar-right {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-xl);
+  }
+
+  /* --- Theme toggle (3-segment segmented control) ---------------------- */
+
+  .theme-toggle {
+    background: var(--surface-2);
+    border-radius: var(--rounded-full);
+    padding: 3px;
+    display: inline-flex;
+    gap: 0;
+  }
+
+  .theme-toggle button {
+    width: 26px;
+    height: 26px;
+    border: 0;
+    background: transparent;
+    border-radius: var(--rounded-full);
+    color: var(--text-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .theme-toggle button:hover {
+    color: var(--text);
+  }
+
+  .theme-toggle button[aria-pressed="true"] {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
   }
 
   /* V4 live-connection indicator — round, accent when on, faint when off. */

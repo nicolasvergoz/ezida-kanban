@@ -1238,6 +1238,53 @@ func fetchProjectName(t *testing.T, baseURL string) string {
 	return payload.ProjectName
 }
 
+// TestStaticStyleCSS_ContainsDarkSelector confirms the served
+// stylesheet exposes the `[data-theme="dark"]` selector block
+// introduced by add-dark-theme so the Alpine controller's
+// `<html data-theme="dark">` write actually swaps the token values.
+func TestStaticStyleCSS_ContainsDarkSelector(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/static/style.css")
+	if err != nil {
+		t.Fatalf("GET /static/style.css: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	body, _ := io.ReadAll(res.Body)
+	const want = `[data-theme="dark"]`
+	if !strings.Contains(string(body), want) {
+		t.Fatalf("style.css missing %q", want)
+	}
+}
+
+// TestIndex_ContainsThemeToggleButtons confirms the rendered topbar
+// includes all three theme-toggle buttons with their stable
+// `data-theme-choice` attributes (light, system, dark).
+func TestIndex_ContainsThemeToggleButtons(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	res, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET /: %v", err)
+	}
+	defer res.Body.Close()
+	body := readString(res.Body)
+	for _, want := range []string{
+		`data-theme-choice="light"`,
+		`data-theme-choice="system"`,
+		`data-theme-choice="dark"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("index body missing %q", want)
+		}
+	}
+}
+
 // firstExternalIPv4 returns the first up, non-loopback IPv4 address
 // on the host, or "" if none. Used to probe loopback-only bind.
 func firstExternalIPv4() string {

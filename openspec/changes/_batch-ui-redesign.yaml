@@ -1,0 +1,48 @@
+topic: ui-redesign
+brief: inline
+created: 2026-05-21
+shared_decisions: openspec/decisions/0003-ui-redesign-batch.md
+verify: "go test ./... && go vet ./..."
+order:
+  - name: redesign-tokens-and-chrome
+    title: UI-1 — visual rebrand (tokens, Geist, surfaces, card chrome, project_name)
+    deps: []
+    agent: general-purpose
+  - name: add-dark-theme
+    title: UI-2 — 3-state theme toggle (light / system / dark) with persistence
+    deps: [redesign-tokens-and-chrome]
+    agent: general-purpose
+  - name: add-board-filter
+    title: UI-3 — topbar filter popover (client-side substring filter + badge)
+    deps: [redesign-tokens-and-chrome]
+    agent: general-purpose
+  - name: add-inline-card-create-delete
+    title: UI-4 — inline column-foot composer (POST /api/cards) + hover delete (DELETE /api/cards/:id)
+    deps: [redesign-tokens-and-chrome]
+    agent: general-purpose
+  - name: redesign-card-detail-modal
+    title: UI-5 — Trello-style click-to-edit fields inside the detail modal (single-key PATCH per commit)
+    deps: [add-inline-card-create-delete]
+    agent: general-purpose
+  - name: add-inline-column-ops
+    title: UI-6 — inline column ops (Add-list, rename, delete, drag-reorder) + 4 new /api/columns endpoints
+    deps: [redesign-tokens-and-chrome]
+    agent: general-purpose
+assumptions:
+  - "Brand = filepath.Base(filepath.Dir(boardPath)) with 'Ezida' fallback; resolved once at server start, surfaced as project_name in /api/board. (Pinned in ADR 0003 §D4; affects redesign-tokens-and-chrome.)"
+  - "Status-dot SSE indicator kept and Redacto-skinned; exact placement (left of brand or near right controls) finalized during redesign-tokens-and-chrome's design.md if not already locked there. (Affects redesign-tokens-and-chrome.)"
+  - "Modal is preserved for card detail despite design.md's 'no modals' principle; ADR 0003 §D3 overrides the design rule for the card-detail case. Inline composers replace the modal for card *create* (UI-4) but not for card *edit* (UI-5). (Affects redesign-tokens-and-chrome, add-inline-card-create-delete, redesign-card-detail-modal.)"
+  - "Dark theme overrides land as `[data-theme=\"dark\"]` selector blocks on the same CSS custom-property names defined by UI-1. UI-1 ships ONLY the light values; dark is exclusively UI-2's domain. (Pinned in ADR 0003 §D5; affects redesign-tokens-and-chrome, add-dark-theme.)"
+  - "Filter is transient — no localStorage persistence; closes do not clear; reload clears. (Pinned in ADR 0003 §D8; affects add-board-filter.)"
+  - "Column-foot composer (UI-4) reuses the SSE refetch path established in V5 — on success the broker fires board-changed and the client refetches; no manual UI optimism. (Pinned in ADR 0002 §D9; affects add-inline-card-create-delete.)"
+  - "PATCH semantics for the per-field commit in UI-5 send exactly one key per request (one PATCH per field commit; tag add/remove sends one PATCH per chip change). Reuses ADR 0002 §D8 'present key replaces, absent key untouched' contract. (Affects redesign-card-detail-modal.)"
+  - "Column delete safety: refuse non-empty (COLUMN_HAS_CARDS) and last-remaining (CANNOT_DELETE_LAST_COLUMN); no 'force delete' override in v1. New error codes minted in this batch are listed in ADR 0003 §D9. (Affects add-inline-column-ops.)"
+  - "Two separate Sortable.js instances coexist: one for cards (group 'cards', already from V2) and one for list headers (group 'lists', handle '.list-header', filter excluding card children). Cross-instance drag interference avoided via distinct groups. (Affects add-inline-column-ops.)"
+  - "Empty-column-name validation reuses INVALID_BODY (400) rather than minting a new EMPTY_COLUMN_NAME code; symmetric with empty-title handling on PATCH /api/cards. (Affects add-inline-column-ops.)"
+  - "Drag-scroll empty board surface attaches pointer listeners on `.board` with delegation guard (closest('.card, .list-header, button, .composer')) so cards/headers/buttons remain interactive. design.md explicitly forbids wheel→horizontal mapping. (Pinned in ADR 0003 §D11; affects redesign-tokens-and-chrome.)"
+  - "Card hover-delete fires DELETE /api/cards/:id immediately with no confirmation dialog; the hover-only affordance is the friction. No undo toast. (Pinned in ADR 0003 §D13; affects add-inline-card-create-delete.)"
+  - "Geist + Geist Mono are vendored as .woff2 under internal/server/web/vendor/fonts/ and embedded via //go:embed. No runtime Google Fonts dependency. (Pinned in ADR 0003 §D6; affects redesign-tokens-and-chrome.)"
+  - "Fonts add ~120 KB to the embedded payload; acceptable given Alpine + Sortable already ~55 KB. Tracked in ADR 0003 'Consequences'. (Affects redesign-tokens-and-chrome.)"
+  - "JSX shell at refs/kanban-design/ is visual fallback only — not imported as code, not ported. design.md is the canonical visual spec. (Pinned in ADR 0003 §D1; affects all six phases.)"
+  - "Stack frozen from ADR 0002 §D5: Alpine + Sortable + vanilla CSS. No React, no build step, no Node toolchain. (Pinned in ADR 0003 §D2; affects all six phases.)"
+  - "All six changes pass `openspec validate --strict`. Three required SHALL/MUST-leading-sentence patches were applied post-generation to satisfy strict parser; semantics unchanged."

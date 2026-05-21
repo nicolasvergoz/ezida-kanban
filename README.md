@@ -64,6 +64,22 @@ runs the same commands on your behalf:
 >
 > "What's in the todo column?"
 
+### Web UI
+
+Prefer a visual board? `ezida serve` launches a local Web UI bound
+to `127.0.0.1` (default port `7777`) and opens it in your default
+browser. The page is read **and** write: click a card to edit
+inline, drag to reorder or move between columns, add/rename/delete
+columns from the header, filter, switch theme. It hot-reloads on
+every change to `kanban.toml` — yours or the CLI's.
+
+```sh
+ezida serve
+```
+
+Full reference (flags, capabilities, port fallback) in
+[`docs/usage.md`](./docs/usage.md#ezida-serve).
+
 ## Documentation
 
 - [`docs/usage.md`](./docs/usage.md) — full CLI reference, JSON

@@ -157,6 +157,50 @@ ezida priorities rename medium normal
 ezida priorities rm urgent
 ```
 
+### `ezida serve`
+
+Launch the Web UI: an HTTP server on `127.0.0.1` that renders the
+current `kanban.toml` as an interactive Kanban board in the
+browser. The page is read **and** write — every mutation goes
+through the same code path as the CLI, and the page hot-reloads
+on every change to `kanban.toml` (yours or the CLI's) via Server-
+Sent Events.
+
+| Flag        | Description                                                     |
+|-------------|-----------------------------------------------------------------|
+| `--port`    | Starting HTTP port (default `7777`). If busy, the server tries the next 10 ports in sequence and uses the first free one. Exits with `PORT_UNAVAILABLE` if all 11 are taken. |
+| `--no-open` | Do not launch the default browser on startup.                   |
+
+```sh
+ezida serve
+ezida serve --port=9000 --no-open
+```
+
+The server binds loopback-only — it never listens on `0.0.0.0` or
+any public interface. It blocks until `SIGINT` or `SIGTERM`, then
+drains in-flight requests within 5 seconds.
+
+**What the Web UI lets you do:**
+- Read the board as a column grid with card counts.
+- Click any card to open a detail modal with click-to-edit fields
+  (title, description, priority, tags) — each field commits via a
+  single PATCH on blur.
+- Add a new card inline at the top of a column without leaving
+  the page.
+- Delete a card from the modal.
+- Drag cards to reorder within a column or move between columns.
+- Add a new column, rename a column inline, delete an empty
+  column, or drag columns to reorder them.
+- Filter visible cards by title, tag, or priority.
+- Toggle between light and dark themes.
+
+The authoritative behavioural contract lives in
+[`openspec/specs/viewer-server/spec.md`](../openspec/specs/viewer-server/spec.md)
+and
+[`openspec/specs/viewer-ui/spec.md`](../openspec/specs/viewer-ui/spec.md);
+consult those if you need exact scenarios (port-fallback edge
+cases, hot-reload semantics, accessibility contract, …).
+
 ## JSON contract
 
 Every command supports `--json`. Keys are `snake_case`; timestamps are

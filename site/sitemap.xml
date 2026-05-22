@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.sitemaps.org/schemas/sitemap-image/0.9">
+  <url>
+    <loc>https://nicolasvergoz.github.io/ezida-kanban/</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <image:image>
+      <image:loc>https://nicolasvergoz.github.io/ezida-kanban/assets/icon.png</image:loc>
+      <image:title>Ezida — file-based Kanban for software projects</image:title>
+    </image:image>
+    <image:image>
+      <image:loc>https://nicolasvergoz.github.io/ezida-kanban/assets/screenshot-light.png</image:loc>
+      <image:title>The ezida serve Web UI</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://nicolasvergoz.github.io/ezida-kanban/alt.html</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
+    <loc>https://nicolasvergoz.github.io/ezida-kanban/llms.txt</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://nicolasvergoz.github.io/ezida-kanban/llms-full.txt</loc>
+    <lastmod>2026-05-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>

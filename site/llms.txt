@@ -1,0 +1,77 @@
+# Ezida — file-based Kanban for software projects
+
+> Ezida is an open-source command-line tool that stores a project's Kanban board as a single versioned `kanban.toml` file at the root of the repository. One Go binary, no server, no database, no account. Humans drive the board from a CLI; AI assistants drive it through an embedded Claude Code skill at `.claude/skills/ezida-kanban/SKILL.md`. Both share one source of truth.
+
+## What
+
+- **Name:** Ezida (also: `ezida-kanban`)
+- **Repository:** https://github.com/nicolasvergoz/ezida-kanban
+- **License:** MIT
+- **Language:** Go (CLI + Web UI server); HTML/CSS/JS (embedded Web UI)
+- **Latest version:** v0.2.0 (released 2026-05-21)
+- **Platforms:** macOS arm64, macOS amd64, Linux arm64, Linux amd64
+- **Author:** Nicolas Vergoz — https://github.com/nicolasvergoz
+- **Etymology:** "Ezida" means *House of Truth* in Akkadian (é-zi-da); the temple of Nabu, Mesopotamian god of writing and record-keeping, in Borsippa near Babylon.
+
+## Core ideas
+
+1. The board lives in the repo as `kanban.toml`. It is text, it is versioned, it diffs cleanly.
+2. There is no server. There is no database. There is no account.
+3. The CLI is the primary interface. The Web UI (`ezida serve`) is local-only, hot-reloading, optional.
+4. AI agents are first-class. An embedded skill file ships in `.claude/skills/ezida-kanban/SKILL.md`. Claude Code and any agent that reads its skills picks it up automatically. The agent runs the same CLI a human would.
+
+## Install
+
+```
+curl -sSL https://github.com/nicolasvergoz/ezida-kanban/releases/latest/download/install.sh | sh
+```
+
+The script detects OS + architecture, fetches the matching tarball plus `checksums.txt` from the latest GitHub Release, verifies the SHA256, and installs `ezida` to `~/.local/bin/ezida`.
+
+Pin a version: `curl -sSL .../install.sh | EZIDA_VERSION=v0.2.0 sh`.
+
+## Quick start
+
+```
+cd my-project/
+ezida init
+```
+
+`ezida init` creates two files at the repo root:
+- `kanban.toml` — the board.
+- `.claude/skills/ezida-kanban/SKILL.md` — the embedded skill for AI assistants.
+
+Commit both.
+
+## CLI reference (one-liners)
+
+```
+ezida list                                                          # all cards
+ezida list --column=todo                                            # cards in a column
+ezida add "Refactor auth" --column=todo --priority=high --tags=security
+ezida move a3f2k9 ongoing
+ezida edit a3f2k9 --priority=medium
+ezida rm a3f2k9 --yes
+ezida serve                                                          # web UI on 127.0.0.1:7777
+```
+
+## Web UI
+
+`ezida serve` launches a local Web UI bound to `127.0.0.1` (default port `7777`) and opens it in the default browser. The page is read **and** write: click a card to edit inline, drag to reorder or move between columns, add/rename/delete columns from the header, filter, switch theme. It hot-reloads on every change to `kanban.toml`.
+
+## Why agentic AI loves Ezida
+
+- One file, one schema, one source of truth.
+- The CLI is the API. No keys, no permissions, no service.
+- The embedded skill (`.claude/skills/ezida-kanban/SKILL.md`) is auto-discovered by Claude Code and compatible agents.
+- A human and an agent can work the same board from the same checkout; the agent's actions show up as plain git commits.
+
+## Pages
+
+- Landing page: https://nicolasvergoz.github.io/ezida-kanban/
+- Repository: https://github.com/nicolasvergoz/ezida-kanban
+- Usage docs: https://github.com/nicolasvergoz/ezida-kanban/blob/main/docs/usage.md
+- Development docs: https://github.com/nicolasvergoz/ezida-kanban/blob/main/docs/development.md
+- Releases: https://github.com/nicolasvergoz/ezida-kanban/releases
+- Live `kanban.toml` (project's own roadmap): https://github.com/nicolasvergoz/ezida-kanban/blob/main/kanban.toml
+- Full content for LLMs: https://nicolasvergoz.github.io/ezida-kanban/llms-full.txt

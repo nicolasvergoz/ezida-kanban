@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+<title>Ezida — File-based Kanban for software projects | Drive it from a CLI or an AI agent</title>
+<meta name="description" content="Ezida is an open-source Kanban for software projects. The board is a versioned kanban.toml at the repo root, driven from a CLI or by AI assistants through an embedded Claude Code skill. One Go binary — no server, no database, no account." />
+<meta name="keywords" content="kanban, file-based kanban, kanban toml, cli kanban, go kanban, open source kanban, claude code skill, ai agent kanban, agentic ai tools, repo-native kanban, developer productivity, project management cli, version controlled kanban, agentic kanban" />
+<meta name="author" content="Nicolas Vergoz" />
+<link rel="canonical" href="https://nicolasvergoz.github.io/ezida-kanban/" />
+<meta name="theme-color" content="#9c4a2c" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#15130f" media="(prefers-color-scheme: dark)" />
+<meta name="color-scheme" content="light dark" />
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Ezida" />
+<meta property="og:title" content="Ezida — File-based Kanban for software projects" />
+<meta property="og:description" content="One Go binary, one versioned kanban.toml. Driven from the CLI — or by any AI assistant that reads Claude Code skills." />
+<meta property="og:url" content="https://nicolasvergoz.github.io/ezida-kanban/" />
+<meta property="og:image" content="https://nicolasvergoz.github.io/ezida-kanban/assets/icon.png" />
+<meta property="og:image:alt" content="Ezida logo — a stylised Mesopotamian temple gate with three columns labelled TODO, DOING, DONE." />
+<meta property="og:locale" content="en_US" />
+
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Ezida — File-based Kanban for software projects" />
+<meta name="twitter:description" content="One Go binary, one versioned kanban.toml. Driven from the CLI — or by any AI assistant." />
+<meta name="twitter:image" content="https://nicolasvergoz.github.io/ezida-kanban/assets/icon.png" />
+
+<!-- Favicons -->
+<link rel="icon" type="image/png" sizes="100x100" href="assets/favicon.png" />
+<link rel="apple-touch-icon" href="assets/icon.png" />
+
+<!-- LLM / AI agent discovery -->
+<link rel="alternate" type="text/plain" href="llms.txt" title="llms.txt — concise project summary for LLMs" />
+<link rel="alternate" type="text/plain" href="llms-full.txt" title="llms-full.txt — full project content for LLMs" />
+
+<!-- Fonts -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet" />
+
+<link rel="stylesheet" href="assets/site.css" />
+
+<style>
+  /* Variation: Tablet (the chosen direction) */
+  .v-tablet .brand-name { font-family: var(--heading-font, "IBM Plex Serif"), Georgia, serif; font-weight: 600; letter-spacing: 0; }
+  .v-tablet .headline { font-family: var(--heading-font, "IBM Plex Serif"), Georgia, serif; font-weight: 500; letter-spacing: -0.025em; }
+  .v-tablet h2 { font-family: var(--heading-font, "IBM Plex Serif"), Georgia, serif; font-weight: 500; letter-spacing: -0.015em; }
+  .v-tablet .feature-grid > li { padding: 32px 28px; }
+  .v-tablet .feature-grid h3 { font-family: var(--heading-font, "IBM Plex Serif"), Georgia, serif; font-weight: 600; letter-spacing: -0.005em; }
+  .v-tablet section + section { border-top-style: dashed; }
+  .v-tablet .section-label::before {
+    width: auto; height: auto;
+    background: transparent;
+    color: var(--accent);
+    content: attr(data-num);
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 2px 8px;
+    letter-spacing: 0.05em;
+  }
+  .v-tablet .feature-grid { border-color: var(--border-2); }
+  .v-tablet .feature-grid > li { border-color: var(--border-2); }
+
+  /* Hero icon — larger now that it's the only visual */
+  .v-tablet .hero-art img { max-width: 440px; }
+
+  /* Trust row below CTAs — three quiet cards */
+  .trust-row {
+    margin-top: 44px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    max-width: 560px;
+  }
+  .trust-card {
+    border: 1px solid var(--border-2);
+    background: var(--bg-elev);
+    border-radius: var(--r-lg);
+    padding: 14px 16px;
+    font-family: var(--mono);
+    transition: border-color 0.12s, transform 0.12s;
+  }
+  .trust-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .trust-card .label {
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .trust-card .value {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  @media (max-width: 540px) {
+    .trust-row { grid-template-columns: 1fr; }
+  }
+</style>
+
+<!-- ===== JSON-LD: SoftwareApplication ===== -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Ezida",
+  "alternateName": "ezida-kanban",
+  "description": "File-based Kanban for software projects. One Go binary, one versioned kanban.toml, no server, no database. Driven from the CLI or by AI assistants through an embedded Claude Code skill.",
+  "applicationCategory": "DeveloperApplication",
+  "applicationSubCategory": "Project Management",
+  "operatingSystem": "macOS, Linux",
+  "url": "https://nicolasvergoz.github.io/ezida-kanban/",
+  "downloadUrl": "https://github.com/nicolasvergoz/ezida-kanban/releases/latest",
+  "softwareVersion": "0.2.0",
+  "datePublished": "2026-05-21",
+  "license": "https://opensource.org/licenses/MIT",
+  "programmingLanguage": "Go",
+  "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+  "author": {"@type": "Person", "name": "Nicolas Vergoz", "url": "https://github.com/nicolasvergoz"},
+  "maintainer": {"@type": "Person", "name": "Nicolas Vergoz", "url": "https://github.com/nicolasvergoz"},
+  "image": "https://nicolasvergoz.github.io/ezida-kanban/assets/icon.png",
+  "screenshot": "https://nicolasvergoz.github.io/ezida-kanban/assets/screenshot-light.png",
+  "softwareRequirements": "macOS (arm64, amd64) or Linux (arm64, amd64)",
+  "featureList": [
+    "Single TOML file as the source of truth",
+    "Go CLI for adding, moving, editing, removing cards",
+    "Local Web UI with drag-and-drop and inline edit (ezida serve)",
+    "Hot-reload from kanban.toml changes",
+    "Embedded Claude Code skill for AI assistants",
+    "No server, no database, no account",
+    "Single static binary, ~10 MB"
+  ]
+}
+</script>
+
+<!-- ===== JSON-LD: SoftwareSourceCode ===== -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "ezida-kanban",
+  "codeRepository": "https://github.com/nicolasvergoz/ezida-kanban",
+  "programmingLanguage": [{"@type": "ComputerLanguage", "name": "Go"}, {"@type": "ComputerLanguage", "name": "JavaScript"}, {"@type": "ComputerLanguage", "name": "CSS"}],
+  "license": "https://opensource.org/licenses/MIT",
+  "runtimePlatform": "Go 1.22+",
+  "targetProduct": {"@type": "SoftwareApplication", "name": "Ezida"}
+}
+</script>
+
+<!-- ===== JSON-LD: FAQPage ===== -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "What is Ezida?", "acceptedAnswer": {"@type": "Answer", "text": "Ezida is an open-source Kanban for software projects. It stores the board as a single versioned kanban.toml file at the root of your repository. There is no server, no database, and no account — the board lives in git alongside your code."}},
+    {"@type": "Question", "name": "How do AI assistants use Ezida?", "acceptedAnswer": {"@type": "Answer", "text": "Ezida ships with an embedded Claude Code skill at .claude/skills/ezida-kanban/SKILL.md. Once committed, Claude Code and any agent that reads Claude Code skills picks it up automatically and runs the same CLI commands a human would. Humans and agents share one source of truth."}},
+    {"@type": "Question", "name": "Which platforms are supported?", "acceptedAnswer": {"@type": "Answer", "text": "macOS on arm64 and amd64, Linux on arm64 and amd64."}},
+    {"@type": "Question", "name": "How do I install Ezida?", "acceptedAnswer": {"@type": "Answer", "text": "Run: curl -sSL https://github.com/nicolasvergoz/ezida-kanban/releases/latest/download/install.sh | sh — the installer detects your OS and architecture, verifies the SHA256 checksum, and installs the binary to ~/.local/bin/ezida. You can pin a version with EZIDA_VERSION=v0.2.0."}},
+    {"@type": "Question", "name": "Is there a web UI?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. Run ezida serve to launch a local Web UI bound to 127.0.0.1:7777. It opens in your default browser and is fully read-write: drag cards between columns, edit titles inline, add columns and tags. It hot-reloads on every change to kanban.toml."}},
+    {"@type": "Question", "name": "What does the name Ezida mean?", "acceptedAnswer": {"@type": "Answer", "text": "Ezida means House of Truth in Akkadian (é-zi-da). It was the temple of Nabu — the Mesopotamian god of writing, scribes, and record-keeping — located in Borsippa near Babylon, and home to one of the great archives of the ancient world."}}
+  ]
+}
+</script>
+
+<!-- ===== JSON-LD: BreadcrumbList ===== -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Ezida", "item": "https://nicolasvergoz.github.io/ezida-kanban/"}
+  ]
+}
+</script>
+</head>
+
+<body class="v-tablet" data-hero="split" data-terminal="off" data-density="default">
+
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a href="/ezida-kanban/" class="brand" aria-label="Ezida — home">
+      <img src="assets/favicon.png" alt="" width="22" height="22" />
+      <span class="brand-name">Ezida</span>
+      <span class="brand-version">v0.2.0</span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#agents">Agents</a>
+      <a href="#webui">Web UI</a>
+      <a href="#install">Install</a>
+      <a href="#about">About</a>
+      <a class="nav-gh" href="https://github.com/nicolasvergoz/ezida-kanban" rel="noopener" target="_blank">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 0a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.1-.75.08-.73.08-.73 1.21.09 1.85 1.25 1.85 1.25 1.08 1.84 2.82 1.31 3.51 1 .11-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.17 0 0 1.01-.32 3.3 1.23a11.4 11.4 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.87.11 3.17.77.84 1.24 1.91 1.24 3.22 0 4.6-2.82 5.62-5.5 5.91.43.38.81 1.12.81 2.26v3.34c0 .33.22.7.83.58A12 12 0 0 0 12 0z"/></svg>
+        <span>GitHub</span>
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-inner">
+        <div class="hero-text">
+          <div class="hero-eyebrow eyebrow">
+            <span class="dot" aria-hidden="true"></span>
+            <span>open source · go · mit · v0.2.0</span>
+          </div>
+          <h1 class="headline">A Kanban board<br/>your <span class="accent">agents</span> can drive.</h1>
+          <p class="subline">
+            Ezida is a file-based Kanban for software projects.
+            One Go binary, one versioned <code>kanban.toml</code> at the repo root —
+            no server, no database. Driven from the CLI, or by any AI assistant
+            that reads Claude&nbsp;Code skills.
+          </p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="#install">Install</a>
+            <a class="btn btn-secondary" href="https://github.com/nicolasvergoz/ezida-kanban" rel="noopener" target="_blank">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 0a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.04c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.1-.75.08-.73.08-.73 1.21.09 1.85 1.25 1.85 1.25 1.08 1.84 2.82 1.31 3.51 1 .11-.78.42-1.31.76-1.61-2.66-.3-5.47-1.33-5.47-5.92 0-1.31.47-2.38 1.24-3.22-.13-.3-.54-1.52.11-3.17 0 0 1.01-.32 3.3 1.23a11.4 11.4 0 0 1 6 0c2.29-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.87.11 3.17.77.84 1.24 1.91 1.24 3.22 0 4.6-2.82 5.62-5.5 5.91.43.38.81 1.12.81 2.26v3.34c0 .33.22.7.83.58A12 12 0 0 0 12 0z"/></svg>
+              View on GitHub <span class="arrow">→</span>
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/nicolasvergoz/ezida-kanban/blob/main/docs/usage.md" rel="noopener" target="_blank">Read the docs</a>
+          </div>
+
+          <div class="trust-row" aria-label="What ships in your repo">
+            <div class="trust-card">
+              <div class="label">the board</div>
+              <div class="value">kanban.toml</div>
+            </div>
+            <div class="trust-card">
+              <div class="label">the cli</div>
+              <div class="value">ezida</div>
+            </div>
+            <div class="trust-card">
+              <div class="label">the agent</div>
+              <div class="value">SKILL.md</div>
+            </div>
+          </div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <img src="assets/icon.png" alt="" width="440" height="440" style="border-radius: 16px; opacity: 1; width: 440px; object-fit: fill; padding: 0px" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGENTS — first after the hero -->
+  <section id="agents">
+    <div class="container">
+      <div class="section-label" data-num="01">agent-ready</div>
+      <h2>Built for humans <em style="color:var(--accent);font-style:italic;">and</em> agents.</h2>
+      <p class="section-head lede">
+        Humans and AI assistants share <strong>one</strong> source of truth — the
+        <code>kanban.toml</code> file in your repo. No separate service to integrate, no API
+        keys to provision, no permissions to grant. The agent runs the same CLI a human would.
+      </p>
+
+      <div class="agents-split">
+        <div class="agents-col">
+          <h3>From the terminal</h3>
+<pre><code><span class="prompt">$</span> <span class="ezida">ezida</span> list <span class="flag">--column=todo</span>
+<span class="prompt">$</span> <span class="ezida">ezida</span> add <span>"Refactor auth"</span> <span class="flag">--column=todo --priority=high --tags=security</span>
+<span class="prompt">$</span> <span class="ezida">ezida</span> move a3f2k9 ongoing
+<span class="prompt">$</span> <span class="ezida">ezida</span> edit a3f2k9 <span class="flag">--priority=medium</span>
+<span class="prompt">$</span> <span class="ezida">ezida</span> rm a3f2k9 <span class="flag">--yes</span></code></pre>
+        </div>
+
+        <div class="agents-col">
+          <h3>From an agent</h3>
+          <div class="agent-prompts">
+            <p>"Add a high-priority card 'Refactor auth' to todo, tagged security."</p>
+            <p>"Move card a3f2k9 to ongoing."</p>
+            <p>"What's in the todo column?"</p>
+          </div>
+          <p class="agents-note">
+            With <code>.claude/skills/ezida-kanban/SKILL.md</code> committed,
+            Claude&nbsp;Code (and any agent that reads
+            <a href="https://docs.claude.com/en/docs/claude-code/skills" rel="noopener" target="_blank">Claude Code skills</a>)
+            picks it up automatically and runs the same commands on your behalf.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WEB UI -->
+  <section id="webui" class="webui">
+    <div class="container">
+      <div class="section-label" data-num="02">web ui · ezida serve</div>
+      <h2>Prefer a visual board? <span class="muted">Run one command.</span></h2>
+      <p class="section-head lede">
+        <code>ezida serve</code> launches a local Web UI bound to <code>127.0.0.1:7777</code>
+        and opens it in your default browser. The page is read <em>and</em> write:
+        click a card to edit inline, drag to reorder or move between columns,
+        add columns from the header, filter, switch theme.
+        It hot-reloads on every change to <code>kanban.toml</code> — yours, the CLI's, or the agent's.
+      </p>
+      <figure>
+        <img src="assets/screenshot-light.png" width="1646" height="556" loading="lazy"
+             alt="Screenshot of the Ezida web UI: four columns (BACKLOG, TODO, ONGOING, DONE) with cards showing tasks and priority tags." />
+        <figcaption>The <code>ezida serve</code> web UI, hot-reloading from kanban.toml.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section id="install">
+    <div class="container-tight">
+      <div class="section-label" data-num="03">install</div>
+      <h2>One command. macOS or Linux.</h2>
+      <p class="section-head lede">
+        The installer detects your OS and architecture, downloads the matching tarball plus
+        <code>checksums.txt</code> from the latest GitHub Release, verifies the SHA256, and
+        installs <code>ezida</code> to <code>~/.local/bin/ezida</code>.
+      </p>
+
+      <div class="install-block">
+        <pre id="install-cmd"><span class="install-prompt">$ </span>curl -sSL https://github.com/nicolasvergoz/ezida-kanban/releases/latest/download/install.sh | sh</pre>
+        <button class="copy-btn" data-copy-target="#install-cmd">Copy</button>
+      </div>
+      <p class="install-note">
+        Supported: macOS (arm64, amd64), Linux (arm64, amd64).
+        Pin a version with <code>EZIDA_VERSION=v0.2.0</code>.
+        <a href="https://github.com/nicolasvergoz/ezida-kanban/blob/main/docs/usage.md#manual-install" rel="noopener" target="_blank">Manual install →</a>
+      </p>
+
+      <div class="quickstart">
+        <h3>Then, in any repo</h3>
+        <pre class="code-block"><span class="prompt">$ </span>cd my-project/
+<span class="prompt">$ </span>ezida init</pre>
+        <p class="install-note">
+          Creates <code>kanban.toml</code> at the project root and
+          <code>.claude/skills/ezida-kanban/SKILL.md</code> — the embedded skill for AI assistants. Commit both.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="container">
+      <div class="section-label" data-num="04">what makes it different</div>
+      <h2>Three constraints, one tool.</h2>
+      <p class="section-head lede">
+        Ezida is opinionated about what it isn't. The board is a file. The file is in git.
+        Everything else follows.
+      </p>
+      <ul class="feature-grid">
+        <li>
+          <h3>File-based</h3>
+          <p>The board is a single TOML file at the repo root. Branches, PRs, blame and history all apply — because the board <em>is</em> code.</p>
+        </li>
+        <li>
+          <h3>No server</h3>
+          <p>One Go binary, around 10&nbsp;MB. No database, no daemon, no account. The Web UI binds <code>127.0.0.1</code> on demand.</p>
+        </li>
+        <li>
+          <h3>Versioned by default</h3>
+          <p>Every move is a commit if you want it. Branch the board, review changes in a PR, roll back — the way you do code.</p>
+        </li>
+        <li>
+          <h3>CLI-first</h3>
+          <p><code>add</code>, <code>move</code>, <code>list</code>, <code>edit</code>, <code>rm</code>. Fast, scriptable, pipeable.</p>
+        </li>
+        <li>
+          <h3>Local Web UI</h3>
+          <p><code>ezida serve</code> launches a hot-reloading board on <code>127.0.0.1:7777</code>. Drag, edit, filter, theme.</p>
+        </li>
+        <li>
+          <h3>Agent-ready</h3>
+          <p>An embedded <code>SKILL.md</code> drops in your repo at <code>init</code>. Claude&nbsp;Code picks it up automatically.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about">
+    <div class="container">
+      <div class="section-label" data-num="05">etymology</div>
+      <h2>Why "Ezida"?</h2>
+      <div class="about-split" style="margin-top: 32px;">
+        <div class="about-icon">
+          <img src="assets/icon.png" width="180" height="180" loading="lazy"
+               alt="The Ezida icon — a stylised carved sandstone temple gate, the three pediment columns labelled TODO, DOING, DONE." />
+        </div>
+        <div class="about-text">
+          <p><strong>Ezida</strong> (literally <em>House of Truth</em>, from the Akkadian <em>é-zi-da</em>) was the temple of <strong>Nabu</strong> — the Mesopotamian god of writing, scribes, and record-keeping — located in <strong>Borsippa</strong>, near Babylon.</p>
+          <p>More than a place of worship, it was one of the great archives of the ancient world. Thousands of cuneiform tablets were stored there, with scribes meticulously copying, cataloguing, and signing their work: early librarians, in a sense.</p>
+          <p>The name felt right for a tool whose job is exactly that — a small, versioned place that lives in your repo, where a project keeps track of what it's working on, what's done, and what's still ahead.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROADMAP -->
+  <section id="roadmap" class="roadmap">
+    <div class="container-tight">
+      <div class="section-label" data-num="06">roadmap</div>
+      <h2>The roadmap is, fittingly,<br/>a <code style="font-size: 0.85em;font-family:var(--mono)">kanban.toml</code>.</h2>
+      <p style="margin-top: 24px;">
+        Ezida tracks its own work in the same format you'll use.
+        Browse the live board: <a href="https://github.com/nicolasvergoz/ezida-kanban/blob/main/kanban.toml" rel="noopener" target="_blank"><code>kanban.toml</code> on GitHub</a>.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="footer-grid">
+    <div>
+      <p class="footer-brand">
+        <img src="assets/favicon.png" alt="" width="22" height="22" />
+        <span>Ezida</span>
+      </p>
+      <p>File-based Kanban for software projects. Open source under the MIT license. Made by <a href="https://github.com/nicolasvergoz">@nicolasvergoz</a>.</p>
+    </div>
+    <div>
+      <h4>Project</h4>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban" rel="noopener" target="_blank">GitHub repository</a>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban/releases" rel="noopener" target="_blank">Releases</a>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban/issues" rel="noopener" target="_blank">Issues</a>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban/blob/main/LICENSE" rel="noopener" target="_blank">MIT License</a>
+    </div>
+    <div>
+      <h4>Documentation</h4>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban/blob/main/docs/usage.md" rel="noopener" target="_blank">Usage</a>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban/blob/main/docs/development.md" rel="noopener" target="_blank">Development</a>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban/tree/main/.claude/skills/ezida-kanban" rel="noopener" target="_blank">Claude skill</a>
+      <a href="https://github.com/nicolasvergoz/ezida-kanban/blob/main/kanban.toml" rel="noopener" target="_blank">Live kanban.toml</a>
+    </div>
+    <div>
+      <h4>Discoverable</h4>
+      <a href="llms.txt">llms.txt</a>
+      <a href="llms-full.txt">llms-full.txt</a>
+      <a href="sitemap.xml">sitemap.xml</a>
+    </div>
+  </div>
+  <p class="footer-copy">
+    <span>© 2026 Nicolas Vergoz · MIT licensed</span>
+    <span>Built with HTML, CSS &amp; <code>kanban.toml</code></span>
+  </p>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

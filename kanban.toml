@@ -5,26 +5,6 @@ columns = ['backlog', 'todo', 'ongoing', 'done']
 priorities = ['low', 'medium', 'high']
 
 [[cards]]
-id = '4lmozo'
-title = 'App icon / project illustration'
-column = 'backlog'
-description = 'Design or find an app icon / illustration for the project. Use cases: favicon for viewer UI, README header in git repo.'
-created_at = 2026-05-21T21:27:09Z
-updated_at = 2026-05-21T21:41:27Z
-tags = ['branding']
-priority = 'low'
-
-[[cards]]
-id = '7ie3qb'
-title = 'Make Github Page'
-column = 'backlog'
-description = ''
-created_at = 2026-05-21T20:50:47Z
-updated_at = 2026-05-21T22:11:32Z
-tags = ['branding']
-priority = 'medium'
-
-[[cards]]
 id = 'gwct06'
 title = 'Improve filter: description, priority, tags, column scope'
 column = 'backlog'
@@ -82,15 +62,6 @@ tags = []
 priority = 'high'
 
 [[cards]]
-id = 'flgccn'
-title = 'SKILL can serve and open link in default browser'
-column = 'done'
-description = ''
-created_at = 2026-05-21T20:59:10Z
-updated_at = 2026-05-21T21:17:56Z
-tags = []
-
-[[cards]]
 id = 'ovc5kh'
 title = 'Fix card top border on hover'
 column = 'done'
@@ -109,3 +80,32 @@ created_at = 2026-05-21T21:24:43Z
 updated_at = 2026-05-21T21:48:23Z
 tags = []
 priority = 'low'
+
+[[cards]]
+id = 'flgccn'
+title = 'SKILL can serve and open link in default browser'
+column = 'done'
+description = ''
+created_at = 2026-05-21T20:59:10Z
+updated_at = 2026-05-21T22:26:12Z
+tags = []
+
+[[cards]]
+id = '4lmozo'
+title = 'App icon / project illustration'
+column = 'done'
+description = 'Design or find an app icon / illustration for the project. Use cases: favicon for viewer UI, README header in git repo.'
+created_at = 2026-05-21T21:27:09Z
+updated_at = 2026-05-22T08:37:47Z
+tags = ['branding']
+priority = 'low'
+
+[[cards]]
+id = '7ie3qb'
+title = 'Make Github Page'
+column = 'todo'
+description = ''
+created_at = 2026-05-21T20:50:47Z
+updated_at = 2026-05-21T22:24:13Z
+tags = ['branding']
+priority = 'medium'

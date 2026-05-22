@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./docs/assets/ezida-icon.png" alt="ezida-kanban" width="180" />
+</p>
+
 # ezida-kanban
 
 > File-based Kanban for software projects. One binary, one TOML file,
@@ -66,6 +70,8 @@ runs the same commands on your behalf:
 
 ### Web UI
 
+![ezida serve — Web UI](./docs/assets/screenshot.png)
+
 Prefer a visual board? `ezida serve` launches a local Web UI bound
 to `127.0.0.1` (default port `7777`) and opens it in your default
 browser. The page is read **and** write: click a card to edit
@@ -90,3 +96,19 @@ Full reference (flags, capabilities, port fallback) in
 ## License
 
 [MIT](./LICENSE).
+
+---
+
+#### Why "Ezida"?
+
+Ezida (literally "House of Truth", from the Akkadian *é-zi-da*) was the
+temple of Nabu, the Mesopotamian god of writing, scribes, and
+record-keeping, located in Borsippa near Babylon. More than a place of
+worship, it was one of the great archives of the ancient world.
+Thousands of cuneiform tablets were stored there, with scribes
+meticulously copying, cataloguing, and signing their work: early
+librarians, in a sense.
+
+The name felt right for a tool whose job is exactly that: a small,
+versioned place that lives in your repo, where a project keeps track of
+what it's working on, what's done, and what's still ahead.

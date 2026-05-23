@@ -105,8 +105,14 @@
     font-weight: 500;
     letter-spacing: -0.01em;
   }
+  @media (max-width: 880px) {
+    .v-tablet .hero-art img { max-width: 220px; height: auto; aspect-ratio: 1 / 1; }
+  }
   @media (max-width: 540px) {
     .trust-row { grid-template-columns: 1fr; }
+    .v-tablet .hero-art img { max-width: 180px; height: auto; aspect-ratio: 1 / 1; }
+    .brand-version { display: none; }
+    .hero { padding-top: 40px; padding-bottom: 32px; }
   }
 </style>
 

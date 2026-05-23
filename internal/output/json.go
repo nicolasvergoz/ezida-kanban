@@ -52,6 +52,32 @@ type GetEnvelope struct {
 	Card GetCard `json:"card"`
 }
 
+// ExportCard mirrors the viewer's per-card response shape from
+// internal/server/handlers.go (cardResponse). Includes description so
+// the demo viewer can render the edit modal without a second fetch.
+type ExportCard struct {
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	Column      string    `json:"column"`
+	Priority    string    `json:"priority,omitempty"`
+	Tags        []string  `json:"tags"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// ExportEnvelope is the JSON shape for `ezida export --json`. Mirrors
+// the viewer's boardResponse (GET /api/board) so the demo viewer can
+// consume the snapshot through the same code path as the live server.
+type ExportEnvelope struct {
+	SchemaVersion  int            `json:"schema_version"`
+	Columns        []string       `json:"columns"`
+	Priorities     []string       `json:"priorities"`
+	CardsPerColumn map[string]int `json:"cards_per_column"`
+	Cards          []ExportCard   `json:"cards"`
+	ProjectName    string         `json:"project_name"`
+}
+
 // ErrorEnvelope is the JSON shape for any command's error output
 // (ADR §D8).
 type ErrorEnvelope struct {
@@ -86,6 +112,9 @@ func List(env ListEnvelope) ([]byte, error) { return marshalLine(env) }
 
 // Get marshals a GetEnvelope and appends a newline.
 func Get(env GetEnvelope) ([]byte, error) { return marshalLine(env) }
+
+// Export marshals an ExportEnvelope and appends a newline.
+func Export(env ExportEnvelope) ([]byte, error) { return marshalLine(env) }
 
 // Error marshals an ErrorEnvelope and appends a newline.
 func Error(env ErrorEnvelope) ([]byte, error) { return marshalLine(env) }

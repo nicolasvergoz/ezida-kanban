@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "kanban.toml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -29,6 +30,26 @@ jobs:
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build ezida
+        run: go build -o ezida ./cmd/ezida
+
+      - name: Export demo board snapshot
+        run: ./ezida export --json > site/demo/board.json
+
+      - name: Substitute snapshot SHA into demo banner
+        run: |
+          short_sha="${GITHUB_SHA:0:7}"
+          sed -i "s/__SNAPSHOT_SHA__/${short_sha}/g" site/demo/index.html
+          if grep -q __SNAPSHOT_SHA__ site/demo/index.html; then
+            echo "::error::placeholder __SNAPSHOT_SHA__ still present after substitution"
+            exit 1
+          fi
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3

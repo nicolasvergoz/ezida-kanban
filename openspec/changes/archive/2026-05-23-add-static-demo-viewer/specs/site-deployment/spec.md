@@ -1,10 +1,4 @@
-# site-deployment Specification
-
-## Purpose
-
-Static landing-page deployment pipeline targeting GitHub Pages from the `site/` directory.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Pages workflow deploys `site/` directory
 The repository SHALL provide a GitHub Actions workflow that publishes the contents of `site/` to GitHub Pages using the official first-party Pages actions (`actions/configure-pages`, `actions/upload-pages-artifact`, `actions/deploy-pages`). The workflow SHALL also regenerate `site/demo/board.json` from the current `kanban.toml` and substitute the snapshot SHA into the demo banner before uploading the artifact.
@@ -31,21 +25,3 @@ The workflow SHALL replace the literal placeholder `__SNAPSHOT_SHA__` inside `si
 #### Scenario: Placeholder substituted
 - **WHEN** the workflow's "substitute snapshot SHA" step runs
 - **THEN** the resulting `site/demo/index.html` contains no occurrence of `__SNAPSHOT_SHA__`
-
-### Requirement: Workflow runs independently of the Go test gate
-The Pages workflow SHALL NOT depend on the `ci` workflow's success. A failing Go test MUST NOT block a site deployment, and a failing Pages deploy MUST NOT block code merges.
-
-#### Scenario: Go tests broken, site change pushed
-- **WHEN** `ci.gate` is failing and a commit modifies `site/index.html`
-- **THEN** the Pages workflow still executes and deploys the change
-
-### Requirement: Workflow uses least-privilege permissions and safe concurrency
-The Pages workflow SHALL declare only the permissions required by the official Pages actions (`contents: read`, `pages: write`, `id-token: write`) and SHALL serialise deploys via a concurrency group named `pages` with `cancel-in-progress: false`.
-
-#### Scenario: Two deploys triggered close together
-- **WHEN** a second deploy is queued while one is in progress
-- **THEN** the in-progress deploy completes uninterrupted and the queued run starts after it
-
-#### Scenario: Permissions check
-- **WHEN** the workflow file is inspected
-- **THEN** it grants exactly `contents: read`, `pages: write`, `id-token: write` at the job (or workflow) scope and no other permissions

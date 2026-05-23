@@ -106,42 +106,42 @@
     font-style: normal;
     font-weight: 300;
     font-display: swap;
-    src: url('/static/vendor/fonts/Geist-Light.woff2') format('woff2');
+    src: url('vendor/fonts/Geist-Light.woff2') format('woff2');
   }
   @font-face {
     font-family: 'Geist';
     font-style: normal;
     font-weight: 400;
     font-display: swap;
-    src: url('/static/vendor/fonts/Geist-Regular.woff2') format('woff2');
+    src: url('vendor/fonts/Geist-Regular.woff2') format('woff2');
   }
   @font-face {
     font-family: 'Geist';
     font-style: normal;
     font-weight: 500;
     font-display: swap;
-    src: url('/static/vendor/fonts/Geist-Medium.woff2') format('woff2');
+    src: url('vendor/fonts/Geist-Medium.woff2') format('woff2');
   }
   @font-face {
     font-family: 'Geist';
     font-style: normal;
     font-weight: 600;
     font-display: swap;
-    src: url('/static/vendor/fonts/Geist-SemiBold.woff2') format('woff2');
+    src: url('vendor/fonts/Geist-SemiBold.woff2') format('woff2');
   }
   @font-face {
     font-family: 'Geist';
     font-style: normal;
     font-weight: 700;
     font-display: swap;
-    src: url('/static/vendor/fonts/Geist-Bold.woff2') format('woff2');
+    src: url('vendor/fonts/Geist-Bold.woff2') format('woff2');
   }
   @font-face {
     font-family: 'Geist';
     font-style: normal;
     font-weight: 800;
     font-display: swap;
-    src: url('/static/vendor/fonts/Geist-ExtraBold.woff2') format('woff2');
+    src: url('vendor/fonts/Geist-ExtraBold.woff2') format('woff2');
   }
 
   /* --- Geist Mono @font-face declarations --------------------------------- */
@@ -150,14 +150,14 @@
     font-style: normal;
     font-weight: 400;
     font-display: swap;
-    src: url('/static/vendor/fonts/GeistMono-Regular.woff2') format('woff2');
+    src: url('vendor/fonts/GeistMono-Regular.woff2') format('woff2');
   }
   @font-face {
     font-family: 'Geist Mono';
     font-style: normal;
     font-weight: 500;
     font-display: swap;
-    src: url('/static/vendor/fonts/GeistMono-Medium.woff2') format('woff2');
+    src: url('vendor/fonts/GeistMono-Medium.woff2') format('woff2');
   }
 
   /* --- Utility classes — type ramp ---------------------------------------- */

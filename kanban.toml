@@ -10,17 +10,48 @@ title = 'Improve filter: description, priority, tags, column scope'
 column = 'backlog'
 description = 'Current viewer filter only matches card title. Extend to: search inside description text, filter by priority, restrict search to a specific column.'
 created_at = 2026-05-21T21:28:54Z
-updated_at = 2026-05-21T21:31:39Z
-tags = []
+updated_at = 2026-05-23T09:10:21Z
+tags = ['viewer', 'ux']
+priority = 'medium'
 
 [[cards]]
-id = 'hrugx0'
-title = 'Configurable priority colors'
+id = 'r0kn99'
+title = 'Windows support'
 column = 'backlog'
-description = 'Allow per-priority color config in kanban.toml (e.g. [board.priority_colors] low="#22c55e" medium="#f59e0b" high="#ef4444"). Defaults: green/orange/red matching low/medium/high. Viewer reads colors from /api/board and applies them to the priority badge.'
-created_at = 2026-05-21T22:08:11Z
-updated_at = 2026-05-21T22:10:12Z
-tags = []
+description = "Verify and document Windows compatibility for ezida CLI + viewer: path handling, file locking, browser auto-open ('start' instead of 'open'/'xdg-open'), install script, build artifacts."
+created_at = 2026-05-21T22:09:43Z
+updated_at = 2026-05-23T09:13:10Z
+tags = ['cli', 'platform']
+priority = 'medium'
+
+[[cards]]
+id = 'f20wbo'
+title = 'Card dependencies'
+column = 'backlog'
+description = "Allow a card to declare dependencies on other cards (blocked-by / blocks). CLI: ezida edit <id> --depends-on <id>,<id> (and --no-depends-on to clear). Viewer: show linked cards in the detail modal with their status, and a small badge on the card when it has unmet dependencies (deps not in 'done'). Goal: surface blocking relationships so the board reflects what is actually actionable now."
+created_at = 2026-05-23T09:09:28Z
+updated_at = 2026-05-23T09:10:22Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'medium'
+
+[[cards]]
+id = 'wrshlo'
+title = 'Card due dates'
+column = 'backlog'
+description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance."
+created_at = 2026-05-23T09:09:28Z
+updated_at = 2026-05-23T09:10:22Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'medium'
+
+[[cards]]
+id = 'ix508e'
+title = 'Auto-screenshot demo board in CI'
+column = 'backlog'
+description = 'Generate site/assets/screenshot-{light,dark}.png from the live /demo/ board during the Pages workflow so the landing-page screenshot always matches the current roadmap. Brief: refs/AUTO_SCREENSHOT_BRIEF.md.'
+created_at = 2026-05-23T09:20:45Z
+updated_at = 2026-05-23T09:20:45Z
+tags = ['site']
 priority = 'low'
 
 [[cards]]
@@ -29,8 +60,19 @@ title = 'Archive cards'
 column = 'backlog'
 description = "Archive cards out of the active board into separate storage (e.g. kanban.archive.toml or .kanban/archive/ folder — TBD). CLI: 'ezida archive <id>'. Viewer: archive action on card. Archived cards excluded from board/list by default; surface via 'ezida archive list' or viewer toggle."
 created_at = 2026-05-21T22:09:11Z
-updated_at = 2026-05-21T22:10:00Z
+updated_at = 2026-05-23T09:27:26Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'low'
+
+[[cards]]
+id = '42q7t6'
+title = 'Attach repo files to a card'
+column = 'backlog'
+description = 'Let a card reference one or more paths in the repo (e.g. docs/X.md, src/Y.go). Surfaced in the viewer + CLI; clicking opens the file. Open questions: stored as repo-relative paths in TOML; viewer needs a way to render (GH link? Local file open?); access control irrelevant since the board is committed alongside the code.'
+created_at = 2026-05-23T09:20:47Z
+updated_at = 2026-05-23T09:20:47Z
 tags = []
+priority = 'low'
 
 [[cards]]
 id = 'e0tf0t'
@@ -121,10 +163,31 @@ updated_at = 2026-05-23T08:16:51Z
 tags = []
 
 [[cards]]
-id = 'r0kn99'
-title = 'Windows support'
+id = 'a4zkwn'
+title = 'Show copyable card ID above title'
 column = 'todo'
-description = "Verify and document Windows compatibility for ezida CLI + viewer: path handling, file locking, browser auto-open ('start' instead of 'open'/'xdg-open'), install script, build artifacts."
-created_at = 2026-05-21T22:09:43Z
-updated_at = 2026-05-23T06:20:26Z
-tags = []
+description = 'Card detail modal already shows the card ID via .modal-id (t-mono-label style). Reuse same look on the card itself: small grey monospace ID above the title in the web viewer — but use a smaller font size than the modal version, since the card title is smaller than the modal title and the ID must stay visually subordinate to it. Click on the ID (both on the card and in the detail modal) copies it to the clipboard. Goal: easier to interact with AIs or manipulate a specific card via its ID (e.g. ezida get <id>, ezida move <id>).'
+created_at = 2026-05-23T08:26:30Z
+updated_at = 2026-05-23T09:04:01Z
+tags = ['viewer', 'ux']
+priority = 'medium'
+
+[[cards]]
+id = '5u7lsw'
+title = 'Polish card detail modal layout'
+column = 'todo'
+description = "Modal is flat: no section labels, fields look passive, priority does not look interactive. Improve hierarchy and affordance.\n\n- Add small uppercase section labels (Title, Description, Priority, Tags) above each field-row so users know what they are editing.\n- Priority: replace the plain 'no priority' span with a clearly clickable control (chip / dropdown trigger with caret + colored dot per priority) so the interaction is discoverable without first click.\n- Description: show a pencil/edit icon hint on hover; placeholder 'Add a description' should look like an empty-state, not a value.\n- Tags: keep chip + add-input but pad spacing and align with the rest.\n- Read-only footer: tighten typography, group column/created/updated with subtle separators.\n- Title: slightly bigger, with edit hint on hover.\n\nGoal: detail modal feels structured and interactive on first glance, no guessing what is editable."
+created_at = 2026-05-23T09:12:34Z
+updated_at = 2026-05-23T09:27:06Z
+tags = ['viewer', 'ux']
+priority = 'medium'
+
+[[cards]]
+id = 'hrugx0'
+title = 'Configurable priority colors'
+column = 'todo'
+description = 'Allow per-priority color config in kanban.toml (e.g. [board.priority_colors] low="#22c55e" medium="#f59e0b" high="#ef4444"). Defaults: green/orange/red matching low/medium/high. Viewer reads colors from /api/board and applies them to the priority badge.'
+created_at = 2026-05-21T22:08:11Z
+updated_at = 2026-05-23T09:27:13Z
+tags = ['viewer', 'config']
+priority = 'low'

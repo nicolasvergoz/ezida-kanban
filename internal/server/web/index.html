@@ -109,6 +109,10 @@
           <ul class="cards" :data-column="col">
             <template x-for="card in filteredCardsByColumn(col)" :key="card.id">
               <li class="card" :data-card-id="card.id" :class="card.priority ? 'priority-' + card.priority : ''" :title="'updated ' + card.updated_at" @click="openCard(card)">
+                <span class="card-id-wrap">
+                  <span class="card-id" x-text="card.id" @click.stop="copyId(card.id, $event, 'card')" @mousedown.stop title="Click to copy card ID"></span>
+                  <span class="card-id-copied" x-show="copiedCardId === card.id" x-transition.opacity.duration.150ms>copied</span>
+                </span>
                 <div class="card-title t-card-text" x-text="card.title"></div>
                 <ul class="card-meta"
                     x-show="card.priority || (card.description && card.description.trim() !== '') || (card.tags && card.tags.length)">
@@ -227,7 +231,8 @@
         <template x-if="openCardData">
           <div>
             <header class="modal-header">
-              <span class="modal-id t-mono-label" x-text="openCardData.id"></span>
+              <span class="modal-id t-mono-label" x-text="openCardData.id" @click="copyId(openCardData.id, $event, 'modal')" title="Click to copy card ID"></span>
+              <span class="modal-id-copied" x-show="copiedModalId" x-transition.opacity.duration.150ms>copied</span>
             </header>
 
             <!-- Title field -->

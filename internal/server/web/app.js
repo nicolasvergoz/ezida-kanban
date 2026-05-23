@@ -45,6 +45,14 @@ function board() {
     errors: { title: '', description: '', priority: '', tags: '' },
     drafts: { title: '', description: '', priority: '' },
     tagInput: '',
+    // copyId feedback: set to the card id whose `.card-id` was last
+    // clicked, or the literal 'modal' when the modal `.modal-id` was
+    // clicked. Cleared by a setTimeout so the "copied" badge fades
+    // back out automatically.
+    copiedCardId: '',
+    copiedModalId: false,
+    _copyTimer: null,
+    _copyModalTimer: null,
     // V4 SSE state. `connected` drives the topbar status dot;
     // `eventSource` holds the active EventSource handle so a future
     // reconnect can tear down the previous one (the browser's
@@ -522,6 +530,43 @@ function board() {
       } catch (e) {
         console.error('delete request errored, refetching', e);
         await this.load();
+      }
+    },
+    // copyId writes the card ID to the system clipboard. Used by both
+    // the card-level .card-id span and the modal .modal-id span. Stops
+    // propagation so the card's click handler (which opens the modal)
+    // does not also fire when clicking the on-card label. Prefers the
+    // async Clipboard API; falls back to execCommand for non-secure-
+    // context loads (e.g. plain http:// over LAN).
+    copyId(id, evt, source) {
+      if (evt) evt.stopPropagation();
+      if (!id) return;
+      const fallback = (text) => {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.setAttribute('readonly', '');
+          ta.style.position = 'absolute';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          document.body.removeChild(ta);
+        } catch (e) { /* swallow */ }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(id).catch(() => fallback(id));
+      } else {
+        fallback(id);
+      }
+      if (source === 'modal') {
+        this.copiedModalId = true;
+        if (this._copyModalTimer) clearTimeout(this._copyModalTimer);
+        this._copyModalTimer = setTimeout(() => { this.copiedModalId = false; }, 1500);
+      } else {
+        this.copiedCardId = id;
+        if (this._copyTimer) clearTimeout(this._copyTimer);
+        this._copyTimer = setTimeout(() => { this.copiedCardId = ''; }, 1500);
       }
     },
     // UI-5: openCard seeds `openCardData` from the clicked card and

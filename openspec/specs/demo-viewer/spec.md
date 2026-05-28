@@ -3,9 +3,7 @@
 ## Purpose
 
 Provide a static, in-memory demo of the Ezida viewer at `/demo/` on the public landing page, so prospects can experience the UX without installing the binary. The demo loads Ezida's own board snapshot as fixture content; all mutations are ephemeral.
-
 ## Requirements
-
 ### Requirement: Demo viewer hosted at `/demo/`
 The landing page deployment SHALL include a static demo of the viewer at the `/demo/` path. The demo SHALL load Ezida's own board as fixture content and present the same UI as `ezida serve`.
 
@@ -47,8 +45,25 @@ The demo page SHALL display a visible banner reading `Demo â€” snapshot <sha7> Â
 - **THEN** the banner contains the sentinel `dev` instead of an unresolved placeholder
 
 ### Requirement: Demo shares viewer assets via symlinks
-`site/demo/app.js`, `site/demo/style.css`, and `site/demo/vendor` SHALL be symbolic links into `internal/server/web/` so the demo stays byte-identical to the real viewer.
+
+The demo directory SHALL link viewer assets via symlinks so the
+demo stays byte-identical to the real viewer: `site/demo/app.jsx`,
+`site/demo/styles.css`, and `site/demo/vendor` MUST be symbolic
+links into `internal/server/web/`. The legacy symlinks
+`site/demo/app.js` and `site/demo/style.css` MUST NOT exist (the
+files they pointed at no longer exist either).
 
 #### Scenario: Asset divergence audit
-- **WHEN** `site/demo/app.js` is inspected
-- **THEN** it is a symlink whose target resolves to `internal/server/web/app.js`
+
+- **WHEN** `site/demo/app.jsx` is inspected
+- **THEN** it is a symlink whose target resolves to
+  `internal/server/web/app.jsx`
+
+- **WHEN** `site/demo/styles.css` is inspected
+- **THEN** it is a symlink whose target resolves to
+  `internal/server/web/styles.css`
+
+- **WHEN** `site/demo/vendor` is inspected
+- **THEN** it is a symlink whose target resolves to
+  `internal/server/web/vendor`
+

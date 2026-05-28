@@ -301,42 +301,27 @@ func TestHandle_Index(t *testing.T) {
 	}
 }
 
-// TestHandle_Index_ContainsUI4Markup asserts that GET / ships the
-// UI-4 footer composer and per-card delete button markup so the
-// browser sees both affordances on first paint.
-func TestHandle_Index_ContainsUI4Markup(t *testing.T) {
-	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
-	defer cleanup()
-
-	res, err := http.Get(ts.URL + "/")
-	if err != nil {
-		t.Fatalf("GET /: %v", err)
-	}
-	defer res.Body.Close()
-	body, _ := io.ReadAll(res.Body)
-	src := string(body)
-	if !strings.Contains(src, `class="column-footer"`) {
-		t.Fatalf(`index.html missing class="column-footer"`)
-	}
-	if !strings.Contains(src, `class="card-delete"`) {
-		t.Fatalf(`index.html missing class="card-delete"`)
-	}
-}
-
+// TestHandle_Static_App confirms the React app source is reachable
+// via the static route. The React UI renders all markup at runtime,
+// so DOM-structure assertions belong in browser-level tests rather
+// than the served HTML.
 func TestHandle_Static_App(t *testing.T) {
 	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
 	defer cleanup()
 
-	res, err := http.Get(ts.URL + "/static/app.js")
+	res, err := http.Get(ts.URL + "/static/app.jsx")
 	if err != nil {
-		t.Fatalf("GET /static/app.js: %v", err)
+		t.Fatalf("GET /static/app.jsx: %v", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
+	if ct := res.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/javascript") && !strings.HasPrefix(ct, "text/javascript") {
+		t.Fatalf("Content-Type = %q, want application/javascript or text/javascript", ct)
+	}
 	body, _ := io.ReadAll(res.Body)
-	want, _ := webFS.ReadFile("web/app.js")
+	want, _ := webFS.ReadFile("web/app.jsx")
 	if string(body) != string(want) {
 		t.Fatalf("body mismatch:\n got: %q\nwant: %q", body, want)
 	}
@@ -559,73 +544,58 @@ func TestServe_BindIsLoopbackOnly(t *testing.T) {
 	}
 }
 
-// TestStatic_Vendor_Alpine confirms the vendored Alpine bundle is
-// reachable through the existing FileServerFS-backed /static route
-// and that its body begins with the vendored comment line recorded
-// in tasks 1.1 / 1.2 of add-viewer-ui-readonly.
-func TestStatic_Vendor_Alpine(t *testing.T) {
+// TestStatic_Vendor_React confirms the vendored React production
+// bundle is reachable through the FileServerFS-backed /static route.
+func TestStatic_Vendor_React(t *testing.T) {
 	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
 	defer cleanup()
 
-	res, err := http.Get(ts.URL + "/static/vendor/alpine.min.js")
+	res, err := http.Get(ts.URL + "/static/vendor/react.production.min.js")
 	if err != nil {
-		t.Fatalf("GET /static/vendor/alpine.min.js: %v", err)
+		t.Fatalf("GET /static/vendor/react.production.min.js: %v", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
-	body, _ := io.ReadAll(res.Body)
-	const prefix = "/* Alpine.js v3."
-	if !strings.HasPrefix(string(body), prefix) {
-		t.Fatalf("body prefix = %q, want %q…", string(body[:min(len(body), 40)]), prefix)
-	}
 }
 
-// TestStatic_Vendor_Sortable confirms the vendored Sortable.js
-// bundle is reachable through the existing FileServerFS-backed
-// /static route and that its body begins with the vendored comment
-// line recorded in task 4.1 of add-card-move-reorder.
-func TestStatic_Vendor_Sortable(t *testing.T) {
+// TestStatic_Vendor_ReactDOM confirms the vendored ReactDOM
+// production bundle is reachable.
+func TestStatic_Vendor_ReactDOM(t *testing.T) {
 	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
 	defer cleanup()
 
-	res, err := http.Get(ts.URL + "/static/vendor/sortable.min.js")
+	res, err := http.Get(ts.URL + "/static/vendor/react-dom.production.min.js")
 	if err != nil {
-		t.Fatalf("GET /static/vendor/sortable.min.js: %v", err)
+		t.Fatalf("GET /static/vendor/react-dom.production.min.js: %v", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
 		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
-	body, _ := io.ReadAll(res.Body)
-	const prefix = "/* Sortable.js v1."
-	if !strings.HasPrefix(string(body), prefix) {
-		t.Fatalf("body prefix = %q, want %q…", string(body[:min(len(body), 40)]), prefix)
-	}
 }
 
-// TestIndex_References_Sortable confirms the embedded page links the
-// vendored sortable script so the drag-drop UI loads without a CDN.
-func TestIndex_References_Sortable(t *testing.T) {
+// TestStatic_Vendor_Babel confirms the vendored Babel-standalone
+// bundle is reachable — needed because the page loads app.jsx with
+// <script type="text/babel">.
+func TestStatic_Vendor_Babel(t *testing.T) {
 	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
 	defer cleanup()
 
-	res, err := http.Get(ts.URL + "/")
+	res, err := http.Get(ts.URL + "/static/vendor/babel.min.js")
 	if err != nil {
-		t.Fatalf("GET /: %v", err)
+		t.Fatalf("GET /static/vendor/babel.min.js: %v", err)
 	}
 	defer res.Body.Close()
-	body := readString(res.Body)
-	if !strings.Contains(body, "/static/vendor/sortable.min.js") {
-		t.Fatalf("index body missing /static/vendor/sortable.min.js")
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
 	}
 }
 
 // TestIndex_References_VendoredAssets confirms the embedded page
-// links the three local assets the design pinned (stylesheet, vendored
-// Alpine, app script). Substring match keeps the test robust to
-// whitespace / attribute-order changes in the HTML.
+// links the local stylesheet, vendored React, vendored ReactDOM,
+// vendored Babel-standalone, and the JSX app source.
 func TestIndex_References_VendoredAssets(t *testing.T) {
 	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
 	defer cleanup()
@@ -637,9 +607,11 @@ func TestIndex_References_VendoredAssets(t *testing.T) {
 	defer res.Body.Close()
 	body := readString(res.Body)
 	for _, want := range []string{
-		"/static/style.css",
-		"/static/vendor/alpine.min.js",
-		"/static/app.js",
+		"/static/styles.css",
+		"/static/vendor/react.production.min.js",
+		"/static/vendor/react-dom.production.min.js",
+		"/static/vendor/babel.min.js",
+		"/static/app.jsx",
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("index body missing %q", want)
@@ -668,53 +640,9 @@ func TestIndex_NoExternalScripts(t *testing.T) {
 	}
 }
 
-// TestIndex_ModalUsesFieldPlaceholders confirms UI-5's modal markup
-// rewrite landed: the rendered HTML carries the per-field click-to-edit
-// scaffold (field-row--title, the description Cmd/Ctrl+Enter binding,
-// and the priority @change commit) instead of V3's always-open form.
-func TestIndex_ModalUsesFieldPlaceholders(t *testing.T) {
-	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
-	defer cleanup()
-
-	res, err := http.Get(ts.URL + "/")
-	if err != nil {
-		t.Fatalf("GET /: %v", err)
-	}
-	defer res.Body.Close()
-	body := readString(res.Body)
-	for _, want := range []string{
-		`class="field-row field-row--title"`,
-		`@keydown.meta.enter.prevent="commitField('description')"`,
-		`@keydown.ctrl.enter.prevent="commitField('description')"`,
-		`@change="commitField('priority')"`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("index body missing %q", want)
-		}
-	}
-}
-
-// TestIndex_ModalHasNoSaveCancelFooter confirms UI-5 removed the V3
-// modal-footer Save / Cancel pair. The composer (UI-4) still has its
-// own Cancel inside .column-footer, so this test scopes the assertion
-// to <footer class="modal-footer">.
-func TestIndex_ModalHasNoSaveCancelFooter(t *testing.T) {
-	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
-	defer cleanup()
-
-	res, err := http.Get(ts.URL + "/")
-	if err != nil {
-		t.Fatalf("GET /: %v", err)
-	}
-	defer res.Body.Close()
-	body := readString(res.Body)
-	if strings.Contains(body, `class="modal-footer"`) {
-		t.Fatalf("index body still contains V3 modal-footer block")
-	}
-	if strings.Contains(body, `<button type="submit" class="t-button"`) {
-		t.Fatalf("index body still contains V3 modal Save submit button")
-	}
-}
+// (Modal markup is rendered by React at runtime; assertions against
+// served HTML for modal structure are covered by browser-level tests
+// or the React component tree.)
 
 // writableBoard copies testdata/valid_kanban.toml into t.TempDir so a
 // test can exercise endpoints that mutate the file. Returns the path
@@ -1429,13 +1357,13 @@ priorities = ["urgent"]
 // stylesheet exposes the `[data-theme="dark"]` selector block
 // introduced by add-dark-theme so the Alpine controller's
 // `<html data-theme="dark">` write actually swaps the token values.
-func TestStaticStyleCSS_ContainsDarkSelector(t *testing.T) {
+func TestStaticStylesCSS_ContainsDarkSelector(t *testing.T) {
 	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
 	defer cleanup()
 
-	res, err := http.Get(ts.URL + "/static/style.css")
+	res, err := http.Get(ts.URL + "/static/styles.css")
 	if err != nil {
-		t.Fatalf("GET /static/style.css: %v", err)
+		t.Fatalf("GET /static/styles.css: %v", err)
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
@@ -1444,74 +1372,13 @@ func TestStaticStyleCSS_ContainsDarkSelector(t *testing.T) {
 	body, _ := io.ReadAll(res.Body)
 	const want = `[data-theme="dark"]`
 	if !strings.Contains(string(body), want) {
-		t.Fatalf("style.css missing %q", want)
+		t.Fatalf("styles.css missing %q", want)
 	}
 }
 
-// TestIndex_ContainsThemeToggleButtons confirms the rendered topbar
-// includes all three theme-toggle buttons with their stable
-// `data-theme-choice` attributes (light, system, dark).
-func TestIndex_ContainsThemeToggleButtons(t *testing.T) {
-	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
-	defer cleanup()
-
-	res, err := http.Get(ts.URL + "/")
-	if err != nil {
-		t.Fatalf("GET /: %v", err)
-	}
-	defer res.Body.Close()
-	body := readString(res.Body)
-	for _, want := range []string{
-		`data-theme-choice="light"`,
-		`data-theme-choice="system"`,
-		`data-theme-choice="dark"`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("index body missing %q", want)
-		}
-	}
-}
-
-// TestIndex_ContainsFilterButton confirms the rendered topbar includes
-// the UI-3 Filter button — both the `filter-btn` class selector and the
-// literal `Filter` label must appear in the embedded markup.
-func TestIndex_ContainsFilterButton(t *testing.T) {
-	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
-	defer cleanup()
-
-	res, err := http.Get(ts.URL + "/")
-	if err != nil {
-		t.Fatalf("GET /: %v", err)
-	}
-	defer res.Body.Close()
-	body := readString(res.Body)
-	for _, want := range []string{
-		"filter-btn",
-		"Filter",
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("index body missing %q", want)
-		}
-	}
-}
-
-// TestIndex_ContainsFilterPopover confirms the rendered topbar includes
-// the UI-3 filter popover container (gated by x-show but always
-// embedded in the static HTML).
-func TestIndex_ContainsFilterPopover(t *testing.T) {
-	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
-	defer cleanup()
-
-	res, err := http.Get(ts.URL + "/")
-	if err != nil {
-		t.Fatalf("GET /: %v", err)
-	}
-	defer res.Body.Close()
-	body := readString(res.Body)
-	if !strings.Contains(body, "filter-popover") {
-		t.Fatalf("index body missing filter-popover")
-	}
-}
+// Theme-toggle, filter-button, and filter-popover are rendered by
+// React at runtime, so they are not present in the served HTML. Their
+// behavior is covered by spec scenarios in `viewer-ui/spec.md`.
 
 // firstExternalIPv4 returns the first up, non-loopback IPv4 address
 // on the host, or "" if none. Used to probe loopback-only bind.

@@ -1,1 +1,0 @@
-../../internal/server/web/app.js

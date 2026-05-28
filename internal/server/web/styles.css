@@ -16,8 +16,8 @@
   /* Light mode (default) — every surface derives from --bg-base */
   --bg-base: #f4efe6;
   --bg-tint: transparent;
-  --surface:        color-mix(in oklch, var(--bg-base) 35%, white);
-  --surface-2:      color-mix(in oklch, var(--bg-base) 92%, black 8%);
+  --surface:        color-mix(in oklch, var(--bg-base) 30%, white);
+  --surface-2:      color-mix(in oklch, var(--bg-base) 65%, white 35%);
   --surface-glass:  color-mix(in srgb, var(--surface) 75%, transparent);
   --border:         color-mix(in oklch, var(--bg-base) 88%, black 12%);
   --border-strong:  color-mix(in oklch, var(--bg-base) 78%, black 22%);

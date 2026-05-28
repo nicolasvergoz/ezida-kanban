@@ -52,8 +52,48 @@ type Board struct {
 
 // BoardConfig holds the columns and priorities lists from [board].
 type BoardConfig struct {
-	Columns    []string `toml:"columns"`
-	Priorities []string `toml:"priorities"`
+	Columns        []string          `toml:"columns"`
+	Priorities     []string          `toml:"priorities"`
+	PriorityColors map[string]string `toml:"priority_colors,omitempty"`
+}
+
+// DefaultPriorityColors maps the three conventional priority names to
+// their default hex colors. Surfaces are filled by ResolvePriorityColors
+// when the priority is declared and the user did not supply a value.
+var DefaultPriorityColors = map[string]string{
+	"low":    "#22c55e",
+	"medium": "#f59e0b",
+	"high":   "#ef4444",
+}
+
+// ResolvePriorityColors returns the final priority → color map exposed
+// by wire surfaces (/api/board, `ezida export`). User values from the
+// TOML always win; any conventional default name in DefaultPriorityColors
+// that is declared in `priorities` but unset by the user is filled in.
+// Keys not present in `priorities` are dropped (defense in depth; the
+// validator already rejects them at load time). The returned map is
+// always non-nil (possibly empty).
+func ResolvePriorityColors(priorities []string, user map[string]string) map[string]string {
+	priSet := make(map[string]struct{}, len(priorities))
+	for _, p := range priorities {
+		priSet[p] = struct{}{}
+	}
+	out := make(map[string]string, len(priorities))
+	for k, v := range user {
+		if _, ok := priSet[k]; ok {
+			out[k] = v
+		}
+	}
+	for name, def := range DefaultPriorityColors {
+		if _, declared := priSet[name]; !declared {
+			continue
+		}
+		if _, set := out[name]; set {
+			continue
+		}
+		out[name] = def
+	}
+	return out
 }
 
 // Card is one [[cards]] entry.

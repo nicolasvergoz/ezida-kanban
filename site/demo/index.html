@@ -149,6 +149,12 @@
                 <div class="card-title t-card-text" x-text="card.title"></div>
                 <ul class="card-meta"
                     x-show="card.priority || (card.description && card.description.trim() !== '') || (card.tags && card.tags.length)">
+                  <template x-if="card.priority">
+                    <li class="card-priority-dot"
+                        :style="priorityColors[card.priority] ? ('background-color:' + priorityColors[card.priority]) : ''"
+                        :title="card.priority"
+                        :aria-label="'priority ' + card.priority"></li>
+                  </template>
                   <li x-show="card.description && card.description.trim() !== ''"
                       class="card-meta-icon">
                     <svg class="card-desc-icon" viewBox="0 0 16 16" width="14" height="14"
@@ -160,9 +166,6 @@
                       <line x1="3" y1="11" x2="10" y2="11"/>
                     </svg>
                   </li>
-                  <template x-if="card.priority">
-                    <li class="badge t-tag" x-text="card.priority"></li>
-                  </template>
                   <template x-for="tag in (card.tags || [])" :key="tag">
                     <li class="tag t-tag" x-text="tag"></li>
                   </template>

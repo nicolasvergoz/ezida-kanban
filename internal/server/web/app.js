@@ -15,6 +15,11 @@ function board() {
     project_name: '',
     columns: [],
     priorities: [],
+    // priorityColors maps priority name → hex color, fully resolved
+    // server-side (user values + low/medium/high defaults). The badge
+    // applies it as inline background-color + border-color via x-bind.
+    // Empty object when no priority has a color configured.
+    priorityColors: {},
     cards: [],
     // _dragScrollMounted guards setupDragScroll() so the pointer
     // listeners attach exactly once even though load() runs on every
@@ -180,6 +185,7 @@ function board() {
         document.title = `Kanban - ${this.project_name}`;
         this.columns = data.columns || [];
         this.priorities = data.priorities || [];
+        this.priorityColors = data.priority_colors || {};
         this.cards = data.cards || [];
         this.loaded = true;
         // Defer until Alpine has flushed the new DOM, then attach

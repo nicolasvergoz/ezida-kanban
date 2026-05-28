@@ -254,30 +254,40 @@ match.
 ### Requirement: Priorities map to distinguishable visual styles
 
 The page SHALL apply a CSS class `priority-<value>` to each card
-whose `priority` field is set. Each value present in
-`[board].priorities` MUST produce a visually distinguishable
-treatment driven by design tokens (no hex literals) — implementations
-SHALL use combinations of token-referenced border colors, badge
-fills, or text emphasis from the existing palette. The treatment
-MUST NOT introduce a new color outside the ramp defined under
-`:root`.
+whose `priority` field is set, AND SHALL render a small textless
+priority indicator (`.card-priority-dot`) inside the card-meta row
+whose inline `background-color` is the color resolved from the
+server-provided `priority_colors` map. The indicator MUST expose
+the priority name via `title` and `aria-label` for accessibility.
+When no color is configured for the card's priority, the indicator
+MUST fall back to a neutral fill driven by design tokens.
+Implementations SHALL NOT hard-code per-priority hex colors in CSS
+and SHALL NOT render the priority value as text on the card.
 
-#### Scenario: All three priorities present
+#### Scenario: All three priorities present with default colors
 
-- **WHEN** the board contains three cards with priorities `low`,
-  `medium`, `high` respectively
+- **WHEN** the board's response `priority_colors` equals
+  `{"low":"#22c55e","medium":"#f59e0b","high":"#ef4444"}` and three
+  cards with these priorities are rendered
 - **THEN** each rendered card carries the matching `priority-*`
   class
-- **AND** the computed CSS produces a different visual state for
-  each (asserted via differing computed `border-left-color`,
-  `background-color`, badge presence, or equivalent token-driven
-  property)
+- **AND** the `.card-priority-dot` of each card has its
+  `background-color` computed-style equal to the corresponding hex
 
 #### Scenario: Card without priority
 
 - **WHEN** a card has no `priority` field
 - **THEN** the rendered `.card` MUST NOT carry any `priority-*`
   class
+- **AND** no `.card-priority-dot` is rendered
+
+#### Scenario: Priority declared without a color
+
+- **WHEN** a card's priority is declared in `[board].priorities` but
+  `priority_colors` has no entry for it
+- **THEN** the `.card-priority-dot` is rendered
+- **AND** its inline `background-color` style is not set, so it
+  falls back to the neutral token-driven fill
 
 ### Requirement: Top bar is present and minimal
 

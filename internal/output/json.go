@@ -70,12 +70,13 @@ type ExportCard struct {
 // the viewer's boardResponse (GET /api/board) so the demo viewer can
 // consume the snapshot through the same code path as the live server.
 type ExportEnvelope struct {
-	SchemaVersion  int            `json:"schema_version"`
-	Columns        []string       `json:"columns"`
-	Priorities     []string       `json:"priorities"`
-	CardsPerColumn map[string]int `json:"cards_per_column"`
-	Cards          []ExportCard   `json:"cards"`
-	ProjectName    string         `json:"project_name"`
+	SchemaVersion  int               `json:"schema_version"`
+	Columns        []string          `json:"columns"`
+	Priorities     []string          `json:"priorities"`
+	PriorityColors map[string]string `json:"priority_colors"`
+	CardsPerColumn map[string]int    `json:"cards_per_column"`
+	Cards          []ExportCard      `json:"cards"`
+	ProjectName    string            `json:"project_name"`
 }
 
 // ErrorEnvelope is the JSON shape for any command's error output

@@ -58,6 +58,8 @@ func (e *SchemaVersionError) Error() string {
 
 var idValidationPattern = regexp.MustCompile(`^[0-9a-z]{6}$`)
 
+var hexColorPattern = regexp.MustCompile(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
+
 // Validate runs the nine business rules in a single pass and returns a
 // *ValidationError listing every violation, or nil if the board is valid.
 func Validate(b *Board) *ValidationError {
@@ -114,6 +116,22 @@ func Validate(b *Board) *ValidationError {
 	priSet := make(map[string]struct{}, len(b.Board.Priorities))
 	for _, p := range b.Board.Priorities {
 		priSet[p] = struct{}{}
+	}
+
+	// Rule 10: every priority_colors key exists in priorities; every value is a valid hex.
+	for k, v := range b.Board.PriorityColors {
+		if _, ok := priSet[k]; !ok {
+			vs = append(vs, Violation{
+				Rule:    10,
+				Message: fmt.Sprintf("[board.priority_colors] key %q is not declared in [board].priorities", k),
+			})
+		}
+		if !hexColorPattern.MatchString(v) {
+			vs = append(vs, Violation{
+				Rule:    10,
+				Message: fmt.Sprintf("[board.priority_colors] value for %q is %q, expected hex color like #rgb or #rrggbb", k, v),
+			})
+		}
 	}
 
 	// Track first-seen ID for duplicate reporting.

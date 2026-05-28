@@ -1308,6 +1308,123 @@ func fetchProjectName(t *testing.T, baseURL string) string {
 	return payload.ProjectName
 }
 
+// fetchPriorityColors hits /api/board and returns the priority_colors
+// map. Used by the rule-10 default-resolution tests below.
+func fetchPriorityColors(t *testing.T, baseURL string) map[string]string {
+	t.Helper()
+	res, err := http.Get(baseURL + "/api/board")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	var payload struct {
+		PriorityColors map[string]string `json:"priority_colors"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return payload.PriorityColors
+}
+
+func writeBoardFixture(t *testing.T, contents string) string {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "kanban.toml")
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	return path
+}
+
+func TestHandle_Board_PriorityColors_DefaultsFilled(t *testing.T) {
+	path := writeBoardFixture(t, `schema_version = 1
+
+[board]
+columns = ["todo"]
+priorities = ["low", "medium", "high"]
+`)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	got := fetchPriorityColors(t, ts.URL)
+	want := map[string]string{
+		"low":    "#22c55e",
+		"medium": "#f59e0b",
+		"high":   "#ef4444",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("priority_colors size = %d, want %d (got %v)", len(got), len(want), got)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("priority_colors[%q] = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
+func TestHandle_Board_PriorityColors_UserOverrideWins(t *testing.T) {
+	path := writeBoardFixture(t, `schema_version = 1
+
+[board]
+columns = ["todo"]
+priorities = ["low", "medium", "high"]
+
+[board.priority_colors]
+high = "#000000"
+`)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	got := fetchPriorityColors(t, ts.URL)
+	if got["high"] != "#000000" {
+		t.Fatalf("priority_colors.high = %q, want %q", got["high"], "#000000")
+	}
+	if got["low"] != "#22c55e" || got["medium"] != "#f59e0b" {
+		t.Fatalf("defaults not filled for unset names: got %v", got)
+	}
+}
+
+func TestHandle_Board_PriorityColors_CustomNameWithExplicitColor(t *testing.T) {
+	path := writeBoardFixture(t, `schema_version = 1
+
+[board]
+columns = ["todo"]
+priorities = ["urgent"]
+
+[board.priority_colors]
+urgent = "#ff0000"
+`)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	got := fetchPriorityColors(t, ts.URL)
+	if len(got) != 1 || got["urgent"] != "#ff0000" {
+		t.Fatalf("priority_colors = %v, want {urgent: #ff0000}", got)
+	}
+}
+
+func TestHandle_Board_PriorityColors_CustomNameNoDefaults(t *testing.T) {
+	path := writeBoardFixture(t, `schema_version = 1
+
+[board]
+columns = ["todo"]
+priorities = ["urgent"]
+`)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	got := fetchPriorityColors(t, ts.URL)
+	if len(got) != 0 {
+		t.Fatalf("priority_colors = %v, want empty {}", got)
+	}
+	if got == nil {
+		t.Fatalf("priority_colors must be non-nil empty object, got nil")
+	}
+}
+
 // TestStaticStyleCSS_ContainsDarkSelector confirms the served
 // stylesheet exposes the `[data-theme="dark"]` selector block
 // introduced by add-dark-theme so the Alpine controller's

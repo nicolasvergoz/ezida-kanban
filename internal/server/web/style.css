@@ -21,78 +21,76 @@
  * ============================================================================ */
 
 @layer tokens {
-  :root {
-    /* Base color ramp — derived from a single bg-base per the Redacto
+	:root {
+		/* Base color ramp — derived from a single bg-base per the Redacto
        tonal system. Pre-computed values match refs/design.md. */
-    --bg-base: #fbfaf8;
-    --surface: #fefdfb;
-    --surface-2: #e8e6e2;
-    --border: #dedbd6;
-    --border-strong: #c8c4be;
-    --text: #1b1c1e;
-    --text-muted: #74726d;
-    --text-faint: #9a988f;
+		--bg-base: #fbfaf8;
+		--surface: #fefdfb;
+		--surface-2: #e8e6e2;
+		--border: #dedbd6;
+		--border-strong: #c8c4be;
+		--text: #1b1c1e;
+		--text-muted: #74726d;
+		--text-faint: #9a988f;
 
-    /* Semantic palette — accent reserved for focus / composer borders /
+		/* Semantic palette — accent reserved for focus / composer borders /
        drop indicators. Danger reserved for destructive hover states. */
-    --accent: #2f6fd1;
-    --accent-soft: #82a8e3;
-    --danger: #c34a3a;
+		--accent: #2f6fd1;
+		--accent-soft: #82a8e3;
+		--danger: #c34a3a;
 
-    /* Spacing scale (non-doubling on purpose). */
-    --space-xxs: 2px;
-    --space-xs: 4px;
-    --space-sm: 6px;
-    --space-md: 8px;
-    --space-lg: 10px;
-    --space-xl: 12px;
-    --space-2xl: 14px;
-    --space-3xl: 18px;
-    --space-4xl: 28px;
-    --space-list-width: 296px;
-    --space-topbar-height: 64px;
+		/* Spacing scale (non-doubling on purpose). */
+		--space-xxs: 2px;
+		--space-xs: 4px;
+		--space-sm: 6px;
+		--space-md: 8px;
+		--space-lg: 10px;
+		--space-xl: 12px;
+		--space-2xl: 14px;
+		--space-3xl: 18px;
+		--space-4xl: 28px;
+		--space-list-width: 296px;
+		--space-topbar-height: 64px;
 
-    /* Rounded scale. */
-    --rounded-xs: 4px;
-    --rounded-sm: 6px;
-    --rounded-md: 8px;
-    --rounded-lg: 10px;
-    --rounded-xl: 14px;
-    --rounded-full: 999px;
+		/* Rounded scale. */
+		--rounded-xs: 4px;
+		--rounded-sm: 6px;
+		--rounded-md: 8px;
+		--rounded-lg: 10px;
+		--rounded-xl: 14px;
+		--rounded-full: 999px;
 
-    /* Elevation. Card idle = single soft 2px-blur drop, almost
+		/* Elevation. Card idle = single soft 2px-blur drop, almost
        imperceptible. Card hover = three-layer stack. Popover = floating
        composer / modal treatment. */
-    --shadow-card-rim: 0 1px 0 rgba(0, 0, 0, 0.03);
-    --shadow-card-idle: 0 1px 1px rgba(0, 0, 0, 0.03);
-    --shadow-card-hover:
-      0 1px 2px rgba(0, 0, 0, 0.05),
-      0 2px 6px -1px rgba(0, 0, 0, 0.06);
-    --shadow-popover:
-      0 12px 32px -8px rgba(0, 0, 0, 0.22),
-      0 2px 8px rgba(0, 0, 0, 0.08);
+		--shadow-card-rim: 0 1px 0 rgba(0, 0, 0, 0.03);
+		--shadow-card-idle: 0 1px 1px rgba(0, 0, 0, 0.03);
+		--shadow-card-hover:
+			0 1px 2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.06);
+		--shadow-popover:
+			0 12px 32px -8px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.08);
 
-    /* Page-surface knobs. */
-    --grain-opacity: 0.04;
-    --topshade-strength: 10%;
-  }
+		/* Page-surface knobs. */
+		--grain-opacity: 0.04;
+		--topshade-strength: 10%;
+	}
 
-  /* Dark-theme overrides — same custom-property names reassigned to
+	/* Dark-theme overrides — same custom-property names reassigned to
      the dark palette from refs/design.md §"Colors". Activated by
      setting `<html data-theme="dark">` via the Alpine theme
      controller. No component selector outside :root /
      [data-theme="dark"] embeds a hex literal (ADR 0003 §D5). */
-  [data-theme="dark"] {
-    --bg-base: #25282e;
-    --surface: #33363d;
-    --surface-2: #414448;
-    --border: #454850;
-    --border-strong: #5d5f66;
-    --text: #f1f1f2;
-    --text-muted: #a9aaad;
-    --text-faint: #7b7c81;
-    --accent: #82a8e3;
-  }
+	[data-theme="dark"] {
+		--bg-base: #25282e;
+		--surface: #33363d;
+		--surface-2: #414448;
+		--border: #454850;
+		--border-strong: #5d5f66;
+		--text: #f1f1f2;
+		--text-muted: #a9aaad;
+		--text-faint: #7b7c81;
+		--accent: #82a8e3;
+	}
 }
 
 /* ============================================================================
@@ -100,122 +98,122 @@
  * ============================================================================ */
 
 @layer typography {
-  /* --- Geist sans @font-face declarations --------------------------------- */
-  @font-face {
-    font-family: 'Geist';
-    font-style: normal;
-    font-weight: 300;
-    font-display: swap;
-    src: url('vendor/fonts/Geist-Light.woff2') format('woff2');
-  }
-  @font-face {
-    font-family: 'Geist';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url('vendor/fonts/Geist-Regular.woff2') format('woff2');
-  }
-  @font-face {
-    font-family: 'Geist';
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('vendor/fonts/Geist-Medium.woff2') format('woff2');
-  }
-  @font-face {
-    font-family: 'Geist';
-    font-style: normal;
-    font-weight: 600;
-    font-display: swap;
-    src: url('vendor/fonts/Geist-SemiBold.woff2') format('woff2');
-  }
-  @font-face {
-    font-family: 'Geist';
-    font-style: normal;
-    font-weight: 700;
-    font-display: swap;
-    src: url('vendor/fonts/Geist-Bold.woff2') format('woff2');
-  }
-  @font-face {
-    font-family: 'Geist';
-    font-style: normal;
-    font-weight: 800;
-    font-display: swap;
-    src: url('vendor/fonts/Geist-ExtraBold.woff2') format('woff2');
-  }
+	/* --- Geist sans @font-face declarations --------------------------------- */
+	@font-face {
+		font-family: "Geist";
+		font-style: normal;
+		font-weight: 300;
+		font-display: swap;
+		src: url("vendor/fonts/Geist-Light.woff2") format("woff2");
+	}
+	@font-face {
+		font-family: "Geist";
+		font-style: normal;
+		font-weight: 400;
+		font-display: swap;
+		src: url("vendor/fonts/Geist-Regular.woff2") format("woff2");
+	}
+	@font-face {
+		font-family: "Geist";
+		font-style: normal;
+		font-weight: 500;
+		font-display: swap;
+		src: url("vendor/fonts/Geist-Medium.woff2") format("woff2");
+	}
+	@font-face {
+		font-family: "Geist";
+		font-style: normal;
+		font-weight: 600;
+		font-display: swap;
+		src: url("vendor/fonts/Geist-SemiBold.woff2") format("woff2");
+	}
+	@font-face {
+		font-family: "Geist";
+		font-style: normal;
+		font-weight: 700;
+		font-display: swap;
+		src: url("vendor/fonts/Geist-Bold.woff2") format("woff2");
+	}
+	@font-face {
+		font-family: "Geist";
+		font-style: normal;
+		font-weight: 800;
+		font-display: swap;
+		src: url("vendor/fonts/Geist-ExtraBold.woff2") format("woff2");
+	}
 
-  /* --- Geist Mono @font-face declarations --------------------------------- */
-  @font-face {
-    font-family: 'Geist Mono';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url('vendor/fonts/GeistMono-Regular.woff2') format('woff2');
-  }
-  @font-face {
-    font-family: 'Geist Mono';
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('vendor/fonts/GeistMono-Medium.woff2') format('woff2');
-  }
+	/* --- Geist Mono @font-face declarations --------------------------------- */
+	@font-face {
+		font-family: "Geist Mono";
+		font-style: normal;
+		font-weight: 400;
+		font-display: swap;
+		src: url("vendor/fonts/GeistMono-Regular.woff2") format("woff2");
+	}
+	@font-face {
+		font-family: "Geist Mono";
+		font-style: normal;
+		font-weight: 500;
+		font-display: swap;
+		src: url("vendor/fonts/GeistMono-Medium.woff2") format("woff2");
+	}
 
-  /* --- Utility classes — type ramp ---------------------------------------- */
-  .t-brand {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 18px;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .t-list-title {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .t-card-text {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13.5px;
-    font-weight: 400;
-    line-height: 1.45;
-  }
-  .t-body-md {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.45;
-  }
-  .t-button {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1;
-  }
-  .t-tag {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-  }
-  .t-mono-counter {
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-  .t-mono-label {
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
+	/* --- Utility classes — type ramp ---------------------------------------- */
+	.t-brand {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 18px;
+		font-weight: 800;
+		line-height: 1;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.t-list-title {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		line-height: 1;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+	.t-card-text {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13.5px;
+		font-weight: 400;
+		line-height: 1.45;
+	}
+	.t-body-md {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.45;
+	}
+	.t-button {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 500;
+		line-height: 1;
+	}
+	.t-tag {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 1;
+	}
+	.t-mono-counter {
+		font-family: "Geist Mono", ui-monospace, monospace;
+		font-size: 11px;
+		font-weight: 400;
+		line-height: 1;
+		font-variant-numeric: tabular-nums;
+	}
+	.t-mono-label {
+		font-family: "Geist Mono", ui-monospace, monospace;
+		font-size: 10px;
+		font-weight: 500;
+		line-height: 1;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
 }
 
 /* ============================================================================
@@ -225,674 +223,705 @@
  * ============================================================================ */
 
 @layer components {
-  * { box-sizing: border-box; }
+	* {
+		box-sizing: border-box;
+	}
 
-  /* Alpine cloak: hide modal until x-init has run so it does not flash. */
-  [x-cloak] { display: none !important; }
+	/* Alpine cloak: hide modal until x-init has run so it does not flash. */
+	[x-cloak] {
+		display: none !important;
+	}
 
-  /* --- Page surfaces (background, grain, top-shade) --------------------- */
+	/* --- Page surfaces (background, grain, top-shade) --------------------- */
 
-  body {
-    margin: 0;
-    background-color: var(--bg-base);
-    color: var(--text);
-    font-family: 'Geist', system-ui, -apple-system, sans-serif;
-    min-height: 100vh;
-    position: relative;
-  }
+	body {
+		margin: 0;
+		background-color: var(--bg-base);
+		color: var(--text);
+		font-family:
+			"Geist",
+			system-ui,
+			-apple-system,
+			sans-serif;
+		min-height: 100vh;
+		position: relative;
+	}
 
-  /* Grain overlay — non-interactive SVG noise data-URI tile sitting
+	/* Grain overlay — non-interactive SVG noise data-URI tile sitting
      behind everything (z-index: -1). Opacity is keyed to the token. */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -1;
-    opacity: var(--grain-opacity);
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
-    background-size: 160px 160px;
-  }
+	body::before {
+		content: "";
+		position: fixed;
+		inset: 0;
+		pointer-events: none;
+		z-index: -1;
+		opacity: var(--grain-opacity);
+		background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+		background-size: 160px 160px;
+	}
 
-  /* Top-shade — 64px linear gradient from 10%-bg-base at the very top
+	/* Top-shade — 64px linear gradient from 10%-bg-base at the very top
      to transparent at the bottom edge of the topbar. Non-interactive. */
-  .topshade,
-  body::after {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: var(--space-topbar-height);
-    pointer-events: none;
-    z-index: 0;
-    background: linear-gradient(
-      to bottom,
-      color-mix(in oklab, var(--bg-base) 90%, transparent) 0%,
-      transparent 100%
-    );
-  }
+	.topshade,
+	body::after {
+		content: "";
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: var(--space-topbar-height);
+		pointer-events: none;
+		z-index: 0;
+		background: linear-gradient(
+			to bottom,
+			color-mix(in oklab, var(--bg-base) 90%, transparent) 0%,
+			transparent 100%
+		);
+	}
 
-  /* --- Topbar ----------------------------------------------------------- */
+	/* --- Topbar ----------------------------------------------------------- */
 
-  .topbar {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: var(--space-topbar-height);
-    padding: 0 var(--space-4xl);
-    background: transparent;
-    color: var(--text);
-  }
+	.topbar {
+		position: relative;
+		z-index: 2;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		height: var(--space-topbar-height);
+		padding: 0 var(--space-4xl);
+		background: transparent;
+		color: var(--text);
+	}
 
-  .brand {
-    color: var(--text);
-    user-select: none;
-  }
+	.brand {
+		color: var(--text);
+		user-select: none;
+	}
 
-  /* Right-side container for topbar controls (theme toggle + status). */
-  .topbar-right {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-xl);
-  }
+	/* Right-side container for topbar controls (theme toggle + status). */
+	.topbar-right {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-xl);
+	}
 
-  /* --- Filter button + popover (UI-3) ---------------------------------- */
+	/* --- Filter button + popover (UI-3) ---------------------------------- */
 
-  /* Anchor wrapper so the popover can be position:absolute relative to
+	/* Anchor wrapper so the popover can be position:absolute relative to
      the Filter button cluster (top:100% drops it below the topbar). */
-  .filter-wrap {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-  }
+	.filter-wrap {
+		position: relative;
+		display: inline-flex;
+		align-items: center;
+	}
 
-  .topbar-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-sm);
-    height: 28px;
-    padding: 0 var(--space-lg);
-    border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text-muted);
-    border-radius: var(--rounded-full);
-    cursor: pointer;
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 500;
-    line-height: 1;
-    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
-  }
-  .topbar-btn:hover {
-    color: var(--text);
-    border-color: var(--border-strong);
-  }
+	.topbar-btn {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-sm);
+		height: 28px;
+		padding: 0 var(--space-lg);
+		border: 1px solid var(--border);
+		background: transparent;
+		color: var(--text-muted);
+		border-radius: var(--rounded-full);
+		cursor: pointer;
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 500;
+		line-height: 1;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease,
+			border-color 120ms ease;
+	}
+	.topbar-btn:hover {
+		color: var(--text);
+		border-color: var(--border-strong);
+	}
 
-  /* Active state — surface fill while the filter is non-empty, matching
+	/* Active state — surface fill while the filter is non-empty, matching
      refs/design.md §"TopBar" active affordance. */
-  .filter-btn.state-active {
-    background: var(--surface);
-    color: var(--text);
-    border-color: var(--border-strong);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
+	.filter-btn.state-active {
+		background: var(--surface);
+		color: var(--text);
+		border-color: var(--border-strong);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+	}
 
-  /* Inline mono-counter pill sitting to the right of the Filter label. */
-  .filter-badge {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 6px;
-    background: var(--surface-2);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-full);
-    margin-left: var(--space-xs);
-  }
+	/* Inline mono-counter pill sitting to the right of the Filter label. */
+	.filter-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 18px;
+		height: 18px;
+		padding: 0 6px;
+		background: var(--surface-2);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-full);
+		margin-left: var(--space-xs);
+	}
 
-  .filter-popover {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: var(--space-md);
-    width: 280px;
-    padding: var(--space-2xl);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-xl);
-    box-shadow: var(--shadow-popover);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-md);
-  }
+	.filter-popover {
+		position: absolute;
+		top: 100%;
+		right: 0;
+		margin-top: var(--space-md);
+		width: 280px;
+		padding: var(--space-2xl);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-xl);
+		box-shadow: var(--shadow-popover);
+		z-index: 100;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-md);
+	}
 
-  .filter-popover label.t-mono-label {
-    color: var(--text-muted);
-  }
+	.filter-popover label.t-mono-label {
+		color: var(--text-muted);
+	}
 
-  .filter-popover input[type="text"] {
-    display: block;
-    width: 100%;
-    padding: var(--space-md) var(--space-lg);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.45;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-md);
-    box-sizing: border-box;
-    outline: none;
-    transition: border-color 120ms ease;
-  }
-  .filter-popover input[type="text"]:focus {
-    border-color: var(--accent);
-  }
+	.filter-popover input[type="text"] {
+		display: block;
+		width: 100%;
+		padding: var(--space-md) var(--space-lg);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.45;
+		color: var(--text);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-md);
+		box-sizing: border-box;
+		outline: none;
+		transition: border-color 120ms ease;
+	}
+	.filter-popover input[type="text"]:focus {
+		border-color: var(--accent);
+	}
 
-  .clear-link {
-    align-self: flex-start;
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13px;
-    font-weight: 400;
-    line-height: 1.45;
-    color: var(--text-muted);
-    text-decoration: none;
-    cursor: pointer;
-  }
-  .clear-link:hover,
-  .clear-link:focus {
-    color: var(--text);
-    text-decoration: underline;
-  }
+	.clear-link {
+		align-self: flex-start;
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 400;
+		line-height: 1.45;
+		color: var(--text-muted);
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.clear-link:hover,
+	.clear-link:focus {
+		color: var(--text);
+		text-decoration: underline;
+	}
 
-  /* In-column placeholder when filter hides all cards in this column. */
-  .no-matches {
-    list-style: none;
-    text-align: center;
-    padding: var(--space-3xl) var(--space-sm);
-    color: var(--text-faint);
-    font-style: italic;
-    background: transparent;
-    border: 0;
-  }
+	/* In-column placeholder when filter hides all cards in this column. */
+	.no-matches {
+		list-style: none;
+		text-align: center;
+		padding: var(--space-3xl) var(--space-sm);
+		color: var(--text-faint);
+		font-style: italic;
+		background: transparent;
+		border: 0;
+	}
 
-  /* --- Theme toggle (3-segment segmented control) ---------------------- */
+	/* --- Theme toggle (3-segment segmented control) ---------------------- */
 
-  .theme-toggle {
-    background: var(--surface-2);
-    border-radius: var(--rounded-full);
-    padding: 3px;
-    display: inline-flex;
-    gap: 0;
-  }
+	.theme-toggle {
+		background: var(--surface-2);
+		border-radius: var(--rounded-full);
+		padding: 3px;
+		display: inline-flex;
+		gap: 0;
+	}
 
-  .theme-toggle button {
-    width: 26px;
-    height: 26px;
-    border: 0;
-    background: transparent;
-    border-radius: var(--rounded-full);
-    color: var(--text-muted);
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
-  }
+	.theme-toggle button {
+		width: 26px;
+		height: 26px;
+		border: 0;
+		background: transparent;
+		border-radius: var(--rounded-full);
+		color: var(--text-muted);
+		cursor: pointer;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease,
+			box-shadow 120ms ease;
+	}
 
-  .theme-toggle button:hover {
-    color: var(--text);
-  }
+	.theme-toggle button:hover {
+		color: var(--text);
+	}
 
-  .theme-toggle button[aria-pressed="true"] {
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
-  }
+	.theme-toggle button[aria-pressed="true"] {
+		background: var(--surface);
+		color: var(--text);
+		box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+	}
 
-  /* V4 live-connection indicator — round, accent when on, faint when off. */
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: var(--rounded-full);
-    display: inline-block;
-    background: var(--text-faint);
-    transition: background-color 120ms ease;
-  }
-  .status-dot.on  { background: var(--accent); }
-  .status-dot.off { background: var(--text-faint); }
+	/* V4 live-connection indicator — round, accent when on, faint when off. */
+	.status-dot {
+		width: 8px;
+		height: 8px;
+		border-radius: var(--rounded-full);
+		display: inline-block;
+		background: var(--text-faint);
+		transition: background-color 120ms ease;
+	}
+	.status-dot.on {
+		background: var(--accent);
+	}
+	.status-dot.off {
+		background: var(--text-faint);
+	}
 
-  /* --- Loading / board scaffold ----------------------------------------- */
+	/* --- Loading / board scaffold ----------------------------------------- */
 
-  .loading {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: calc(100vh - var(--space-topbar-height));
-    color: var(--text-muted);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.45;
-  }
+	.loading {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: calc(100vh - var(--space-topbar-height));
+		color: var(--text-muted);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.45;
+	}
 
-  .board {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    gap: var(--space-3xl);
-    padding: var(--space-md) var(--space-4xl) var(--space-4xl);
-    overflow-x: auto;
-    overflow-y: hidden;
-    min-height: calc(100vh - var(--space-topbar-height));
-    cursor: grab;
-  }
-  .board:active {
-    cursor: grabbing;
-  }
+	.board {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		gap: var(--space-3xl);
+		padding: var(--space-md) var(--space-4xl) var(--space-4xl);
+		overflow-x: auto;
+		overflow-y: hidden;
+		min-height: calc(100vh - var(--space-topbar-height));
+		cursor: grab;
+	}
+	.board:active {
+		cursor: grabbing;
+	}
 
-  /* When drag-scroll is active, disable pointer events on cards so the
+	/* When drag-scroll is active, disable pointer events on cards so the
      drag-scroll gesture is not hijacked by a child click. */
-  body.is-scrolling .card {
-    pointer-events: none;
-  }
+	body.is-scrolling .card {
+		pointer-events: none;
+	}
 
-  /* --- Columns (glass panels) ------------------------------------------- */
+	/* --- Columns (glass panels) ------------------------------------------- */
 
-  .column {
-    width: var(--space-list-width);
-    flex: 0 0 var(--space-list-width);
-    align-self: flex-start;
-    background: color-mix(in oklab, var(--surface) 75%, transparent);
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-xl);
-    padding: var(--space-sm);
-    display: flex;
-    flex-direction: column;
-  }
+	.column {
+		width: var(--space-list-width);
+		flex: 0 0 var(--space-list-width);
+		align-self: flex-start;
+		background: color-mix(in oklab, var(--surface) 75%, transparent);
+		backdrop-filter: blur(14px) saturate(140%);
+		-webkit-backdrop-filter: blur(14px) saturate(140%);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-xl);
+		padding: var(--space-sm);
+		display: flex;
+		flex-direction: column;
+	}
 
-  .column-header {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-sm) var(--space-md);
-    margin-bottom: var(--space-xs);
-    color: var(--text);
-  }
+	.column-header {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xs);
+		padding: var(--space-sm) var(--space-sm) var(--space-md);
+		margin-bottom: var(--space-xs);
+		color: var(--text);
+	}
 
-  .column-name {
-    margin-right: auto;
-  }
+	.column-name {
+		margin-right: auto;
+	}
 
-  .column-count {
-    background: var(--surface);
-    color: var(--text);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-md);
-    padding: 2px 7px;
-  }
+	.column-count {
+		background: var(--surface);
+		color: var(--text);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-md);
+		padding: 2px 7px;
+	}
 
-  .cards {
-    list-style: none;
-    margin: 0;
-    padding: 2px 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-    overflow-y: auto;
-  }
+	.cards {
+		list-style: none;
+		margin: 0;
+		padding: 2px 0;
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-sm);
+		overflow-y: auto;
+	}
 
-  /* --- Cards ------------------------------------------------------------ */
+	/* --- Cards ------------------------------------------------------------ */
 
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-lg);
-    padding: 10px 12px;
-    color: var(--text);
-    box-shadow: var(--shadow-card-idle);
-    transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
-    cursor: grab;
-  }
-  .card:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-card-hover);
-  }
-  .card:active {
-    cursor: grabbing;
-  }
+	.card {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-lg);
+		padding: 10px 12px;
+		color: var(--text);
+		box-shadow: var(--shadow-card-idle);
+		transition:
+			transform 120ms ease,
+			box-shadow 120ms ease,
+			border-color 120ms ease;
+		cursor: grab;
+	}
+	.card:hover {
+		transform: translateY(-1px);
+		box-shadow: var(--shadow-card-hover);
+	}
+	.card:active {
+		cursor: grabbing;
+	}
 
-  /* Sortable.js applies .sortable-ghost to the placeholder element
+	/* Sortable.js applies .sortable-ghost to the placeholder element
      while a drag is in progress (see app.js ghostClass option). */
-  .sortable-ghost {
-    opacity: 0.35;
-  }
+	.sortable-ghost {
+		opacity: 0.35;
+	}
 
-  /* When Sortable inserts the ghost into a previously empty column,
+	/* When Sortable inserts the ghost into a previously empty column,
      hide the "empty" placeholder so the drop affordance is the only
      thing visible. Uses :has() — falls back to no-op on browsers
      without support (the placeholder simply stays, which is the
      current behavior, not a regression). */
-  .cards:has(.sortable-ghost) .empty {
-    display: none;
-  }
+	.cards:has(.sortable-ghost) .empty {
+		display: none;
+	}
 
-  .card-id-wrap {
-    display: flex;
-    align-items: baseline;
-    gap: 6px;
-    margin-bottom: 4px;
-  }
+	.card-id-wrap {
+		display: flex;
+		align-items: baseline;
+		gap: 6px;
+		margin-bottom: 4px;
+	}
 
-  .card-id {
-    display: inline-block;
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 9px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text-faint);
-    cursor: pointer;
-    user-select: none;
-  }
+	.card-id {
+		display: inline-block;
+		font-family: "Geist Mono", ui-monospace, monospace;
+		font-size: 9px;
+		font-weight: 500;
+		line-height: 1;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text-faint);
+		cursor: pointer;
+		user-select: none;
+	}
 
-  .card-id-copied {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1;
-    color: var(--accent);
-    pointer-events: none;
-  }
+	.card-priority-dot {
+		display: inline-block;
+		width: 8px;
+		height: 16px;
+		border-radius: 4px;
+		background: color-mix(in oklab, var(--text) 15%, transparent);
+		align-self: center;
+		flex: 0 0 auto;
+	}
 
-  .modal-id-copied {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-    margin-left: 8px;
-    color: var(--accent);
-    pointer-events: none;
-  }
+	.card-id-copied {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 10px;
+		font-weight: 500;
+		line-height: 1;
+		color: var(--accent);
+		pointer-events: none;
+	}
 
-  .card-title {
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13.5px;
-    font-weight: 500;
-    line-height: 1.45;
-    color: var(--text);
-    word-break: break-word;
-  }
+	.modal-id-copied {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 1;
+		margin-left: 8px;
+		color: var(--accent);
+		pointer-events: none;
+	}
 
-  /* --- Card meta row (icon + priority badge + tag chips) --------------- */
+	.card-title {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13.5px;
+		font-weight: 500;
+		line-height: 1.45;
+		color: var(--text);
+		word-break: break-word;
+	}
 
-  .card-meta {
-    list-style: none;
-    margin: 6px 0 0 0;
-    padding: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 6px;
-  }
+	/* --- Card meta row (icon + priority badge + tag chips) --------------- */
 
-  .card-meta-icon {
-    display: inline-flex;
-    align-items: center;
-  }
+	.card-meta {
+		list-style: none;
+		margin: 6px 0 0 0;
+		padding: 0;
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
+	}
 
-  .card-desc-icon {
-    display: block;
-    color: var(--text-faint);
-  }
+	.card-meta-icon {
+		display: inline-flex;
+		align-items: center;
+	}
 
-  /* --- Tag / badge chips (shared pill skin; only color differs) -------- */
+	.card-desc-icon {
+		display: block;
+		color: var(--text-faint);
+	}
 
-  .tag,
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    height: 20px;
-    padding: 0 7px;
-    border-radius: var(--rounded-full);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 1;
-    letter-spacing: 0;
-    text-transform: none;
-  }
+	/* --- Tag / badge chips (shared pill skin; only color differs) -------- */
 
-  .tag {
-    background: color-mix(in oklab, var(--text) 3%, transparent);
-    color: var(--text-faint);
-    border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
-  }
+	.tag,
+	.badge {
+		display: inline-flex;
+		align-items: center;
+		height: 20px;
+		padding: 0 7px;
+		border-radius: var(--rounded-full);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 11px;
+		font-weight: 500;
+		line-height: 1;
+		letter-spacing: 0;
+		text-transform: none;
+	}
 
-  .badge {
-    background: var(--text);
-    color: var(--surface);
-    border: 1px solid var(--text);
-  }
+	.tag {
+		background: color-mix(in oklab, var(--text) 3%, transparent);
+		color: var(--text-faint);
+		border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
+	}
 
-  /* --- Empty-column placeholder ----------------------------------------- */
+	.badge {
+		background: var(--text);
+		color: var(--surface);
+		border: 1px solid var(--text);
+	}
 
-  .empty {
-    list-style: none;
-    text-align: center;
-    padding: var(--space-3xl) var(--space-sm);
-    color: var(--text-faint);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.45;
-    font-style: italic;
-    background: transparent;
-    border: 0;
-  }
+	/* --- Empty-column placeholder ----------------------------------------- */
 
-  /* --- Edit modal (V3 markup, Redacto chrome) --------------------------- */
+	.empty {
+		list-style: none;
+		text-align: center;
+		padding: var(--space-3xl) var(--space-sm);
+		color: var(--text-faint);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.45;
+		font-style: italic;
+		background: transparent;
+		border: 0;
+	}
 
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: color-mix(in oklab, var(--bg-base) 10%, transparent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-  }
+	/* --- Edit modal (V3 markup, Redacto chrome) --------------------------- */
 
-  .modal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-xl);
-    padding: var(--space-3xl);
-    max-width: 520px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: var(--shadow-popover);
-    color: var(--text);
-  }
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		width: 100vw;
+		height: 100vh;
+		background: color-mix(in oklab, var(--bg-base) 10%, transparent);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+	}
 
-  .modal-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    margin-bottom: var(--space-xl);
-  }
+	.modal {
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-xl);
+		padding: var(--space-3xl);
+		max-width: 520px;
+		width: 100%;
+		max-height: 90vh;
+		overflow-y: auto;
+		box-shadow: var(--shadow-popover);
+		color: var(--text);
+	}
 
-  .modal-header h2 {
-    margin: 0;
-    /* .t-list-title equivalent — keep utility composition explicit in
+	.modal-header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		margin-bottom: var(--space-xl);
+	}
+
+	.modal-header h2 {
+		margin: 0;
+		/* .t-list-title equivalent — keep utility composition explicit in
        the markup; selector mirror here for headings without a class. */
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 12px;
-    font-weight: 600;
-    line-height: 1;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--text);
-  }
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 600;
+		line-height: 1;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+		color: var(--text);
+	}
 
-  .modal-id {
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 11px;
-    color: var(--text-faint);
-    cursor: pointer;
-    user-select: none;
-  }
+	.modal-id {
+		font-family: "Geist Mono", ui-monospace, monospace;
+		font-size: 11px;
+		color: var(--text-faint);
+		cursor: pointer;
+		user-select: none;
+	}
 
-  /* --- UI-5 per-field click-to-edit detail (design MD12) --------------- */
+	/* --- UI-5 per-field click-to-edit detail (design MD12) --------------- */
 
-  .field-row {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: var(--space-sm) 0;
-  }
+	.field-row {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xs);
+		padding: var(--space-sm) 0;
+	}
 
-  .field {
-    padding: var(--space-xs) var(--space-sm);
-    border-radius: var(--rounded-sm);
-    cursor: text;
-    color: var(--text);
-    transition: background-color 120ms ease;
-  }
+	.field {
+		padding: var(--space-xs) var(--space-sm);
+		border-radius: var(--rounded-sm);
+		cursor: text;
+		color: var(--text);
+		transition: background-color 120ms ease;
+	}
 
-  .field:hover {
-    background: color-mix(in oklab, var(--surface) 85%, var(--accent) 15%);
-  }
+	.field:hover {
+		background: color-mix(in oklab, var(--surface) 85%, var(--accent) 15%);
+	}
 
-  /* Multi-line variant for the description rendered cell — preserves
+	/* Multi-line variant for the description rendered cell — preserves
      whitespace so newlines from the textarea survive at rest. */
-  .field--multiline {
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
+	.field--multiline {
+		margin: 0;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
 
-  .field--input,
-  .field--textarea,
-  .field--select {
-    display: block;
-    width: 100%;
-    padding: var(--space-xs) var(--space-sm);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.45;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--accent);
-    border-radius: var(--rounded-sm);
-    box-sizing: border-box;
-    outline: none;
-  }
+	.field--input,
+	.field--textarea,
+	.field--select {
+		display: block;
+		width: 100%;
+		padding: var(--space-xs) var(--space-sm);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.45;
+		color: var(--text);
+		background: var(--surface);
+		border: 1px solid var(--accent);
+		border-radius: var(--rounded-sm);
+		box-sizing: border-box;
+		outline: none;
+	}
 
-  .field--textarea {
-    resize: vertical;
-    min-height: 88px;
-  }
+	.field--textarea {
+		resize: vertical;
+		min-height: 88px;
+	}
 
-  /* Subtle in-flight affordance — opacity + pointer-events:none so a
+	/* Subtle in-flight affordance — opacity + pointer-events:none so a
      second click can't queue a duplicate PATCH (design MD6: CSS-only,
      no spinner). */
-  .field--saving {
-    opacity: 0.6;
-    pointer-events: none;
-  }
+	.field--saving {
+		opacity: 0.6;
+		pointer-events: none;
+	}
 
-  .field-error {
-    color: var(--danger);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 13px;
-    margin: 0;
-  }
+	.field-error {
+		color: var(--danger);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13px;
+		margin: 0;
+	}
 
-  .tag-chips {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    padding: 0;
-    margin: 0 0 var(--space-sm);
-    list-style: none;
-  }
+	.tag-chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-xs);
+		padding: 0;
+		margin: 0 0 var(--space-sm);
+		list-style: none;
+	}
 
-  .tag-chips .tag {
-    gap: var(--space-xs);
-  }
+	.tag-chips .tag {
+		gap: var(--space-xs);
+	}
 
-  .tag-chips .tag button {
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    margin-left: var(--space-xs);
-    font-size: 12px;
-    line-height: 1;
-    color: var(--text-faint);
-    padding: 0;
-  }
+	.tag-chips .tag button {
+		background: transparent;
+		border: 0;
+		cursor: pointer;
+		margin-left: var(--space-xs);
+		font-size: 12px;
+		line-height: 1;
+		color: var(--text-faint);
+		padding: 0;
+	}
 
-  .tag-chips .tag button:hover {
-    color: var(--text);
-  }
+	.tag-chips .tag button:hover {
+		color: var(--text);
+	}
 
-  .tag-add {
-    display: block;
-    width: 100%;
-    padding: var(--space-xs) var(--space-sm);
-    font-family: 'Geist', system-ui, sans-serif;
-    font-size: 14px;
-    font-weight: 400;
-    line-height: 1.45;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--rounded-sm);
-    box-sizing: border-box;
-    outline: none;
-    transition: border-color 120ms ease;
-  }
+	.tag-add {
+		display: block;
+		width: 100%;
+		padding: var(--space-xs) var(--space-sm);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 14px;
+		font-weight: 400;
+		line-height: 1.45;
+		color: var(--text);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-sm);
+		box-sizing: border-box;
+		outline: none;
+		transition: border-color 120ms ease;
+	}
 
-  .tag-add:focus {
-    border-color: var(--accent);
-  }
+	.tag-add:focus {
+		border-color: var(--accent);
+	}
 
-  .modal-readonly {
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    font-size: 10px;
-    font-weight: 500;
-    line-height: 1.4;
-    letter-spacing: 0.04em;
-    color: var(--text-faint);
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xl);
-    margin: var(--space-md) 0 0;
-  }
+	.modal-readonly {
+		font-family: "Geist Mono", ui-monospace, monospace;
+		font-size: 10px;
+		font-weight: 500;
+		line-height: 1.4;
+		letter-spacing: 0.04em;
+		color: var(--text-faint);
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--space-xl);
+		margin: var(--space-md) 0 0;
+	}
 
-  .modal-readonly code {
-    font-family: 'Geist Mono', ui-monospace, monospace;
-    color: var(--text-muted);
-  }
+	.modal-readonly code {
+		font-family: "Geist Mono", ui-monospace, monospace;
+		color: var(--text-muted);
+	}
 }
 
 /* ---------------------------------------------------------------------------
@@ -905,131 +934,140 @@
  * form with textarea + Add / Cancel buttons on click.
  * ------------------------------------------------------------------------- */
 
-.card { position: relative; }
+.card {
+	position: relative;
+}
 
 .card-delete {
-  position: absolute;
-  top: var(--space-sm);
-  right: var(--space-sm);
-  width: 22px;
-  height: 22px;
-  border-radius: 11px;
-  border: 0;
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 120ms ease, background 120ms ease, color 120ms ease;
+	position: absolute;
+	top: var(--space-sm);
+	right: var(--space-sm);
+	width: 22px;
+	height: 22px;
+	border-radius: 11px;
+	border: 0;
+	background: var(--surface);
+	color: var(--text-muted);
+	font-size: 16px;
+	line-height: 1;
+	cursor: pointer;
+	opacity: 0;
+	pointer-events: none;
+	transition:
+		opacity 120ms ease,
+		background 120ms ease,
+		color 120ms ease;
 }
 
 .card:hover .card-delete {
-  opacity: 1;
-  pointer-events: auto;
+	opacity: 1;
+	pointer-events: auto;
 }
 
 .card-delete:hover {
-  background: color-mix(in oklab, var(--danger) 15%, var(--surface));
-  color: var(--danger);
+	background: color-mix(in oklab, var(--danger) 15%, var(--surface));
+	color: var(--danger);
 }
 
 .column-footer {
-  padding: var(--space-sm);
+	padding: var(--space-sm);
 }
 
 .composer-open {
-  width: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  border-radius: var(--rounded-md);
-  font: inherit;
-  transition: background-color 120ms ease, color 120ms ease;
+	width: 100%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: var(--space-sm);
+	padding: var(--space-sm) var(--space-md);
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+	border-radius: var(--rounded-md);
+	font: inherit;
+	transition:
+		background-color 120ms ease,
+		color 120ms ease;
 }
 
 .composer-open:hover {
-  background: color-mix(in oklab, var(--text) 4%, transparent);
-  color: var(--text);
+	background: color-mix(in oklab, var(--text) 4%, transparent);
+	color: var(--text);
 }
 
 .composer {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--rounded-lg);
-  padding: var(--space-md);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-sm);
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--rounded-lg);
+	padding: var(--space-md);
 }
 
 .composer textarea {
-  resize: vertical;
-  min-height: 56px;
-  background: transparent;
-  border: 0;
-  outline: none;
-  font: inherit;
-  color: var(--text);
+	resize: vertical;
+	min-height: 56px;
+	background: transparent;
+	border: 0;
+	outline: none;
+	font: inherit;
+	color: var(--text);
 }
 
 .composer:focus-within {
-  border-color: var(--accent);
+	border-color: var(--accent);
 }
 
 .composer-actions {
-  display: flex;
-  gap: var(--space-sm);
-  align-items: center;
+	display: flex;
+	gap: var(--space-sm);
+	align-items: center;
 }
 
 .composer-actions .button-primary {
-  border: 0;
-  background: var(--text);
-  color: var(--bg-base);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--rounded-md);
-  font: inherit;
-  cursor: pointer;
-  transition: background-color 120ms ease;
+	border: 0;
+	background: var(--text);
+	color: var(--bg-base);
+	padding: var(--space-sm) var(--space-md);
+	border-radius: var(--rounded-md);
+	font: inherit;
+	cursor: pointer;
+	transition: background-color 120ms ease;
 }
 
 .composer-actions .button-primary:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--text) 92%, transparent);
+	background: color-mix(in oklab, var(--text) 92%, transparent);
 }
 
 .composer-actions .button-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+	opacity: 0.6;
+	cursor: not-allowed;
 }
 
 .composer-actions .button-ghost {
-  border: 0;
-  background: transparent;
-  color: var(--text-muted);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--rounded-md);
-  font: inherit;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+	border: 0;
+	background: transparent;
+	color: var(--text-muted);
+	padding: var(--space-sm) var(--space-md);
+	border-radius: var(--rounded-md);
+	font: inherit;
+	cursor: pointer;
+	transition:
+		background-color 120ms ease,
+		color 120ms ease;
 }
 
 .composer-actions .button-ghost:hover {
-  background: color-mix(in oklab, var(--text) 4%, transparent);
-  color: var(--text);
+	background: color-mix(in oklab, var(--text) 4%, transparent);
+	color: var(--text);
 }
 
 .composer-error {
-  color: var(--danger);
-  margin: 0;
-  font-size: 12px;
+	color: var(--danger);
+	margin: 0;
+	font-size: 12px;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1042,150 +1080,154 @@
 
 /* Dashed Add-list placeholder, rendered after the last column. */
 .add-list-placeholder {
-  width: var(--space-list-width);
-  height: 48px;
-  border: 1.5px dashed var(--border-strong);
-  border-radius: var(--rounded-lg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  background: transparent;
-  cursor: pointer;
-  font: inherit;
-  flex: 0 0 auto;
-  transition: color 120ms ease, border-color 120ms ease;
+	width: var(--space-list-width);
+	height: 48px;
+	border: 1.5px dashed var(--border-strong);
+	border-radius: var(--rounded-lg);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	background: transparent;
+	cursor: pointer;
+	font: inherit;
+	flex: 0 0 auto;
+	transition:
+		color 120ms ease,
+		border-color 120ms ease;
 }
 
 .add-list-placeholder:hover {
-  color: var(--text);
-  border-color: var(--text-muted);
+	color: var(--text);
+	border-color: var(--text-muted);
 }
 
 /* List composer (swaps in when the placeholder is clicked). */
 .list-composer {
-  width: var(--space-list-width);
-  background: var(--surface);
-  border: 1px solid var(--accent);
-  border-radius: var(--rounded-xl);
-  padding: var(--space-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-xs);
-  flex: 0 0 auto;
+	width: var(--space-list-width);
+	background: var(--surface);
+	border: 1px solid var(--accent);
+	border-radius: var(--rounded-xl);
+	padding: var(--space-sm);
+	display: flex;
+	flex-direction: column;
+	gap: var(--space-xs);
+	flex: 0 0 auto;
 }
 
 .list-composer input {
-  width: 100%;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--rounded-sm);
-  padding: var(--space-xs) var(--space-sm);
-  color: var(--text);
-  font: inherit;
+	width: 100%;
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: var(--rounded-sm);
+	padding: var(--space-xs) var(--space-sm);
+	color: var(--text);
+	font: inherit;
 }
 
 .list-composer .composer-actions {
-  display: flex;
-  gap: var(--space-xs);
-  align-items: center;
+	display: flex;
+	gap: var(--space-xs);
+	align-items: center;
 }
 
 .list-composer .composer-error {
-  color: var(--danger);
-  font-size: var(--space-xl);
-  margin: 0;
+	color: var(--danger);
+	font-size: var(--space-xl);
+	margin: 0;
 }
 
 /* 3-dots button on the right end of every list header. */
 .list-menu-btn {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  color: var(--text-muted);
-  border: 0;
-  cursor: pointer;
-  border-radius: var(--rounded-md);
-  padding: 0;
-  transition: background-color 120ms ease, color 120ms ease;
+	width: 28px;
+	height: 28px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: transparent;
+	color: var(--text-muted);
+	border: 0;
+	cursor: pointer;
+	border-radius: var(--rounded-md);
+	padding: 0;
+	transition:
+		background-color 120ms ease,
+		color 120ms ease;
 }
 
 .list-menu-btn:hover {
-  color: var(--text);
-  background: color-mix(in oklab, var(--text) 6%, transparent);
+	color: var(--text);
+	background: color-mix(in oklab, var(--text) 6%, transparent);
 }
 
 /* Popover that opens below the 3-dots button. */
 .list-menu {
-  position: absolute;
-  top: calc(100% + var(--space-xs));
-  right: var(--space-xs);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--rounded-md);
-  box-shadow: var(--shadow-popover);
-  padding: var(--space-xs);
-  min-width: 160px;
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
+	position: absolute;
+	top: calc(100% + var(--space-xs));
+	right: var(--space-xs);
+	background: var(--surface);
+	border: 1px solid var(--border);
+	border-radius: var(--rounded-md);
+	box-shadow: var(--shadow-popover);
+	padding: var(--space-xs);
+	min-width: 160px;
+	z-index: 10;
+	display: flex;
+	flex-direction: column;
 }
 
 .list-menu .menu-item {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--rounded-sm);
-  font: inherit;
-  color: var(--text);
-  transition: background-color 120ms ease;
+	display: block;
+	width: 100%;
+	text-align: left;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	padding: var(--space-xs) var(--space-sm);
+	border-radius: var(--rounded-sm);
+	font: inherit;
+	color: var(--text);
+	transition: background-color 120ms ease;
 }
 
 .list-menu .menu-item.danger {
-  color: var(--danger);
+	color: var(--danger);
 }
 
 .list-menu .menu-item.danger:hover {
-  background: color-mix(in oklab, var(--danger) 8%, transparent);
+	background: color-mix(in oklab, var(--danger) 8%, transparent);
 }
 
 .list-menu .menu-error {
-  color: var(--danger);
-  font-size: var(--space-xl);
-  padding: var(--space-xs) var(--space-sm);
-  margin: 0;
+	color: var(--danger);
+	font-size: var(--space-xl);
+	padding: var(--space-xs) var(--space-sm);
+	margin: 0;
 }
 
 /* The list-header is now the positioning anchor for the popover. */
 .list-header {
-  position: relative;
+	position: relative;
 }
 
 /* Inline rename input variant (when .list-header.is-renaming). */
 .list-header .column-name--input {
-  background: var(--surface-2);
-  border: 1px solid var(--accent);
-  border-radius: var(--rounded-sm);
-  padding: 2px 6px;
-  color: var(--text);
-  font: inherit;
-  flex: 1 1 auto;
-  min-width: 0;
+	background: var(--surface-2);
+	border: 1px solid var(--accent);
+	border-radius: var(--rounded-sm);
+	padding: 2px 6px;
+	color: var(--text);
+	font: inherit;
+	flex: 1 1 auto;
+	min-width: 0;
 }
 
 .list-header .rename-error {
-  color: var(--danger);
-  font-size: var(--space-xl);
+	color: var(--danger);
+	font-size: var(--space-xl);
 }
 
 /* Sortable ghost styling for the list-drag instance. */
 .sortable-ghost-list {
-  opacity: 0.5;
+	opacity: 0.5;
 }

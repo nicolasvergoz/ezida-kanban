@@ -67,6 +67,7 @@ func runExport(cmd *cobra.Command, path string, asJSON bool) error {
 		SchemaVersion:  b.SchemaVersion,
 		Columns:        b.Board.Columns,
 		Priorities:     b.Board.Priorities,
+		PriorityColors: board.ResolvePriorityColors(b.Board.Priorities, b.Board.PriorityColors),
 		CardsPerColumn: counts,
 		Cards:          cards,
 		ProjectName:    resolveProjectName(path),

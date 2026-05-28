@@ -510,16 +510,18 @@ func (s *serverState) handleIndex(w http.ResponseWriter, r *http.Request) {
 // Field order and snake_case names match ADR 0002 §D7 — the viewer
 // UI consumes this shape directly.
 type boardResponse struct {
-	SchemaVersion  int            `json:"schema_version"`
-	Columns        []string       `json:"columns"`
-	Priorities     []string       `json:"priorities"`
-	CardsPerColumn map[string]int `json:"cards_per_column"`
-	Cards          []cardResponse `json:"cards"`
+	SchemaVersion  int               `json:"schema_version"`
+	Columns        []string          `json:"columns"`
+	Priorities     []string          `json:"priorities"`
+	PriorityColors map[string]string `json:"priority_colors"`
+	CardsPerColumn map[string]int    `json:"cards_per_column"`
+	Cards          []cardResponse    `json:"cards"`
 	// ProjectName is the server-resolved name of the project (parent-
 	// directory of the board path, with "Ezida" fallback). Computed
 	// once at server start; immutable for the process lifetime.
 	ProjectName string `json:"project_name"`
 }
+
 
 // cardResponse is the per-card JSON shape returned inside
 // boardResponse. Snake_case keys match ADR 0002 §D7; the
@@ -582,6 +584,7 @@ func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
 		SchemaVersion:  b.SchemaVersion,
 		Columns:        b.Board.Columns,
 		Priorities:     b.Board.Priorities,
+		PriorityColors: board.ResolvePriorityColors(b.Board.Priorities, b.Board.PriorityColors),
 		CardsPerColumn: counts,
 		Cards:          cards,
 		ProjectName:    s.projectName,

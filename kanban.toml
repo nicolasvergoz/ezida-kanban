@@ -4,15 +4,20 @@ schema_version = 1
 columns = ['backlog', 'todo', 'ongoing', 'done']
 priorities = ['low', 'medium', 'high']
 
+[board.priority_colors]
+high = '#ef4444'
+low = '#22c55e'
+medium = '#f59e0b'
+
 [[cards]]
 id = 'gwct06'
 title = 'Improve filter: description, priority, tags, column scope'
 column = 'backlog'
-description = 'Current viewer filter only matches card title. Extend to: search inside description text, filter by priority, restrict search to a specific column.'
+description = 'Current viewer filter only matches card title. Extend to: search inside description text, or tags, toggle by priorities'
 created_at = 2026-05-21T21:28:54Z
-updated_at = 2026-05-23T09:10:21Z
+updated_at = 2026-05-28T09:03:26Z
 tags = ['viewer', 'ux']
-priority = 'medium'
+priority = 'high'
 
 [[cards]]
 id = 'r0kn99'
@@ -75,6 +80,16 @@ tags = []
 priority = 'low'
 
 [[cards]]
+id = 'hrugx0'
+title = 'Configurable priority colors'
+column = 'done'
+description = 'Allow per-priority color config in kanban.toml (e.g. [board.priority_colors] low="#22c55e" medium="#f59e0b" high="#ef4444"). Defaults: green/orange/red matching low/medium/high. Viewer reads colors from /api/board and applies them to the priority badge.'
+created_at = 2026-05-21T22:08:11Z
+updated_at = 2026-05-28T09:04:09Z
+tags = ['viewer', 'config']
+priority = 'low'
+
+[[cards]]
 id = 'e0tf0t'
 title = 'Static demo viewer on GitHub Pages'
 column = 'done'
@@ -93,6 +108,15 @@ created_at = 2026-05-21T20:50:47Z
 updated_at = 2026-05-23T06:19:59Z
 tags = ['branding']
 priority = 'medium'
+
+[[cards]]
+id = 'flgccn'
+title = 'SKILL can serve and open link in default browser'
+column = 'done'
+description = ''
+created_at = 2026-05-21T20:59:10Z
+updated_at = 2026-05-28T09:04:02Z
+tags = []
 
 [[cards]]
 id = 'qf1eoj'
@@ -135,15 +159,6 @@ tags = []
 priority = 'low'
 
 [[cards]]
-id = 'flgccn'
-title = 'SKILL can serve and open link in default browser'
-column = 'done'
-description = ''
-created_at = 2026-05-21T20:59:10Z
-updated_at = 2026-05-21T22:26:12Z
-tags = []
-
-[[cards]]
 id = '4lmozo'
 title = 'App icon / project illustration'
 column = 'done'
@@ -178,16 +193,16 @@ title = 'Polish card detail modal layout'
 column = 'todo'
 description = "Modal is flat: no section labels, fields look passive, priority does not look interactive. Improve hierarchy and affordance.\n\n- Add small uppercase section labels (Title, Description, Priority, Tags) above each field-row so users know what they are editing.\n- Priority: replace the plain 'no priority' span with a clearly clickable control (chip / dropdown trigger with caret + colored dot per priority) so the interaction is discoverable without first click.\n- Description: show a pencil/edit icon hint on hover; placeholder 'Add a description' should look like an empty-state, not a value.\n- Tags: keep chip + add-input but pad spacing and align with the rest.\n- Read-only footer: tighten typography, group column/created/updated with subtle separators.\n- Title: slightly bigger, with edit hint on hover.\n\nGoal: detail modal feels structured and interactive on first glance, no guessing what is editable."
 created_at = 2026-05-23T09:12:34Z
-updated_at = 2026-05-23T09:27:06Z
+updated_at = 2026-05-28T09:03:32Z
 tags = ['viewer', 'ux']
-priority = 'medium'
+priority = 'high'
 
 [[cards]]
-id = 'hrugx0'
-title = 'Configurable priority colors'
+id = '5fdy8j'
+title = 'Fix mobile version'
 column = 'todo'
-description = 'Allow per-priority color config in kanban.toml (e.g. [board.priority_colors] low="#22c55e" medium="#f59e0b" high="#ef4444"). Defaults: green/orange/red matching low/medium/high. Viewer reads colors from /api/board and applies them to the priority badge.'
-created_at = 2026-05-21T22:08:11Z
-updated_at = 2026-05-23T09:27:13Z
-tags = ['viewer', 'config']
+description = ''
+created_at = 2026-05-26T07:04:16Z
+updated_at = 2026-05-28T08:55:42Z
+tags = []
 priority = 'low'

@@ -686,3 +686,126 @@ func TestValidate_MultipleViolations(t *testing.T) {
 		t.Fatalf("expected at least 2 violations in one pass, got %d", len(verr.Violations))
 	}
 }
+
+// --- Rule 10: priority_colors ----------------------------------------------
+
+func newValidBoardWithColors(colors map[string]string) *Board {
+	now := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
+	return &Board{
+		SchemaVersion: SupportedSchemaVersion,
+		Board: BoardConfig{
+			Columns:        []string{"todo"},
+			Priorities:     []string{"low", "medium", "high"},
+			PriorityColors: colors,
+		},
+		Cards: []Card{
+			{ID: "aaaaaa", Title: "A", Column: "todo", CreatedAt: now, UpdatedAt: now},
+		},
+	}
+}
+
+func TestValidate_Rule10_AbsentMapIsValid(t *testing.T) {
+	b := newValidBoardWithColors(nil)
+	if err := Validate(b); err != nil {
+		t.Fatalf("Validate returned %v, want nil for absent priority_colors", err)
+	}
+}
+
+func TestValidate_Rule10_EmptyMapIsValid(t *testing.T) {
+	b := newValidBoardWithColors(map[string]string{})
+	if err := Validate(b); err != nil {
+		t.Fatalf("Validate returned %v, want nil for empty priority_colors", err)
+	}
+}
+
+func TestValidate_Rule10_GoodColorsPass(t *testing.T) {
+	b := newValidBoardWithColors(map[string]string{
+		"low":    "#22c55e",
+		"medium": "#f59e0b",
+		"high":   "#ef4444",
+	})
+	if err := Validate(b); err != nil {
+		t.Fatalf("Validate returned %v, want nil for valid priority_colors", err)
+	}
+}
+
+func TestValidate_Rule10_ShortHexPasses(t *testing.T) {
+	b := newValidBoardWithColors(map[string]string{"low": "#0f0"})
+	if err := Validate(b); err != nil {
+		t.Fatalf("Validate returned %v, want nil for #rgb", err)
+	}
+}
+
+func TestValidate_Rule10_UnknownKeyFails(t *testing.T) {
+	b := newValidBoardWithColors(map[string]string{"urgent": "#ff0000"})
+	err := Validate(b)
+	if err == nil || !hasViolationForRule(err, 10) {
+		t.Fatalf("expected rule 10 violation for unknown key, got %v", err)
+	}
+}
+
+func TestValidate_Rule10_BadHexValueFails(t *testing.T) {
+	b := newValidBoardWithColors(map[string]string{"low": "red"})
+	err := Validate(b)
+	if err == nil || !hasViolationForRule(err, 10) {
+		t.Fatalf("expected rule 10 violation for non-hex value, got %v", err)
+	}
+}
+
+func TestValidate_Rule10_MissingHashFails(t *testing.T) {
+	b := newValidBoardWithColors(map[string]string{"low": "22c55e"})
+	err := Validate(b)
+	if err == nil || !hasViolationForRule(err, 10) {
+		t.Fatalf("expected rule 10 violation for missing #, got %v", err)
+	}
+}
+
+func TestRoundTrip_PriorityColors_PreservesNonEmpty(t *testing.T) {
+	b := newValidBoardWithColors(map[string]string{
+		"low":  "#22c55e",
+		"high": "#ef4444",
+	})
+	tmpDir := t.TempDir()
+	out := filepath.Join(tmpDir, "kanban.toml")
+	if err := Save(out, b); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	b2, err := Load(out)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if got := b2.Board.PriorityColors["low"]; got != "#22c55e" {
+		t.Fatalf("priority_colors.low = %q, want %q", got, "#22c55e")
+	}
+	if got := b2.Board.PriorityColors["high"]; got != "#ef4444" {
+		t.Fatalf("priority_colors.high = %q, want %q", got, "#ef4444")
+	}
+	if len(b2.Board.PriorityColors) != 2 {
+		t.Fatalf("priority_colors len = %d, want 2", len(b2.Board.PriorityColors))
+	}
+}
+
+func TestRoundTrip_PriorityColors_AbsentStaysAbsent(t *testing.T) {
+	b := newValidBoardWithColors(nil)
+	tmpDir := t.TempDir()
+	out := filepath.Join(tmpDir, "kanban.toml")
+	if err := Save(out, b); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	raw, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if contains(string(raw), "priority_colors") {
+		t.Fatalf("saved file unexpectedly contains 'priority_colors':\n%s", raw)
+	}
+}
+
+func contains(haystack, needle string) bool {
+	for i := 0; i+len(needle) <= len(haystack); i++ {
+		if haystack[i:i+len(needle)] == needle {
+			return true
+		}
+	}
+	return false
+}

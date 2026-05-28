@@ -35,6 +35,9 @@
       if (!Array.isArray(state.cards)) state.cards = [];
       if (!Array.isArray(state.columns)) state.columns = [];
       if (!Array.isArray(state.priorities)) state.priorities = [];
+      if (state.priority_colors === null || typeof state.priority_colors !== 'object' || Array.isArray(state.priority_colors)) {
+        state.priority_colors = {};
+      }
       state.cards.forEach(function (c) {
         if (!Array.isArray(c.tags)) c.tags = [];
         if (typeof c.description !== 'string') c.description = '';
@@ -48,6 +51,7 @@
         project_name: 'Ezida (demo)',
         columns: ['todo', 'ongoing', 'done'],
         priorities: ['low', 'medium', 'high'],
+        priority_colors: { low: '#22c55e', medium: '#f59e0b', high: '#ef4444' },
         cards_per_column: { todo: 0, ongoing: 0, done: 0 },
         cards: [],
       };

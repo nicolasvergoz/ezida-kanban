@@ -185,6 +185,13 @@ install_binary() {
     mkdir -p "${INSTALL_DIR}"
     cp "${extract_dir}/ezida" "${INSTALL_DIR}/ezida"
     chmod 0755 "${INSTALL_DIR}/ezida"
+
+    # macOS AMFI rejects cross-compiled ad-hoc signatures (error -423).
+    # Re-sign locally so the kernel accepts the binary.
+    if [ "$(uname -s)" = "Darwin" ] && command -v codesign >/dev/null 2>&1; then
+        codesign --force --sign - "${INSTALL_DIR}/ezida" >/dev/null 2>&1 \
+            || printf 'warning: codesign re-sign failed; run: codesign --force --sign - %s/ezida\n' "${INSTALL_DIR}" >&2
+    fi
 }
 
 # ---------------------------------------------------------------------------

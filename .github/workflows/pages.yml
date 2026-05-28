@@ -8,6 +8,7 @@ on:
     paths:
       - "site/**"
       - "kanban.toml"
+      - "docs/assets/screenshot.png"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -38,6 +39,19 @@ jobs:
 
       - name: Build ezida
         run: go build -o ezida ./cmd/ezida
+
+      - name: Sync landing screenshot from docs/
+        run: cp docs/assets/screenshot.png site/assets/screenshot-light.png
+
+      - name: Patch screenshot dimensions in index.html
+        run: |
+          set -eu
+          read w h < <(python3 -c "import struct; \
+            d=open('site/assets/screenshot-light.png','rb').read(24); \
+            w,h=struct.unpack('>II', d[16:24]); print(w, h)")
+          sed -i -E "s|(src=\"assets/screenshot-light\.png\")[[:space:]]+width=\"[0-9]+\"[[:space:]]+height=\"[0-9]+\"|\1 width=\"${w}\" height=\"${h}\"|" site/index.html
+          grep -q "src=\"assets/screenshot-light.png\" width=\"${w}\" height=\"${h}\"" site/index.html \
+            || { echo "::error::failed to patch screenshot dimensions"; exit 1; }
 
       - name: Export demo board snapshot
         run: ./ezida export --json > site/demo/board.json

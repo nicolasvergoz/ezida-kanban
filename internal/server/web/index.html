@@ -234,92 +234,257 @@
         <template x-if="openCardData">
           <div>
             <header class="modal-header">
-              <span class="modal-id t-mono-label" x-text="openCardData.id" @click="copyId(openCardData.id, $event, 'modal')" title="Click to copy card ID"></span>
-              <span class="modal-id-copied" x-show="copiedModalId" x-transition.opacity.duration.150ms>copied</span>
+              <div class="modal-id-group">
+                <span class="modal-id t-mono-label" x-text="openCardData.id" @click="copyId(openCardData.id, $event, 'modal')" title="Click to copy card ID"></span>
+                <span class="modal-id-copied" x-show="copiedModalId" x-transition.opacity.duration.150ms>copied</span>
+              </div>
+              <div class="modal-actions">
+                <button type="button"
+                        class="modal-action danger"
+                        @click="confirmDeleteCardFromModal()"
+                        title="Delete this card"
+                        aria-label="Delete this card">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                       stroke="currentColor" stroke-width="1.6"
+                       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/>
+                    <path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+                <button type="button"
+                        class="modal-action"
+                        @click="closeModal()"
+                        title="Close"
+                        aria-label="Close">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none"
+                       stroke="currentColor" stroke-width="1.8"
+                       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <line x1="6" y1="6" x2="18" y2="18"/>
+                    <line x1="6" y1="18" x2="18" y2="6"/>
+                  </svg>
+                </button>
+              </div>
             </header>
 
-            <!-- Title field -->
-            <div class="field-row field-row--title">
-              <span class="field t-list-title"
-                    x-show="!editing.title"
-                    @click="startEdit('title')"
-                    x-text="openCardData.title"></span>
-              <input type="text"
-                     class="field--input"
-                     :class="{ 'field--saving': saving.title }"
-                     x-show="editing.title"
-                     x-model="drafts.title"
-                     x-ref="titleInput"
-                     @blur="commitField('title')"
-                     @keydown.enter.prevent="commitField('title')"
-                     @keydown.escape.stop.prevent="revertField('title')">
-              <p class="field-error" x-show="errors.title" x-text="errors.title"></p>
+            <div class="modal-body">
+
+              <!-- Title field -->
+              <div class="modal-section">
+                <span class="modal-label t-mono-label">Title</span>
+                <div class="field-row field-row--title">
+                  <span class="field field--title"
+                        x-show="!editing.title"
+                        @click="startEdit('title')"
+                        title="Click to edit"
+                        x-text="openCardData.title"></span>
+                  <input type="text"
+                         class="field--input field--input-title"
+                         :class="{ 'field--saving': saving.title }"
+                         x-show="editing.title"
+                         x-model="drafts.title"
+                         x-ref="titleInput"
+                         @blur="commitField('title')"
+                         @keydown.enter.prevent="commitField('title')"
+                         @keydown.escape.stop.prevent="revertField('title')">
+                  <p class="field-error" x-show="errors.title" x-text="errors.title"></p>
+                </div>
+              </div>
+
+              <!-- Priority + Column meta grid -->
+              <div class="modal-meta">
+
+                <!-- Priority -->
+                <div class="modal-section">
+                  <span class="modal-label t-mono-label">Priority</span>
+                  <div class="field-row field-row--priority"
+                       @click.outside="prioOpen = false">
+                    <button type="button"
+                            class="field field--chip modal-prio"
+                            :class="{ 'field--saving': saving.priority }"
+                            @click="togglePrio()"
+                            aria-haspopup="listbox"
+                            :aria-expanded="prioOpen ? 'true' : 'false'"
+                            title="Click to change priority">
+                      <span class="prio-dot"
+                            :style="openCardData.priority && priorityColors[openCardData.priority] ? ('background: ' + priorityColors[openCardData.priority]) : ''"
+                            aria-hidden="true"></span>
+                      <span class="field--chip-text" x-text="openCardData.priority || 'no priority'"></span>
+                      <svg class="field--chip-caret" viewBox="0 0 24 24" width="12" height="12" fill="none"
+                           stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                           stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                    </button>
+                    <ul class="modal-dropdown" role="listbox" x-show="prioOpen" x-cloak x-transition.opacity.duration.120ms>
+                      <li role="option" :aria-selected="!openCardData.priority">
+                        <button type="button"
+                                class="modal-dropdown-item"
+                                :class="{ selected: !openCardData.priority }"
+                                @click="setPriorityValue('')">
+                          <span class="prio-dot" aria-hidden="true"></span>
+                          <span class="modal-dropdown-label">no priority</span>
+                          <svg class="modal-dropdown-check" x-show="!openCardData.priority" viewBox="0 0 24 24" width="12" height="12" fill="none"
+                               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        </button>
+                      </li>
+                      <template x-for="p in priorities" :key="p">
+                        <li role="option" :aria-selected="openCardData.priority === p">
+                          <button type="button"
+                                  class="modal-dropdown-item"
+                                  :class="{ selected: openCardData.priority === p }"
+                                  @click="setPriorityValue(p)">
+                            <span class="prio-dot"
+                                  :style="priorityColors[p] ? ('background: ' + priorityColors[p]) : ''"
+                                  aria-hidden="true"></span>
+                            <span class="modal-dropdown-label" x-text="p"></span>
+                            <svg class="modal-dropdown-check" x-show="openCardData.priority === p" viewBox="0 0 24 24" width="12" height="12" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          </button>
+                        </li>
+                      </template>
+                    </ul>
+                    <p class="field-error" x-show="errors.priority" x-text="errors.priority"></p>
+                  </div>
+                </div>
+
+                <!-- Column -->
+                <div class="modal-section">
+                  <span class="modal-label t-mono-label">Column</span>
+                  <div class="field-row field-row--column"
+                       @click.outside="colOpen = false">
+                    <button type="button"
+                            class="field field--chip modal-col"
+                            :class="{ 'field--saving': saving.column }"
+                            @click="toggleCol()"
+                            aria-haspopup="listbox"
+                            :aria-expanded="colOpen ? 'true' : 'false'"
+                            title="Click to move to another column">
+                      <svg class="field--chip-icon" viewBox="0 0 24 24" width="13" height="13" fill="none"
+                           stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                           stroke-linejoin="round" aria-hidden="true">
+                        <rect x="3" y="4" width="5" height="16" rx="1"/>
+                        <rect x="10" y="4" width="5" height="10" rx="1"/>
+                        <rect x="17" y="4" width="4" height="7" rx="1"/>
+                      </svg>
+                      <span class="field--chip-text" x-text="openCardData.column"></span>
+                      <svg class="field--chip-caret" viewBox="0 0 24 24" width="12" height="12" fill="none"
+                           stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                           stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9"/>
+                      </svg>
+                    </button>
+                    <ul class="modal-dropdown" role="listbox" x-show="colOpen" x-cloak x-transition.opacity.duration.120ms>
+                      <template x-for="c in columns" :key="c">
+                        <li role="option" :aria-selected="openCardData.column === c">
+                          <button type="button"
+                                  class="modal-dropdown-item"
+                                  :class="{ selected: openCardData.column === c }"
+                                  @click="setColumnValue(c)">
+                            <span class="col-tick" aria-hidden="true"></span>
+                            <span class="modal-dropdown-label" x-text="c"></span>
+                            <svg class="modal-dropdown-check" x-show="openCardData.column === c" viewBox="0 0 24 24" width="12" height="12" fill="none"
+                                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                              <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                          </button>
+                        </li>
+                      </template>
+                    </ul>
+                    <p class="field-error" x-show="errors.column" x-text="errors.column"></p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Description field -->
+              <div class="modal-section">
+                <span class="modal-label t-mono-label">Description</span>
+                <div class="field-row field-row--description">
+                  <p class="field field--multiline"
+                     :class="{ 'field--empty': !openCardData.description }"
+                     x-show="!editing.description"
+                     @click="startEdit('description')"
+                     title="Click to edit"
+                     x-text="openCardData.description || 'Add a description'"></p>
+                  <textarea class="field--textarea"
+                            :class="{ 'field--saving': saving.description }"
+                            x-show="editing.description"
+                            x-model="drafts.description"
+                            x-ref="descriptionInput"
+                            rows="6"
+                            placeholder="Add a description"
+                            @blur="commitField('description')"
+                            @keydown.meta.enter.prevent="commitField('description')"
+                            @keydown.ctrl.enter.prevent="commitField('description')"
+                            @keydown.escape.stop.prevent="revertField('description')"></textarea>
+                  <p class="field-error" x-show="errors.description" x-text="errors.description"></p>
+                </div>
+              </div>
+
+              <!-- Tag chips (always live, no rendered-vs-editing split) -->
+              <div class="modal-section">
+                <span class="modal-label t-mono-label">Tags</span>
+                <div class="field-row field-row--tags">
+                  <ul class="tag-chips" :class="{ 'field--saving': saving.tags }">
+                    <template x-for="t in openCardData.tags" :key="t">
+                      <li class="tag t-tag modal-tag-chip">
+                        <span x-text="t"></span>
+                        <button type="button" @click="removeTag(t)" aria-label="remove tag">&times;</button>
+                      </li>
+                    </template>
+                    <li class="modal-tag-add-wrap">
+                      <button type="button"
+                              class="modal-tag-add"
+                              x-show="!tagAdding"
+                              @click="startAddTag()"
+                              title="Add a tag">
+                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none"
+                             stroke="currentColor" stroke-width="2"
+                             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <line x1="12" y1="5" x2="12" y2="19"/>
+                          <line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        <span>Add</span>
+                      </button>
+                      <input type="text"
+                             class="modal-tag-input"
+                             x-show="tagAdding"
+                             x-ref="tagAddInput"
+                             x-model="tagInput"
+                             maxlength="40"
+                             placeholder="new tag…"
+                             @blur="commitNewTag()"
+                             @keydown.enter.prevent="commitNewTag()"
+                             @keydown.comma.prevent="commitNewTag()"
+                             @keydown.escape.stop.prevent="cancelAddTag()">
+                    </li>
+                  </ul>
+                  <p class="field-error" x-show="errors.tags" x-text="errors.tags"></p>
+                </div>
+              </div>
+
             </div>
 
-            <!-- Description field -->
-            <div class="field-row field-row--description">
-              <p class="field field--multiline"
-                 x-show="!editing.description"
-                 @click="startEdit('description')"
-                 x-text="openCardData.description || 'Add a description'"></p>
-              <textarea class="field--textarea"
-                        :class="{ 'field--saving': saving.description }"
-                        x-show="editing.description"
-                        x-model="drafts.description"
-                        x-ref="descriptionInput"
-                        rows="6"
-                        @blur="commitField('description')"
-                        @keydown.meta.enter.prevent="commitField('description')"
-                        @keydown.ctrl.enter.prevent="commitField('description')"
-                        @keydown.escape.stop.prevent="revertField('description')"></textarea>
-              <p class="field-error" x-show="errors.description" x-text="errors.description"></p>
-            </div>
-
-            <!-- Priority field -->
-            <div class="field-row field-row--priority">
-              <span class="field"
-                    x-show="!editing.priority"
-                    @click="startEdit('priority')"
-                    x-text="openCardData.priority || 'no priority'"></span>
-              <select class="field--select"
-                      :class="{ 'field--saving': saving.priority }"
-                      x-show="editing.priority"
-                      x-model="drafts.priority"
-                      x-ref="priorityInput"
-                      @change="commitField('priority')"
-                      @blur="commitField('priority')"
-                      @keydown.escape.stop.prevent="revertField('priority')">
-                <option value="">no priority</option>
-                <template x-for="p in priorities" :key="p">
-                  <option :value="p" x-text="p"></option>
-                </template>
-              </select>
-              <p class="field-error" x-show="errors.priority" x-text="errors.priority"></p>
-            </div>
-
-            <!-- Tag chips (always live, no rendered-vs-editing split) -->
-            <div class="field-row field-row--tags">
-              <ul class="tag-chips" :class="{ 'field--saving': saving.tags }">
-                <template x-for="t in openCardData.tags" :key="t">
-                  <li class="tag t-tag">
-                    <span x-text="t"></span>
-                    <button type="button" @click="removeTag(t)" aria-label="remove tag">&times;</button>
-                  </li>
-                </template>
-              </ul>
-              <input type="text" class="tag-add"
-                     x-model="tagInput"
-                     @keydown.enter.prevent="addTag()"
-                     @keydown.comma.prevent="addTag()"
-                     placeholder="add tag">
-              <p class="field-error" x-show="errors.tags" x-text="errors.tags"></p>
-            </div>
-
-            <!-- Read-only metadata -->
-            <footer class="modal-readonly t-mono-label">
-              <span>column: <code x-text="openCardData.column"></code></span>
-              <span>created: <code x-text="openCardData.created_at"></code></span>
-              <span>updated: <code x-text="openCardData.updated_at"></code></span>
+            <!-- Read-only footer -->
+            <footer class="modal-foot">
+              <div class="modal-foot-item">
+                <span class="modal-foot-label t-mono-label">Created</span>
+                <span class="modal-foot-value"
+                      :title="formatAbsolute(openCardData.created_at)"
+                      x-text="formatRelative(openCardData.created_at)"></span>
+              </div>
+              <span class="modal-foot-sep" aria-hidden="true"></span>
+              <div class="modal-foot-item">
+                <span class="modal-foot-label t-mono-label">Updated</span>
+                <span class="modal-foot-value"
+                      :title="formatAbsolute(openCardData.updated_at)"
+                      x-text="formatRelative(openCardData.updated_at)"></span>
+              </div>
             </footer>
           </div>
         </template>

@@ -400,8 +400,8 @@ The page SHALL reference `/static/vendor/sortable.min.js` as a `<script defer>`.
 
 The page SHALL open a modal dialog when the user clicks a `.card`
 element. The modal MUST display the card's current values for title,
-description, priority, and tags as rendered text (NOT as form inputs),
-and MUST display the card's `id`, `column`, `created_at`, and
+description, priority, column, and tags as rendered text (NOT as form
+inputs), and MUST display the card's `id`, `created_at`, and
 `updated_at` as read-only metadata. The modal MUST NOT contain a
 global Save button or a global Cancel button.
 
@@ -441,20 +441,217 @@ global Save button or a global Cancel button.
 - **WHEN** the user starts a drag from a card and drops it elsewhere
 - **THEN** the modal MUST NOT open as a result of the drop
 
+#### Scenario: Column is rendered as an editable field, not read-only metadata
+
+- **WHEN** the user clicks a card in column `todo` on a board with
+  columns `backlog, todo, ongoing, done`
+- **THEN** the modal MUST render `todo` as text inside a `.field`
+  element (the column field), NOT inside the read-only footer
+- **AND** the read-only footer MUST NOT contain the card's column
+  value
+
+### Requirement: Modal exposes section labels above each editable field
+
+The modal MUST render a small uppercase monospace label above each
+editable field-row (Title, Description, Priority, Column, Tags) so
+users can identify what they are editing without first clicking.
+Each label MUST be a sibling element with a stable class
+(`.modal-label`) preceding its corresponding `.field-row`. Labels MUST
+NOT be inputs and MUST NOT trap clicks intended for the field below.
+
+#### Scenario: Each editable field has a preceding uppercase label
+
+- **WHEN** the modal is open for any card
+- **THEN** the DOM MUST contain at least five `.modal-label` elements
+  with visible text matching (case-insensitive): `title`,
+  `description`, `priority`, `column`, `tags`
+- **AND** each `.modal-label` MUST appear in document order
+  immediately before its corresponding `.field-row` element
+
+#### Scenario: Clicking a label does NOT enter edit mode
+
+- **WHEN** the user clicks a `.modal-label` element
+- **THEN** no field MUST switch into edit mode
+- **AND** no PATCH request MUST fire
+
+### Requirement: Priority rendered cell shows a colored dot and caret
+
+The modal's priority `.field` (rendered state) MUST display a small
+colored dot whose background color matches the board's configured
+`priority_colors.<id>` value for the card's current priority, followed
+by the priority label, followed by a chevron / caret glyph indicating
+the field is a selector. When the card's priority is empty the dot
+MUST still render with a neutral muted background and the label MUST
+remain `no priority`. Clicking the `.field` MUST toggle a custom
+listbox popover (`.modal-dropdown` with `role="listbox"`) anchored to
+the chip — NOT a native `<select>` element.
+
+#### Scenario: Dot color matches `priority_colors` from `/api/board`
+
+- **WHEN** the board configuration includes
+  `[board.priority_colors] high = "#ef4444"` and the user opens a card
+  whose priority is `high`
+- **THEN** the priority `.field` MUST contain an element with class
+  `prio-dot` whose computed `background-color` resolves to `#ef4444`
+
+#### Scenario: Caret indicates the field is a selector
+
+- **WHEN** the modal is open with a card of any priority
+- **THEN** the priority `.field` MUST contain a caret / chevron glyph
+  visible to the user (e.g. an SVG, `▾`, or equivalent)
+
+#### Scenario: Clicking the priority chip opens the listbox
+
+- **WHEN** the user clicks anywhere inside the priority `.field`
+  (including the dot or the caret)
+- **THEN** a `.modal-dropdown` element with `role="listbox"` MUST be
+  visible, anchored beneath the chip
+- **AND** the listbox MUST contain one item per value in
+  `[board].priorities` plus a leading `no priority` item
+- **AND** the item matching the card's current priority MUST carry a
+  `.selected` class (or equivalent) and a visible check glyph
+
+### Requirement: Modal exposes a column-move field with a listbox
+
+The modal SHALL render the card's current column as a `.field`
+element (rendered state) displaying the column title plus a caret.
+Clicking the field MUST toggle a custom listbox popover
+(`.modal-dropdown` with `role="listbox"`) anchored to the chip listing
+every column from `[board].columns`. The current column's item MUST
+carry a `.selected` marker and a visible check glyph. Choosing a
+different column MUST issue `POST /api/cards/{id}/move` with body
+`{"column": <new column name>, "position": 0}`. Choosing the same
+column MUST NOT issue any network request. On a 2xx response the
+field MUST return to rendered mode with the new column label and the
+listbox MUST close. On a non-2xx response the listbox MUST close AND
+a `.field-error` element directly under the column field MUST
+display the server's `error.message` (or `HTTP <status>` fallback).
+
+#### Scenario: Click column field opens a listbox of all columns
+
+- **WHEN** the user opens a card in column `todo` on a board with
+  columns `backlog, todo, ongoing, done` and clicks the column
+  `.field`
+- **THEN** a `.modal-dropdown` element with `role="listbox"` MUST be
+  visible
+- **AND** the listbox MUST contain one item per board column in the
+  same order as `[board].columns`
+- **AND** the item whose label is `todo` MUST carry a `.selected`
+  class (or equivalent)
+
+#### Scenario: Choosing a different column fires a move request
+
+- **WHEN** the user opens a card in column `todo`, clicks the column
+  `.field`, and clicks the `ongoing` item in the listbox
+- **THEN** a `POST /api/cards/<id>/move` request MUST fire with body
+  containing `"column":"ongoing"` and `"position":0`
+- **AND** on 2xx the column `.field` MUST display `ongoing` in
+  rendered text mode
+- **AND** the listbox MUST NOT be visible
+
+#### Scenario: Selecting the same column is a no-op
+
+- **WHEN** the user opens a card in column `todo`, clicks the column
+  `.field`, and clicks the `todo` item in the listbox
+- **THEN** no `POST /api/cards/<id>/move` request MUST fire
+- **AND** no `PATCH /api/cards/<id>` request MUST fire
+- **AND** the listbox MUST close
+
+#### Scenario: Server error surfaces inline under the column field
+
+- **WHEN** the user picks a different column in the listbox and the
+  server returns 400 with message `column "archive" not configured`
+- **THEN** a `.field-error` element directly under the column field
+  MUST display the text `column "archive" not configured`
+
+### Requirement: Modal header exposes a delete-card action
+
+The modal SHALL render a delete action (typically a small trash icon
+button) in its header. Activating the button MUST first prompt the
+user via `window.confirm` (or equivalent confirmation gate). On
+confirmation the page MUST issue `DELETE /api/cards/{id}` and, on
+2xx, MUST close the modal. The id-copy affordance on the header MUST
+remain functional: clicking the rendered id span MUST copy the id to
+the clipboard and surface a transient `copied` confirmation, exactly
+as today.
+
+#### Scenario: Trash button asks to confirm before deleting
+
+- **WHEN** the user clicks the trash button in the modal header
+- **THEN** the page MUST invoke `window.confirm`
+- **AND** no `DELETE` request MUST fire until the user confirms
+
+#### Scenario: Confirmed delete removes the card and closes the modal
+
+- **WHEN** the user clicks the trash button and confirms the prompt
+- **THEN** a `DELETE /api/cards/<id>` request MUST fire
+- **AND** on 2xx the `.modal` element MUST NOT be visible
+
+#### Scenario: Cancelled delete leaves the modal open
+
+- **WHEN** the user clicks the trash button and cancels the prompt
+- **THEN** no network request MUST fire
+- **AND** the `.modal` element MUST remain visible
+
+#### Scenario: Clicking the id span still copies the id
+
+- **WHEN** the user clicks the rendered `.modal-id` element for a
+  card with `id="a4zkwn"`
+- **THEN** the clipboard MUST contain `a4zkwn`
+- **AND** the `.modal-id-copied` indicator MUST appear transiently
+
+### Requirement: Modal footer shows relative dates with absolute tooltip
+
+The modal footer SHALL render exactly two items — Created and
+Updated — each composed of a label and a value. Values MUST be
+rendered as a human-readable relative string derived from the card's
+`created_at` / `updated_at` ISO timestamp (e.g. `just now`,
+`5 min ago`, `2 h ago`, `3 d ago`, `23 May 2026`). The same element
+MUST carry a `title` attribute exposing the absolute date AND time of
+day formatted as `YYYY-MM-DD HH:MM` (24-hour, local). The two items
+MUST be visually grouped with a thin separator (rule or pipe) and
+MUST NOT render the raw ISO string in visible text.
+
+#### Scenario: Recent update renders as relative string
+
+- **WHEN** the user opens a card whose `updated_at` is 30 minutes
+  before now
+- **THEN** the modal footer's Updated value MUST contain the
+  substring `min ago` (e.g. `30 min ago`)
+- **AND** the visible text MUST NOT contain a `T` (no ISO marker)
+
+#### Scenario: Absolute date+time is available in the tooltip
+
+- **WHEN** the user opens a card whose `updated_at` is
+  `2026-05-23T09:45:07Z`
+- **THEN** the modal footer's Updated value MUST carry a `title`
+  attribute matching the regular expression
+  `\d{4}-\d{2}-\d{2} \d{2}:\d{2}` (date plus hours and minutes)
+
+#### Scenario: Footer no longer renders the column
+
+- **WHEN** the modal is open for any card
+- **THEN** the modal footer MUST contain exactly two `<span>`-or-
+  equivalent metadata items: one labelled `created` and one labelled
+  `updated` (case-insensitive)
+- **AND** the footer MUST NOT render the card's column value
+
 ### Requirement: Fields enter inline edit mode on click
 
 The modal MUST switch a rendered field into an inline editor when the
-user clicks it. Clicking a rendered editable field (`.field` for
-title, priority; `.field--multiline` for description) SHALL replace it
-with the corresponding inline editor: a single-line `<input>` for
-title, a multi-line `<textarea>` for description, and a `<select>` for
-priority. The editor MUST receive focus on the next event tick. Only
-one field MAY be in edit mode at any moment; clicking a second field
-while one is in edit mode MUST first commit (blur) the active one
-before entering edit on the new field.
+user clicks it. Clicking a rendered editable text field (`.field` for
+title; `.field--multiline` for description) SHALL replace it with the
+corresponding inline editor: a single-line `<input>` for title, and a
+multi-line `<textarea>` for description. The editor MUST receive
+focus on the next event tick. Only one inline text editor MAY be in
+edit mode at any moment; clicking a second one while another is in
+edit mode MUST first commit (blur) the active one before entering
+edit on the new field.
 
-The tag chip editor is exempt from the click-to-edit gate — chips and
-the tag-add input are always live whenever the modal is open.
+Priority and column use a custom listbox popover instead of an inline
+editor (see their respective requirements). The tag chip editor is
+exempt from the click-to-edit gate — chips are always live, and a
+dashed `+ Add` pill toggles a single-shot tag input when clicked.
 
 #### Scenario: Click title enters title edit mode
 
@@ -473,16 +670,6 @@ the tag-add input are always live whenever the modal is open.
 - **THEN** a `<textarea>` element with value `Long body...` MUST be
   visible and focused
 
-#### Scenario: Click priority enters priority edit mode
-
-- **WHEN** the modal is open showing a card with priority `medium`
-  and the user clicks the priority `.field`
-- **THEN** a `<select>` element with `medium` as the selected option
-  MUST be visible and focused
-- **AND** the `<select>` MUST include one `<option value="">` whose
-  visible text is `no priority` plus one `<option>` per value in
-  `[board].priorities`
-
 #### Scenario: Clicking a second field commits the first
 
 - **WHEN** the user is editing the title field (title editor visible)
@@ -498,7 +685,7 @@ the tag-add input are always live whenever the modal is open.
 The modal MUST commit an edited field independently of all other
 fields. Committing a field — defined as blur on its editor, `Enter`
 in the title input, `Cmd/Ctrl+Enter` in the description textarea, or
-`change`/blur on the priority `<select>` — SHALL issue
+clicking an item in the priority listbox — SHALL issue
 `PATCH /api/cards/<id>` with a JSON body containing exactly one key
 (the field that was edited) and its new value. On a 2xx response, the field MUST return to rendered text
 mode with the value from the server's response. On a non-2xx response,
@@ -534,17 +721,17 @@ fallback `HTTP <status>` string) MUST be displayed inline in a
 - **AND** plain `Enter` in the textarea MUST NOT trigger a PATCH (it
   inserts a newline)
 
-#### Scenario: Priority `<select>` change commits via PATCH
+#### Scenario: Priority listbox click commits via PATCH
 
-- **WHEN** the user changes the priority `<select>` from `high` to
-  `low`
+- **WHEN** the user clicks the priority chip on a card with priority
+  `high` and then clicks the `low` item in the listbox
 - **THEN** a `PATCH /api/cards/<id>` request MUST fire with body
   `{"priority":"low"}`
 
 #### Scenario: Clearing priority via the dropdown
 
 - **WHEN** the user opens a card whose priority is `high`, clicks the
-  priority field, and selects `no priority`
+  priority chip, and clicks the `no priority` item in the listbox
 - **THEN** a `PATCH /api/cards/<id>` request MUST fire with body
   `{"priority":""}`
 - **AND** after the response the priority `.field` MUST render the
@@ -616,35 +803,55 @@ behavior:
 ### Requirement: Tag chip add and remove each commit a PATCH
 
 The modal SHALL display each existing tag as a removable chip element
-and SHALL provide a text input for adding new tags. The chip list and
-tag-add input are always live whenever the modal is open (no
-click-to-edit gate). Pressing Enter or comma in the input MUST add
-the trimmed, deduplicated value to the tag list AND immediately issue
+and SHALL provide a dashed `+ Add` pill button (`.modal-tag-add`) for
+adding new tags. The chip list is always live whenever the modal is
+open (no click-to-edit gate). The `+ Add` button MUST swap itself for
+an inline tag input (`.modal-tag-input`) when clicked; the input MUST
+receive focus on the next tick and MUST commit on Enter, comma, or
+blur (with a non-empty trimmed value). On a successful commit the
+input MUST collapse back to the `+ Add` pill. Pressing `Escape` while
+the input is visible MUST cancel without issuing a PATCH. Pressing
+Enter or comma with a non-empty trimmed, deduplicated value MUST add
+that value to the tag list AND immediately issue
 `PATCH /api/cards/<id>` with body `{"tags": <new array>}`. Clicking a
 chip's remove button (`×`) MUST remove that chip from the tag list
 AND immediately issue `PATCH /api/cards/<id>` with body
-`{"tags": <new array>}`. The tag input MUST be cleared on add. On a
-non-2xx response the chip list MUST revert to the pre-action state
-(by re-reading from the locally cached card or refetching) AND a
-`.field-error` element MUST display the server error message under
-the tag field.
+`{"tags": <new array>}`. On a non-2xx response the chip list MUST
+revert to the pre-action state (by re-reading from the locally cached
+card or refetching) AND a `.field-error` element MUST display the
+server error message under the tag field.
+
+#### Scenario: Clicking `+ Add` reveals the tag input
+
+- **WHEN** the user opens a card with tags `["a"]` and clicks the
+  `.modal-tag-add` button
+- **THEN** the `.modal-tag-add` button MUST NOT be visible
+- **AND** an input element with class `modal-tag-input` MUST be
+  visible and focused
 
 #### Scenario: Add a tag via Enter fires a PATCH
 
-- **WHEN** the user opens a card with tags `["a"]`, types `b` in the
-  tag input, and presses Enter
+- **WHEN** the user opens a card with tags `["a"]`, clicks `+ Add`,
+  types `b`, and presses Enter
 - **THEN** a `PATCH /api/cards/<id>` request MUST fire with body
   `{"tags":["a","b"]}`
 - **AND** the request body MUST NOT contain any other top-level key
 - **AND** on 2xx the modal MUST display two chips: `a` and `b`
-- **AND** the tag input MUST be empty
+- **AND** the tag input MUST collapse back to the `+ Add` pill
 
 #### Scenario: Add a tag via comma fires a PATCH
 
-- **WHEN** the user opens a card with tags `[]`, types `urgent,` in
-  the tag input
+- **WHEN** the user opens a card with tags `[]`, clicks `+ Add`, and
+  types `urgent,`
 - **THEN** a `PATCH /api/cards/<id>` request MUST fire with body
   `{"tags":["urgent"]}`
+
+#### Scenario: Escape cancels the tag input without firing a PATCH
+
+- **WHEN** the user clicks `+ Add`, types `draft`, and presses Escape
+- **THEN** no PATCH request MUST fire
+- **AND** the `.modal-tag-input` MUST NOT be visible
+- **AND** the `.modal-tag-add` button MUST be visible again
 
 #### Scenario: Remove a tag via the chip's button fires a PATCH
 
@@ -656,11 +863,11 @@ the tag field.
 
 #### Scenario: Duplicate tag input is deduplicated and does NOT fire a PATCH
 
-- **WHEN** the user opens a card with tags `["a"]` and types `a` then
-  Enter
+- **WHEN** the user opens a card with tags `["a"]`, clicks `+ Add`,
+  types `a`, then presses Enter
 - **THEN** the chip list MUST still show exactly one `a` chip
 - **AND** no `PATCH` request MUST have fired
-- **AND** the tag input MUST be empty
+- **AND** the tag input MUST collapse back to the `+ Add` pill
 
 #### Scenario: Tag PATCH rejection shows inline error
 

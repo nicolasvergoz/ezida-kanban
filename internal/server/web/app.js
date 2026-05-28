@@ -45,10 +45,17 @@ function board() {
     // wholesale from the server response after each successful PATCH.
     open: false,
     openCardData: null,
-    editing: { title: false, description: false, priority: false, tags: false },
-    saving: { title: false, description: false, priority: false, tags: false },
-    errors: { title: '', description: '', priority: '', tags: '' },
-    drafts: { title: '', description: '', priority: '' },
+    editing: { title: false, description: false, priority: false, column: false, tags: false },
+    saving: { title: false, description: false, priority: false, column: false, tags: false },
+    errors: { title: '', description: '', priority: '', column: '', tags: '' },
+    drafts: { title: '', description: '', priority: '', column: '' },
+    // Custom dropdown popovers replace the native <select> for priority
+    // and column. prioOpen/colOpen toggle the .modal-dropdown listbox
+    // under each chip. tagAdding gates the dashed "+ Add" pill vs the
+    // inline input.
+    prioOpen: false,
+    colOpen: false,
+    tagAdding: false,
     tagInput: '',
     // copyId feedback: set to the card id whose `.card-id` was last
     // clicked, or the literal 'modal' when the modal `.modal-id` was
@@ -582,11 +589,14 @@ function board() {
     // cannot accidentally alias the rendered board state.
     openCard(card) {
       this.openCardData = Object.assign({}, card, { tags: (card.tags || []).slice() });
-      this.editing = { title: false, description: false, priority: false, tags: false };
-      this.saving = { title: false, description: false, priority: false, tags: false };
-      this.errors = { title: '', description: '', priority: '', tags: '' };
-      this.drafts = { title: '', description: '', priority: '' };
+      this.editing = { title: false, description: false, priority: false, column: false, tags: false };
+      this.saving = { title: false, description: false, priority: false, column: false, tags: false };
+      this.errors = { title: '', description: '', priority: '', column: '', tags: '' };
+      this.drafts = { title: '', description: '', priority: '', column: '' };
       this.tagInput = '';
+      this.prioOpen = false;
+      this.colOpen = false;
+      this.tagAdding = false;
       this.open = true;
     },
     // closeModal tears down the per-field state and hides the modal.
@@ -596,11 +606,14 @@ function board() {
     closeModal() {
       this.open = false;
       this.openCardData = null;
-      this.editing = { title: false, description: false, priority: false, tags: false };
-      this.saving = { title: false, description: false, priority: false, tags: false };
-      this.errors = { title: '', description: '', priority: '', tags: '' };
-      this.drafts = { title: '', description: '', priority: '' };
+      this.editing = { title: false, description: false, priority: false, column: false, tags: false };
+      this.saving = { title: false, description: false, priority: false, column: false, tags: false };
+      this.errors = { title: '', description: '', priority: '', column: '', tags: '' };
+      this.drafts = { title: '', description: '', priority: '', column: '' };
       this.tagInput = '';
+      this.prioOpen = false;
+      this.colOpen = false;
+      this.tagAdding = false;
     },
     // startEdit flips a single field into edit mode (design MD2: one
     // field at a time). Any other currently-editing field is committed
@@ -609,8 +622,12 @@ function board() {
     // next tick.
     async startEdit(name) {
       if (!this.openCardData) return;
-      // Commit any other field that is currently in editing.
-      const names = ['title', 'description', 'priority'];
+      // Close any open popover when entering an inline editor so the
+      // two paradigms don't visually overlap.
+      this.prioOpen = false;
+      this.colOpen = false;
+      // Commit any other inline-editor field that is currently active.
+      const names = ['title', 'description'];
       for (let i = 0; i < names.length; i++) {
         const other = names[i];
         if (other !== name && this.editing[other]) {
@@ -625,7 +642,6 @@ function board() {
       const refMap = {
         title: 'titleInput',
         description: 'descriptionInput',
-        priority: 'priorityInput',
       };
       this.$nextTick(function () {
         const ref = refMap[name];
@@ -645,6 +661,66 @@ function board() {
     async commitField(name) {
       if (!this.editing[name]) return;
       await this.saveField(name, this.drafts[name]);
+    },
+    // togglePrio / setPriorityValue drive the custom priority listbox.
+    // The trigger button toggles the popover; an item click closes the
+    // popover and (if the value differs from the current one) issues
+    // a PATCH via saveField. saveField's existing 2xx/non-2xx handling
+    // and saving-flag lifecycle are reused unchanged.
+    togglePrio() {
+      if (!this.openCardData) return;
+      this.colOpen = false;
+      this.prioOpen = !this.prioOpen;
+    },
+    async setPriorityValue(value) {
+      if (!this.openCardData) return;
+      this.prioOpen = false;
+      const current = this.openCardData.priority || '';
+      if (value === current) return;
+      this.editing.priority = true;
+      this.drafts.priority = value;
+      await this.saveField('priority', value);
+    },
+    // toggleCol / setColumnValue drive the custom column listbox. The
+    // commit path routes through saveColumn → POST /cards/{id}/move.
+    toggleCol() {
+      if (!this.openCardData) return;
+      this.prioOpen = false;
+      this.colOpen = !this.colOpen;
+    },
+    async setColumnValue(value) {
+      if (!this.openCardData) return;
+      this.colOpen = false;
+      this.editing.column = true;
+      this.drafts.column = value;
+      await this.saveColumn(value);
+    },
+    // startAddTag flips the dashed "+ Add" pill into an inline input.
+    // commitNewTag delegates to the existing addTag() flow on Enter or
+    // blur with a non-empty value, then collapses back to the pill.
+    // cancelAddTag is the Escape path — discards the draft, no PATCH.
+    startAddTag() {
+      if (!this.openCardData) return;
+      this.tagAdding = true;
+      this.tagInput = '';
+      const self = this;
+      this.$nextTick(function () {
+        if (self.$refs && self.$refs.tagAddInput) self.$refs.tagAddInput.focus();
+      });
+    },
+    async commitNewTag() {
+      if (!this.tagAdding) return;
+      const raw = (this.tagInput || '').trim();
+      if (!raw) {
+        this.tagAdding = false;
+        return;
+      }
+      await this.addTag();
+      this.tagAdding = false;
+    },
+    cancelAddTag() {
+      this.tagAdding = false;
+      this.tagInput = '';
     },
     // revertField discards the in-flight draft and clears any field
     // error without firing a PATCH (design MD5 Esc semantics). The
@@ -699,6 +775,111 @@ function board() {
         this.saving[name] = false;
       }
     },
+    // saveColumn handles the column field's commit. Unlike PATCH
+    // fields, a column change goes through POST /api/cards/<id>/move
+    // with {column, position: 0}. Selecting the same column is a
+    // no-op (no network request, field flips back to rendered mode).
+    // On 2xx the server response replaces openCardData; on non-2xx
+    // the editor stays open with an inline error.
+    async saveColumn(newColumn) {
+      if (!this.openCardData) return;
+      const id = this.openCardData.id;
+      const current = this.openCardData.column || '';
+      if (newColumn === current) {
+        this.editing.column = false;
+        this.drafts.column = '';
+        this.errors.column = '';
+        return;
+      }
+      this.errors.column = '';
+      this.saving.column = true;
+      try {
+        this._lastSelfWriteAt = Date.now();
+        const res = await fetch('/api/cards/' + encodeURIComponent(id) + '/move', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ column: newColumn, position: 0 }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(function () { return {}; });
+          this.errors.column = (err && err.error && err.error.message) || ('HTTP ' + res.status);
+          return;
+        }
+        const data = await res.json().catch(function () { return {}; });
+        if (data && data.card) {
+          this.openCardData = Object.assign({}, data.card, {
+            tags: (data.card.tags || []).slice(),
+          });
+        } else {
+          this.openCardData = Object.assign({}, this.openCardData, { column: newColumn });
+        }
+        this.editing.column = false;
+        this.drafts.column = '';
+        await this.load();
+      } catch (e) {
+        this.errors.column = e.message || String(e);
+      } finally {
+        this.saving.column = false;
+      }
+    },
+    // confirmDeleteCardFromModal is the trash-button handler in the
+    // modal header. Prompts for confirmation, then reuses the
+    // existing deleteCard() flow and closes the modal on success.
+    async confirmDeleteCardFromModal() {
+      if (!this.openCardData) return;
+      const id = this.openCardData.id;
+      if (!window.confirm('Delete this card?')) return;
+      try {
+        this._lastSelfWriteAt = Date.now();
+        const res = await fetch('/api/cards/' + encodeURIComponent(id), {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          console.warn('delete failed', res.status);
+          await this.load();
+          return;
+        }
+        this.closeModal();
+        await this.load();
+      } catch (e) {
+        console.error('delete request errored', e);
+        await this.load();
+      }
+    },
+    // formatRelative renders an ISO timestamp as a short human string.
+    // Falls back to a locale short date once the delta crosses a week.
+    // The absolute value (with hours/minutes) belongs in the tooltip
+    // via formatAbsolute.
+    formatRelative(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const t = d.getTime();
+      if (isNaN(t)) return '—';
+      const diff = Date.now() - t;
+      const m = Math.round(diff / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return m + ' min ago';
+      const h = Math.round(m / 60);
+      if (h < 24) return h + ' h ago';
+      const dd = Math.round(h / 24);
+      if (dd < 7) return dd + ' d ago';
+      try {
+        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+      } catch (_) {
+        return d.toISOString().slice(0, 10);
+      }
+    },
+    // formatAbsolute renders an ISO timestamp as `YYYY-MM-DD HH:MM`
+    // in local time. Used for the footer tooltip so the user can see
+    // the exact wall-clock moment a card was created or updated.
+    formatAbsolute(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+        ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    },
     // onEscape is the modal-overlay Esc handler — context-sensitive
     // per design MD5: if any field is in editing, revert that one;
     // otherwise close the modal. Inline editors also stop.prevent on
@@ -706,7 +887,10 @@ function board() {
     // only reached when no field is active.
     onEscape() {
       if (!this.open) return;
-      const names = ['title', 'description', 'priority'];
+      if (this.prioOpen) { this.prioOpen = false; return; }
+      if (this.colOpen) { this.colOpen = false; return; }
+      if (this.tagAdding) { this.cancelAddTag(); return; }
+      const names = ['title', 'description'];
       for (let i = 0; i < names.length; i++) {
         if (this.editing[names[i]]) {
           this.revertField(names[i]);

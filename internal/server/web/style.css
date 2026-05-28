@@ -733,7 +733,7 @@
 		border: 0;
 	}
 
-	/* --- Edit modal (V3 markup, Redacto chrome) --------------------------- */
+	/* --- Edit modal (Redacto chrome, polish v2) --------------------------- */
 
 	.modal-overlay {
 		position: fixed;
@@ -741,10 +741,18 @@
 		left: 0;
 		width: 100vw;
 		height: 100vh;
-		background: color-mix(in oklab, var(--bg-base) 10%, transparent);
+		background:
+			radial-gradient(80% 60% at 50% 30%,
+				color-mix(in oklab, var(--bg-base) 70%, transparent) 0%,
+				transparent 70%),
+			color-mix(in oklab, var(--bg-base) 55%, transparent);
+		backdrop-filter: blur(4px) saturate(120%);
+		-webkit-backdrop-filter: blur(4px) saturate(120%);
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: center;
+		padding: 6vh var(--space-3xl) var(--space-3xl);
+		overflow-y: auto;
 		z-index: 1000;
 	}
 
@@ -752,41 +760,104 @@
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: var(--rounded-xl);
-		padding: var(--space-3xl);
-		max-width: 520px;
+		max-width: 560px;
 		width: 100%;
 		max-height: 90vh;
-		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
 		box-shadow: var(--shadow-popover);
 		color: var(--text);
 	}
 
 	.modal-header {
 		display: flex;
-		align-items: baseline;
+		align-items: center;
 		justify-content: space-between;
-		margin-bottom: var(--space-xl);
+		padding: var(--space-lg) var(--space-xl);
+		border-bottom: 1px solid var(--border);
+		background: var(--surface-2);
 	}
 
-	.modal-header h2 {
-		margin: 0;
-		/* .t-list-title equivalent — keep utility composition explicit in
-       the markup; selector mirror here for headings without a class. */
-		font-family: "Geist", system-ui, sans-serif;
-		font-size: 12px;
-		font-weight: 600;
-		line-height: 1;
-		letter-spacing: 0.08em;
-		text-transform: uppercase;
-		color: var(--text);
+	.modal-id-group {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-md);
 	}
 
 	.modal-id {
 		font-family: "Geist Mono", ui-monospace, monospace;
 		font-size: 11px;
-		color: var(--text-faint);
+		color: var(--text-muted);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-sm);
+		padding: 2px 8px;
 		cursor: pointer;
 		user-select: none;
+		transition: border-color 120ms ease, color 120ms ease;
+	}
+
+	.modal-id:hover {
+		border-color: var(--border-strong);
+		color: var(--text);
+	}
+
+	.modal-actions {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-xs);
+	}
+
+	.modal-action {
+		width: 28px;
+		height: 28px;
+		border-radius: var(--rounded-md);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		background: transparent;
+		border: 0;
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: background-color 120ms ease, color 120ms ease;
+	}
+
+	.modal-action:hover {
+		background: var(--surface);
+		color: var(--text);
+	}
+
+	.modal-action.danger:hover {
+		color: var(--danger);
+		background: color-mix(in oklab, var(--danger) 12%, var(--surface));
+	}
+
+	/* --- Modal body / section / labels ----------------------------------- */
+
+	.modal-body {
+		padding: var(--space-3xl) var(--space-3xl) var(--space-xl);
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xl);
+		overflow-y: auto;
+	}
+
+	.modal-section {
+		display: flex;
+		flex-direction: column;
+		gap: var(--space-xs);
+	}
+
+	.modal-label {
+		color: var(--text-faint);
+		margin: 0;
+	}
+
+	.modal-meta {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: var(--space-xl);
 	}
 
 	/* --- UI-5 per-field click-to-edit detail (design MD12) --------------- */
@@ -795,7 +866,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: var(--space-xs);
-		padding: var(--space-sm) 0;
+		position: relative;
 	}
 
 	.field {
@@ -810,12 +881,176 @@
 		background: color-mix(in oklab, var(--surface) 85%, var(--accent) 15%);
 	}
 
+	/* Title field — larger, heading-like ramp. Keeps .field hover so the
+     click-to-edit affordance is consistent with the rest. */
+	.field--title {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 18px;
+		font-weight: 600;
+		line-height: 1.3;
+		letter-spacing: -0.005em;
+		display: block;
+	}
+
+	.field--input-title {
+		font-size: 18px !important;
+		font-weight: 600 !important;
+		line-height: 1.3 !important;
+	}
+
+	/* Chip-style trigger for selector-backed fields (priority, column).
+     Looks clickable on first glance, opens the matching <select> on
+     click. Cap width to its grid cell so the control doesn't span. */
+	.field--chip {
+		display: inline-flex;
+		align-items: center;
+		gap: var(--space-md);
+		height: 32px;
+		padding: 0 var(--space-md);
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-md);
+		color: var(--text);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 500;
+		text-align: left;
+		cursor: pointer;
+		width: 100%;
+		transition: background-color 120ms ease, border-color 120ms ease;
+	}
+
+	.field--chip:hover {
+		background: var(--surface);
+		border-color: var(--border-strong);
+	}
+
+	.field--chip-text {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.field--chip-caret {
+		color: var(--text-faint);
+		flex-shrink: 0;
+	}
+
+	.field--chip-icon {
+		color: var(--text-muted);
+		flex-shrink: 0;
+	}
+
+	.prio-dot {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		flex-shrink: 0;
+		background: var(--text-faint);
+	}
+
+	/* --- Custom listbox popover (priority + column) ---------------------- */
+
+	.modal-dropdown {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		right: 0;
+		list-style: none;
+		margin: 0;
+		padding: var(--space-xs);
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-lg);
+		box-shadow: var(--shadow-popover);
+		z-index: 20;
+	}
+
+	.modal-dropdown li {
+		list-style: none;
+	}
+
+	.modal-dropdown-item {
+		display: flex;
+		align-items: center;
+		gap: var(--space-md);
+		width: 100%;
+		padding: var(--space-sm) var(--space-md);
+		border-radius: var(--rounded-sm);
+		background: transparent;
+		border: 0;
+		color: var(--text);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 13px;
+		font-weight: 500;
+		text-align: left;
+		cursor: pointer;
+		transition: background-color 100ms ease;
+	}
+
+	.modal-dropdown-item:hover {
+		background: var(--surface-2);
+	}
+
+	.modal-dropdown-item.selected {
+		background: color-mix(in oklab, var(--accent) 14%, transparent);
+	}
+
+	.modal-dropdown-label {
+		flex: 1;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.modal-dropdown-check {
+		color: var(--accent);
+		flex-shrink: 0;
+	}
+
+	.col-tick {
+		display: inline-block;
+		width: 8px;
+		height: 8px;
+		border-radius: 2px;
+		flex-shrink: 0;
+		background: var(--text-faint);
+	}
+
 	/* Multi-line variant for the description rendered cell — preserves
      whitespace so newlines from the textarea survive at rest. */
 	.field--multiline {
 		margin: 0;
 		white-space: pre-wrap;
 		word-break: break-word;
+		padding: var(--space-md) var(--space-xl);
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: var(--rounded-md);
+		min-height: 44px;
+		transition: background-color 120ms ease, border-color 120ms ease;
+	}
+
+	.field--multiline:hover {
+		background: var(--surface);
+		border-color: var(--border-strong);
+	}
+
+	/* Empty-description state — dashed border + faint italic so it reads
+     as a hint, not as data. */
+	.field--multiline.field--empty {
+		border-style: dashed;
+		color: var(--text-faint);
+		font-style: italic;
+		font-size: 13px;
+	}
+
+	.field--multiline.field--empty:hover {
+		color: var(--text-muted);
 	}
 
 	.field--input,
@@ -838,7 +1073,9 @@
 
 	.field--textarea {
 		resize: vertical;
-		min-height: 88px;
+		min-height: 96px;
+		padding: var(--space-md) var(--space-xl);
+		background: var(--surface-2);
 	}
 
 	/* Subtle in-flight affordance — opacity + pointer-events:none so a
@@ -859,10 +1096,11 @@
 	.tag-chips {
 		display: flex;
 		flex-wrap: wrap;
-		gap: var(--space-xs);
+		gap: var(--space-sm);
 		padding: 0;
-		margin: 0 0 var(--space-sm);
+		margin: 0;
 		list-style: none;
+		align-items: center;
 	}
 
 	.tag-chips .tag {
@@ -884,43 +1122,122 @@
 		color: var(--text);
 	}
 
-	.tag-add {
-		display: block;
-		width: 100%;
-		padding: var(--space-xs) var(--space-sm);
-		font-family: "Geist", system-ui, sans-serif;
-		font-size: 14px;
-		font-weight: 400;
-		line-height: 1.45;
+	/* Modal tag chip: taller pill (26px) than the card-on-board .tag
+     (20px). Override the shared .tag base for tags rendered inside
+     the detail-modal field row. */
+	.field-row--tags .tag,
+	.tag-chips .modal-tag-chip {
+		height: 26px;
+		padding: 0 10px;
+		font-size: 12px;
+		gap: 6px;
+		background: color-mix(in oklab, var(--text) 6%, transparent);
 		color: var(--text);
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: var(--rounded-sm);
-		box-sizing: border-box;
-		outline: none;
-		transition: border-color 120ms ease;
+		border: 1px solid color-mix(in oklab, var(--text) 12%, transparent);
+		transition: background-color 120ms ease, border-color 120ms ease;
 	}
 
-	.tag-add:focus {
-		border-color: var(--accent);
+	.field-row--tags .tag:hover {
+		background: color-mix(in oklab, var(--text) 10%, transparent);
 	}
 
-	.modal-readonly {
-		font-family: "Geist Mono", ui-monospace, monospace;
-		font-size: 10px;
-		font-weight: 500;
-		line-height: 1.4;
-		letter-spacing: 0.04em;
+	.field-row--tags .tag button {
+		font-size: 13px;
 		color: var(--text-faint);
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--space-xl);
-		margin: var(--space-md) 0 0;
+		opacity: 0.7;
+		transition: opacity 120ms ease, color 120ms ease;
 	}
 
-	.modal-readonly code {
-		font-family: "Geist Mono", ui-monospace, monospace;
+	.field-row--tags .tag:hover button {
+		opacity: 1;
+	}
+
+	.modal-tag-add-wrap {
+		display: inline-flex;
+		align-items: center;
+	}
+
+	/* Dashed pill — idle "+ Add" affordance. Replaces the previous
+     always-visible tag input. */
+	.modal-tag-add {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		height: 26px;
+		padding: 0 10px;
+		border-radius: var(--rounded-full);
+		background: transparent;
+		border: 1px dashed color-mix(in oklab, var(--text) 22%, transparent);
 		color: var(--text-muted);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: color 120ms ease, border-color 120ms ease;
+	}
+
+	.modal-tag-add:hover {
+		color: var(--text);
+		border-color: var(--text-muted);
+	}
+
+	/* Focused pill — input that swaps in when the "+ Add" button is
+     clicked. Matches the chip pill height so the row doesn't reflow. */
+	.modal-tag-input {
+		display: inline-flex;
+		align-items: center;
+		height: 26px;
+		padding: 0 12px;
+		border-radius: var(--rounded-full);
+		background: var(--surface-2);
+		border: 1px solid var(--accent);
+		color: var(--text);
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 12px;
+		font-weight: 500;
+		outline: none;
+		width: 140px;
+		box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 18%, transparent);
+	}
+
+	.modal-tag-input::placeholder {
+		color: var(--text-faint);
+	}
+
+	/* --- Read-only footer (Created / Updated, relative + tooltip) -------- */
+
+	.modal-foot {
+		display: flex;
+		align-items: center;
+		gap: var(--space-xl);
+		padding: var(--space-lg) var(--space-3xl);
+		border-top: 1px solid var(--border);
+		background: var(--surface-2);
+	}
+
+	.modal-foot-item {
+		display: inline-flex;
+		align-items: baseline;
+		gap: var(--space-sm);
+		white-space: nowrap;
+	}
+
+	.modal-foot-label {
+		color: var(--text-faint);
+	}
+
+	.modal-foot-value {
+		font-family: "Geist", system-ui, sans-serif;
+		font-size: 12px;
+		color: var(--text-muted);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	.modal-foot-sep {
+		width: 1px;
+		height: 14px;
+		background: var(--border);
 	}
 }
 

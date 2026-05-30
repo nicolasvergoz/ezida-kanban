@@ -522,7 +522,6 @@ type boardResponse struct {
 	ProjectName string `json:"project_name"`
 }
 
-
 // cardResponse is the per-card JSON shape returned inside
 // boardResponse. Snake_case keys match ADR 0002 §D7; the
 // description field is always present (empty string when unset)

@@ -33,9 +33,9 @@ priority = 'medium'
 id = 'wrshlo'
 title = 'Card due dates'
 column = 'backlog'
-description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance."
+description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance.\n\nNotifications / events list: because cards can have deadlines, surface overdue + due-soon cards in a dedicated list somewhere in the UI (notification panel, events feed, sidebar widget — form TBD). Lets the user see at a glance what slipped or is about to slip without scanning the whole board. Each entry links back to the card."
 created_at = 2026-05-23T09:09:28Z
-updated_at = 2026-05-23T09:10:22Z
+updated_at = 2026-05-29T08:44:18Z
 tags = ['cli', 'viewer', 'schema']
 priority = 'medium'
 
@@ -66,6 +66,16 @@ column = 'backlog'
 description = 'Let a card reference one or more paths in the repo (e.g. docs/X.md, src/Y.go). Surfaced in the viewer + CLI; clicking opens the file. Open questions: stored as repo-relative paths in TOML; viewer needs a way to render (GH link? Local file open?); access control irrelevant since the board is committed alongside the code.'
 created_at = 2026-05-23T09:20:47Z
 updated_at = 2026-05-28T11:54:12Z
+tags = []
+priority = 'low'
+
+[[cards]]
+id = 'l76gjt'
+title = 'Markdown rendering for card descriptions + basic rich text editor on card details'
+column = 'backlog'
+description = ''
+created_at = 2026-05-29T08:41:50Z
+updated_at = 2026-05-29T08:41:50Z
 tags = []
 priority = 'low'
 
@@ -194,6 +204,16 @@ column = 'done'
 description = 'Card detail modal already shows the card ID via .modal-id (t-mono-label style). Reuse same look on the card itself: small grey monospace ID above the title in the web viewer — but use a smaller font size than the modal version, since the card title is smaller than the modal title and the ID must stay visually subordinate to it. Click on the ID (both on the card and in the detail modal) copies it to the clipboard. Goal: easier to interact with AIs or manipulate a specific card via its ID (e.g. ezida get <id>, ezida move <id>).'
 created_at = 2026-05-23T08:26:30Z
 updated_at = 2026-05-23T09:45:07Z
+tags = ['viewer', 'ux']
+priority = 'medium'
+
+[[cards]]
+id = 't07htj'
+title = 'Search cards by ID'
+column = 'done'
+description = "Filter/search references card IDs (often cited in descriptions). Extend the viewer filter to match card ID alongside title, description, and tags. Add an 'ID' scope pill to the filter popover."
+created_at = 2026-05-30T10:04:27Z
+updated_at = 2026-05-30T10:09:32Z
 tags = ['viewer', 'ux']
 priority = 'medium'
 

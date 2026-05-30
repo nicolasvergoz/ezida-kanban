@@ -68,6 +68,7 @@ const DEFAULT_FILTER = {
   inTitle: true,
   inDescription: true,
   inTags: true,
+  inId: true,
   priorities: [], // empty = all pass
 };
 
@@ -82,10 +83,11 @@ function matchCard(card, f) {
   }
   const q = (f.query || "").trim().toLowerCase();
   if (!q) return true;
-  if (!f.inTitle && !f.inDescription && !f.inTags) return false;
+  if (!f.inTitle && !f.inDescription && !f.inTags && !f.inId) return false;
   if (f.inTitle && (card.text || "").toLowerCase().includes(q)) return true;
   if (f.inDescription && (card.description || "").toLowerCase().includes(q)) return true;
   if (f.inTags && (card.tags || []).some((t) => String(t).toLowerCase().includes(q))) return true;
+  if (f.inId && (card.id || "").toLowerCase().includes(q)) return true;
   return false;
 }
 
@@ -463,6 +465,7 @@ function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFi
                 <button type="button" className={"filter-pill" + (filter.inTitle ? " on" : "")} onClick={() => toggleScope("inTitle")} aria-pressed={filter.inTitle}>Title</button>
                 <button type="button" className={"filter-pill" + (filter.inDescription ? " on" : "")} onClick={() => toggleScope("inDescription")} aria-pressed={filter.inDescription}>Description</button>
                 <button type="button" className={"filter-pill" + (filter.inTags ? " on" : "")} onClick={() => toggleScope("inTags")} aria-pressed={filter.inTags}>Tags</button>
+                <button type="button" className={"filter-pill" + (filter.inId ? " on" : "")} onClick={() => toggleScope("inId")} aria-pressed={filter.inId}>ID</button>
               </div>
               {priorities.length > 0 && <>
                 <p className="popover-sub">Priority</p>

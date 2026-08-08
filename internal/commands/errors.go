@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+
+	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 )
 
 // affectedCard is the per-card pair carried by refusal-with-detail
@@ -337,17 +340,115 @@ func (e *LastPriorityError) Details() any {
 	return map[string]any{"priority": e.Name}
 }
 
+// InvalidEpicError is returned by `add` / `edit` when --epic names a
+// card that does not exist, the card being edited, or a card that
+// already belongs to an epic.
+//
+// Reason carries the explanation, which matters most for the nesting
+// case: the target looks like an ordinary card, so "id rejected" alone
+// would leave the user with no way to understand the refusal.
+type InvalidEpicError struct {
+	ID     string
+	Reason string
+}
+
+func (e *InvalidEpicError) Error() string {
+	if e.Reason == "" {
+		return fmt.Sprintf("epic %q is not a valid parent", e.ID)
+	}
+	return fmt.Sprintf("epic %q is not a valid parent: %s", e.ID, e.Reason)
+}
+
+func (e *InvalidEpicError) ErrorCode() string { return "INVALID_EPIC" }
+func (e *InvalidEpicError) ExitCode() int     { return 1 }
+func (e *InvalidEpicError) Details() map[string]any {
+	d := map[string]any{"epic": e.ID}
+	if e.Reason != "" {
+		d["reason"] = e.Reason
+	}
+	return d
+}
+
+// InvalidColorError is returned by `add` / `edit` when --color is
+// neither a palette name nor a well-formed hex value.
+type InvalidColorError struct {
+	Value  string
+	Reason string
+}
+
+func (e *InvalidColorError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("color %q is invalid: %s", e.Value, e.Reason)
+	}
+	return fmt.Sprintf(
+		"color %q is neither a palette name (%s) nor a hex value like #rgb or #rrggbb",
+		e.Value, strings.Join(board.PaletteNames(), ", "))
+}
+
+func (e *InvalidColorError) ErrorCode() string { return "INVALID_COLOR" }
+func (e *InvalidColorError) ExitCode() int     { return 1 }
+func (e *InvalidColorError) Details() map[string]any {
+	return map[string]any{"color": e.Value}
+}
+
+// InvalidColumnNameError is returned when a column name carries the
+// terminal marker, which is a serialization detail and never valid
+// input.
+type InvalidColumnNameError struct {
+	Name string
+}
+
+func (e *InvalidColumnNameError) Error() string {
+	return fmt.Sprintf(
+		"column name %q contains %q, which is reserved for the terminal-column marker; use `ezida columns done <name>` instead",
+		e.Name, board.TerminalMarker)
+}
+
+func (e *InvalidColumnNameError) ErrorCode() string { return "INVALID_COLUMN_NAME" }
+func (e *InvalidColumnNameError) ExitCode() int     { return 1 }
+func (e *InvalidColumnNameError) Details() map[string]any {
+	return map[string]any{"column": e.Name}
+}
+
+// MigrationNotNeededError is returned by `migrate` when the board is
+// already at the supported schema version.
+type MigrationNotNeededError struct {
+	Version int
+}
+
+func (e *MigrationNotNeededError) Error() string {
+	return fmt.Sprintf("kanban.toml is already at schema_version %d; nothing to migrate", e.Version)
+}
+
+func (e *MigrationNotNeededError) ErrorCode() string { return "MIGRATION_NOT_NEEDED" }
+func (e *MigrationNotNeededError) ExitCode() int     { return 1 }
+func (e *MigrationNotNeededError) Details() map[string]any {
+	return map[string]any{"schema_version": e.Version}
+}
+
 // NothingToEditError is returned by `edit` when no field flag was
 // passed.
 type NothingToEditError struct{}
 
 func (e *NothingToEditError) Error() string {
-	return "edit requires at least one of --title, --description, --priority, --tags, --column"
+	return "edit requires at least one of --title, --description, --priority, --tags, --column, --epic, --no-epic, --color, --no-color"
 }
 
 func (e *NothingToEditError) Code() string         { return "NOTHING_TO_EDIT" }
 func (e *NothingToEditError) ShortMessage() string { return e.Error() }
 func (e *NothingToEditError) Details() any         { return nil }
+
+// asEpicError translates the board package's epic refusal into the CLI
+// error carrying the INVALID_EPIC code, preserving the reason so the
+// user learns *why* a legal-looking id was rejected. Any other error
+// passes through untouched.
+func asEpicError(err error) error {
+	var ie *board.InvalidEpicError
+	if errors.As(err, &ie) {
+		return &InvalidEpicError{ID: ie.ID, Reason: ie.Reason}
+	}
+	return err
+}
 
 // AsDetailed wraps any error into a detailedError. For errors that
 // already implement detailedError it returns them unchanged; for legacy

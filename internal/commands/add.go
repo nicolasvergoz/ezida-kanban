@@ -18,6 +18,8 @@ type addFlags struct {
 	priority    string
 	tagsCSV     string
 	description string
+	epic        string
+	color       string
 }
 
 // NewAddCmd builds the `ezida add` command.
@@ -35,6 +37,9 @@ func NewAddCmd(jsonOut *bool) *cobra.Command {
 	cmd.Flags().StringVar(&f.priority, "priority", "", "optional priority")
 	cmd.Flags().StringVar(&f.tagsCSV, "tags", "", "comma-separated tag list")
 	cmd.Flags().StringVar(&f.description, "description", "", "free-form card body")
+	cmd.Flags().StringVar(&f.epic, "epic", "", "id of the card this one belongs to")
+	cmd.Flags().StringVar(&f.color, "color", "",
+		"palette name ("+strings.Join(board.PaletteNames(), ", ")+") or hex value")
 	_ = cmd.MarkFlagRequired("column")
 	return cmd
 }
@@ -75,6 +80,22 @@ func runAdd(cmd *cobra.Command, path, title string, f addFlags, asJSON bool) err
 		if f.priority != "" && !slices.Contains(b.Board.Priorities, f.priority) {
 			return board.Card{}, &InvalidPriorityError{Name: f.priority}
 		}
+		// The new card has no id yet, so the self-reference arm of
+		// CheckEpicTarget cannot fire — which is correct, a card
+		// cannot be created under itself.
+		if f.epic != "" {
+			if err := board.CheckEpicTarget(b, "", f.epic); err != nil {
+				return board.Card{}, asEpicError(err)
+			}
+		}
+		color := ""
+		if f.color != "" {
+			resolved, cerr := board.ResolveColor(f.color)
+			if cerr != nil {
+				return board.Card{}, &InvalidColorError{Value: f.color}
+			}
+			color = resolved
+		}
 		existing := make([]string, 0, len(b.Cards))
 		for _, c := range b.Cards {
 			existing = append(existing, c.ID)
@@ -91,10 +112,22 @@ func runAdd(cmd *cobra.Command, path, title string, f addFlags, asJSON bool) err
 			Description: f.description,
 			Tags:        tags,
 			Priority:    f.priority,
+			Epic:        f.epic,
+			Color:       color,
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
 		board.AppendCardToColumn(b, c)
+		// The parent becomes an epic the moment it acquires this
+		// child, so it gets a color in the same write.
+		if f.epic != "" && board.EnsureEpicColor(b, f.epic) {
+			for i := range b.Cards {
+				if b.Cards[i].ID == f.epic {
+					b.Cards[i].UpdatedAt = now
+					break
+				}
+			}
+		}
 		return c, nil
 	})
 	if err != nil {

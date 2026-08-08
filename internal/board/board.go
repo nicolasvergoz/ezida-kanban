@@ -1,6 +1,7 @@
 package board
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -41,7 +42,11 @@ func (e *ColumnNotFoundError) Error() string {
 // SupportedSchemaVersion is the on-disk kanban.toml schema version this
 // package understands. Load refuses files at any other version with a
 // SchemaVersionError; Validate enforces the same constraint.
-const SupportedSchemaVersion = 1
+//
+// v2 added Card.Epic, Card.Color and the terminal-column `*` suffix in
+// [board].columns. `ezida migrate` is the only code path allowed to read
+// a file at any other version.
+const SupportedSchemaVersion = 2
 
 // Board is the in-memory representation of a kanban.toml file.
 type Board struct {
@@ -51,10 +56,19 @@ type Board struct {
 }
 
 // BoardConfig holds the columns and priorities lists from [board].
+//
+// Columns always holds *bare* column names: the terminal-column `*`
+// suffix is a serialization detail decoded by Load and re-encoded by
+// Save (design D3). The decoded flags live in the unexported
+// doneColumns set, reachable only through IsDoneColumn / DoneColumns /
+// SetDoneColumn, so no caller can desync it from Columns. Being
+// unexported also keeps it out of the TOML marshaller.
 type BoardConfig struct {
 	Columns        []string          `toml:"columns"`
 	Priorities     []string          `toml:"priorities"`
 	PriorityColors map[string]string `toml:"priority_colors,omitempty"`
+
+	doneColumns map[string]bool
 }
 
 // DefaultPriorityColors maps the three conventional priority names to
@@ -97,6 +111,15 @@ func ResolvePriorityColors(priorities []string, user map[string]string) map[stri
 }
 
 // Card is one [[cards]] entry.
+//
+// Epic, when non-empty, holds the id of another card on the same board
+// (the "parent"). Nesting is capped at one level: a card carrying Epic
+// may not itself be named as another card's Epic (validation rule 13),
+// which makes reference cycles unrepresentable rather than detectable.
+//
+// Color, when non-empty, is a literal CSS hex string. Named palette
+// entries (see colors.go) are a CLI convenience and are never written
+// to disk.
 type Card struct {
 	ID          string    `toml:"id"`
 	Title       string    `toml:"title"`
@@ -106,6 +129,8 @@ type Card struct {
 	UpdatedAt   time.Time `toml:"updated_at"`
 	Tags        []string  `toml:"tags"`
 	Priority    string    `toml:"priority,omitempty"`
+	Epic        string    `toml:"epic,omitempty"`
+	Color       string    `toml:"color,omitempty"`
 }
 
 // Load reads the file at path, parses it as TOML, checks the schema version,
@@ -131,22 +156,55 @@ func Load(path string) (*Board, error) {
 			SupportedVersion: SupportedSchemaVersion,
 		}
 	}
+	// Strip the terminal-column markers so every in-memory comparison
+	// against Columns sees a bare name (design D3).
+	names, done := DecodeColumns(b.Board.Columns)
+	b.Board.Columns = names
+	b.Board.doneColumns = done
 	if verr := Validate(&b); verr != nil {
 		return nil, verr
 	}
 	return &b, nil
 }
 
+// LoadUnchecked parses the file at path without enforcing the schema
+// version and without validating. It exists for `ezida migrate`, which
+// is by design the only command allowed to read a file the rest of the
+// binary refuses (design D8) — every other caller must use Load.
+//
+// Terminal markers are still decoded, so a hand-written marker in an
+// older file is honored rather than silently doubled.
+func LoadUnchecked(path string) (*Board, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var b Board
+	if err := toml.Unmarshal(data, &b); err != nil {
+		return nil, err
+	}
+	names, done := DecodeColumns(b.Board.Columns)
+	b.Board.Columns = names
+	b.Board.doneColumns = done
+	return &b, nil
+}
+
 // Save validates b, marshals it to TOML, and writes the result atomically to
 // path via a temp file in the same directory plus os.Rename.
+//
+// The terminal-column markers are re-attached on a copy of b, so a
+// caller's board still holds bare names after the call.
 func Save(path string, b *Board) error {
 	if verr := Validate(b); verr != nil {
 		return verr
 	}
-	data, err := toml.Marshal(b)
+	enc := *b
+	enc.Board.Columns = EncodeColumns(b.Board.Columns, b.Board.doneColumns)
+	data, err := toml.Marshal(&enc)
 	if err != nil {
 		return err
 	}
+	data = withColumnsComment(data)
 
 	dir := filepath.Dir(path)
 	tmp, err := os.CreateTemp(dir, ".kanban.toml.tmp.*")
@@ -170,6 +228,32 @@ func Save(path string, b *Board) error {
 		return err
 	}
 	return os.Rename(tmpName, path)
+}
+
+// withColumnsComment inserts ColumnsComment immediately above the
+// `columns` key of the marshaled document. go-toml has no comment
+// support on the encode side, so this is a line-level insertion on the
+// rendered bytes. A document with no `columns` key (only possible on a
+// board the validator would already reject) is returned unchanged.
+func withColumnsComment(data []byte) []byte {
+	lines := bytes.Split(data, []byte("\n"))
+	for i, line := range lines {
+		key := bytes.TrimLeft(line, " \t")
+		if !bytes.HasPrefix(key, []byte("columns")) {
+			continue
+		}
+		if rest := bytes.TrimLeft(key[len("columns"):], " \t"); !bytes.HasPrefix(rest, []byte("=")) {
+			continue
+		}
+		indent := line[:len(line)-len(bytes.TrimLeft(line, " \t"))]
+		comment := append(append([]byte{}, indent...), ColumnsComment...)
+		out := make([][]byte, 0, len(lines)+1)
+		out = append(out, lines[:i]...)
+		out = append(out, comment)
+		out = append(out, lines[i:]...)
+		return bytes.Join(out, []byte("\n"))
+	}
+	return data
 }
 
 // AppendCardToColumn inserts c into b.Cards immediately after the last card

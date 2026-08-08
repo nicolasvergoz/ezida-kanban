@@ -210,7 +210,7 @@ func TestInit_SkillOnly_DoesNotTouchExistingBoard(t *testing.T) {
 	dir := t.TempDir()
 	boardPath := filepath.Join(dir, "kanban.toml")
 	skillPath := filepath.Join(dir, ".claude", "skills", "ezida-kanban", "SKILL.md")
-	sentinel := []byte("# sentinel\nschema_version = 1\n")
+	sentinel := []byte("# sentinel\nschema_version = 2\n")
 	if err := os.WriteFile(boardPath, sentinel, 0o644); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
@@ -413,8 +413,8 @@ func TestBoard_TextOutput(t *testing.T) {
 		t.Fatalf("board: %v", err)
 	}
 	out := stdout.String()
-	if !strings.Contains(out, "schema 1") {
-		t.Errorf("missing 'schema 1' line: %q", out)
+	if !strings.Contains(out, "schema 2") {
+		t.Errorf("missing 'schema 2' line: %q", out)
 	}
 	if !strings.Contains(out, "todo (3)") || !strings.Contains(out, "ongoing (1)") || !strings.Contains(out, "done (7)") {
 		t.Errorf("missing per-column counts: %q", out)
@@ -437,7 +437,7 @@ func TestBoard_JSONOutput(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatalf("unmarshal: %v\n%s", err, stdout.String())
 	}
-	if got["schema_version"].(float64) != 1 {
+	if got["schema_version"].(float64) != 2 {
 		t.Errorf("schema_version: %v", got["schema_version"])
 	}
 	cpc := got["cards_per_column"].(map[string]any)

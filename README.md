@@ -33,6 +33,11 @@ curl -sSL https://github.com/nicolasvergoz/ezida-kanban/releases/latest/download
 Prefer to inspect the script first, or want a tarball-only install?
 See [`docs/usage.md`](./docs/usage.md#manual-install).
 
+**Upgrading from a board written before epics?** The schema moved to
+version 2 and the binary refuses any other version. Run `ezida migrate`
+once — it backs up to `kanban.toml.v1.bak` and reports what it changed.
+See [Migration](./docs/usage.md#migration).
+
 ## Quick start
 
 ```sh

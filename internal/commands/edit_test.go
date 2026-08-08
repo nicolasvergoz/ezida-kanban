@@ -30,6 +30,10 @@ func newDummyEditForPath(path string, asJSON bool) *cobra.Command {
 	cmd.Flags().StringVar(&state.priority, "priority", "", "")
 	cmd.Flags().StringVar(&state.tags, "tags", "", "")
 	cmd.Flags().StringVar(&state.column, "column", "", "")
+	cmd.Flags().StringVar(&state.epic, "epic", "", "")
+	cmd.Flags().BoolVar(&state.noEpic, "no-epic", false, "")
+	cmd.Flags().StringVar(&state.color, "color", "", "")
+	cmd.Flags().BoolVar(&state.noColor, "no-color", false, "")
 	return cmd
 }
 

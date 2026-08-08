@@ -18,12 +18,20 @@ func TestErrors_TypedErrorsImplementCodedError(t *testing.T) {
 		{"missing title", &MissingTitleError{}, "MISSING_TITLE"},
 		{"invalid tag", &InvalidTagError{Raw: ",foo,"}, "INVALID_TAG"},
 		{"interactive required", &InteractiveRequiredError{Hint: "use --yes"}, "INTERACTIVE_REQUIRED"},
+		{"invalid epic", &InvalidEpicError{ID: "zzzzzz", Reason: "no such card"}, "INVALID_EPIC"},
+		{"invalid color", &InvalidColorError{Value: "chartreuse"}, "INVALID_COLOR"},
+		{"invalid column name", &InvalidColumnNameError{Name: "done*"}, "INVALID_COLUMN_NAME"},
+		{"migration not needed", &MigrationNotNeededError{Version: 2}, "MIGRATION_NOT_NEEDED"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Each error must carry a non-empty Error() message.
 			if tc.err.Error() == "" {
 				t.Errorf("Error() returned empty string")
+			}
+			// …and the stable code the enumeration promises.
+			if got := AsDetailed(tc.err).Code(); got != tc.code {
+				t.Errorf("Code() = %s, want %s", got, tc.code)
 			}
 		})
 	}

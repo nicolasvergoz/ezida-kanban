@@ -16,7 +16,7 @@ import (
 // hotReloadFixtureBody is the minimal valid kanban file used by the
 // Run-level hot-reload tests. Cards are absent on purpose; the
 // watcher only cares that the file exists at startup.
-const hotReloadFixtureBody = `schema_version = 1
+const hotReloadFixtureBody = `schema_version = 2
 
 [board]
 columns = ["todo", "done"]

@@ -41,7 +41,24 @@ func runColumnsCmd(t *testing.T, path string, asJSON bool, args ...string) (stri
 			return runColumnsRm(cmd, path, args[0], asJSON)
 		},
 	}
-	parent.AddCommand(add, rename, rm)
+	done := &cobra.Command{
+		Use:  "done",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runColumnsDone(cmd, path, args[0], true, asJSON)
+		},
+	}
+	undone := &cobra.Command{
+		Use:  "undone",
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runColumnsDone(cmd, path, args[0], false, asJSON)
+		},
+	}
+	parent.RunE = func(cmd *cobra.Command, args []string) error {
+		return runColumnsList(cmd, path, asJSON)
+	}
+	parent.AddCommand(add, rename, rm, done, undone)
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}
 	parent.SetOut(stdout)

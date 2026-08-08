@@ -32,8 +32,8 @@ func TestExport_FullEnvelope(t *testing.T) {
 			t.Errorf("missing key %q in envelope: %s", key, stdout.String())
 		}
 	}
-	if got["schema_version"].(float64) != 1 {
-		t.Errorf("schema_version = %v, want 1", got["schema_version"])
+	if got["schema_version"].(float64) != 2 {
+		t.Errorf("schema_version = %v, want 2", got["schema_version"])
 	}
 	cards := got["cards"].([]any)
 	if len(cards) != 11 {

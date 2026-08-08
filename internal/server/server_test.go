@@ -358,8 +358,8 @@ func TestHandle_Board_Valid(t *testing.T) {
 	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if payload.SchemaVersion != 1 {
-		t.Fatalf("schema_version = %d, want 1", payload.SchemaVersion)
+	if payload.SchemaVersion != 2 {
+		t.Fatalf("schema_version = %d, want 2", payload.SchemaVersion)
 	}
 	if len(payload.Columns) != 2 || payload.Columns[0] != "todo" {
 		t.Fatalf("columns = %v", payload.Columns)
@@ -402,7 +402,7 @@ func TestHandle_Board_SchemaMismatch(t *testing.T) {
 	// per-test temp file so we don't duplicate maintenance.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "kanban.toml")
-	if err := os.WriteFile(path, []byte("schema_version = 2\n\n[board]\ncolumns = [\"todo\"]\npriorities = [\"low\"]\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("schema_version = 3\n\n[board]\ncolumns = [\"todo\"]\npriorities = [\"low\"]\n"), 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
 	ts, cleanup := startTestServer(t, path)
@@ -426,7 +426,7 @@ func TestHandle_Board_Invalid(t *testing.T) {
 	// self-contained.
 	dir := t.TempDir()
 	path := filepath.Join(dir, "kanban.toml")
-	const body = `schema_version = 1
+	const body = `schema_version = 2
 
 [board]
 columns = ["todo"]
@@ -1268,7 +1268,7 @@ func writeBoardFixture(t *testing.T, contents string) string {
 }
 
 func TestHandle_Board_PriorityColors_DefaultsFilled(t *testing.T) {
-	path := writeBoardFixture(t, `schema_version = 1
+	path := writeBoardFixture(t, `schema_version = 2
 
 [board]
 columns = ["todo"]
@@ -1294,7 +1294,7 @@ priorities = ["low", "medium", "high"]
 }
 
 func TestHandle_Board_PriorityColors_UserOverrideWins(t *testing.T) {
-	path := writeBoardFixture(t, `schema_version = 1
+	path := writeBoardFixture(t, `schema_version = 2
 
 [board]
 columns = ["todo"]
@@ -1316,7 +1316,7 @@ high = "#000000"
 }
 
 func TestHandle_Board_PriorityColors_CustomNameWithExplicitColor(t *testing.T) {
-	path := writeBoardFixture(t, `schema_version = 1
+	path := writeBoardFixture(t, `schema_version = 2
 
 [board]
 columns = ["todo"]
@@ -1335,7 +1335,7 @@ urgent = "#ff0000"
 }
 
 func TestHandle_Board_PriorityColors_CustomNameNoDefaults(t *testing.T) {
-	path := writeBoardFixture(t, `schema_version = 1
+	path := writeBoardFixture(t, `schema_version = 2
 
 [board]
 columns = ["todo"]

@@ -78,7 +78,8 @@ func classify(err error) (code string, exit int, textBody string, jsonMessage st
 
 	var sv *board.SchemaVersionError
 	if errors.As(err, &sv) {
-		return "SCHEMA_VERSION_MISMATCH", ExitUserError, err.Error(), err.Error(), map[string]any{
+		msg := err.Error() + "; " + schemaVersionRemedy(sv)
+		return "SCHEMA_VERSION_MISMATCH", ExitUserError, msg, msg, map[string]any{
 			"file_version":      sv.FileVersion,
 			"supported_version": sv.SupportedVersion,
 		}
@@ -109,6 +110,17 @@ func classify(err error) (code string, exit int, textBody string, jsonMessage st
 	}
 
 	return "IO_ERROR", ExitSystemError, err.Error(), err.Error(), nil
+}
+
+// schemaVersionRemedy names the fix for a version mismatch. The two
+// directions have different answers and must not be confused: an older
+// file is upgradeable through `ezida migrate`, while a newer file has
+// no downgrade path at all and needs a newer binary.
+func schemaVersionRemedy(sv *board.SchemaVersionError) string {
+	if sv.FileVersion < sv.SupportedVersion {
+		return "run `ezida migrate` to upgrade it"
+	}
+	return "upgrade ezida to a build that supports it"
 }
 
 // mapToAny normalises a legacy details map (used by CodedError) into the

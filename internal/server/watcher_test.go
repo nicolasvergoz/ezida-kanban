@@ -35,7 +35,7 @@ func newWatcherFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "kanban.toml")
-	if err := os.WriteFile(path, []byte("schema_version = 1\n"), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte("schema_version = 2\n"), 0o644); err != nil {
 		t.Fatalf("seed: %v", err)
 	}
 	return path
@@ -53,7 +53,7 @@ func TestWatcher_DebouncesBurst(t *testing.T) {
 
 	// Fire 3 writes within 100 ms.
 	for i := 0; i < 3; i++ {
-		writeAtomic(t, path, []byte("schema_version = 1\n# burst "+string(rune('a'+i))+"\n"))
+		writeAtomic(t, path, []byte("schema_version = 2\n# burst "+string(rune('a'+i))+"\n"))
 		time.Sleep(30 * time.Millisecond)
 	}
 
@@ -88,14 +88,14 @@ func TestWatcher_SurvivesRename(t *testing.T) {
 	go w.Run(ctx)
 
 	// First atomic rewrite.
-	writeAtomic(t, path, []byte("schema_version = 1\n# first\n"))
+	writeAtomic(t, path, []byte("schema_version = 2\n# first\n"))
 	if !waitEvent(w, 1*time.Second) {
 		t.Fatalf("expected first event")
 	}
 	// Wait ~1 s and rewrite again — the re-arm logic must keep the
 	// watch alive across the rename so this second event still fires.
 	time.Sleep(1 * time.Second)
-	writeAtomic(t, path, []byte("schema_version = 1\n# second\n"))
+	writeAtomic(t, path, []byte("schema_version = 2\n# second\n"))
 	if !waitEvent(w, 1*time.Second) {
 		t.Fatalf("expected second event after rename re-arm")
 	}

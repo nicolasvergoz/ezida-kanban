@@ -92,13 +92,25 @@ func runInit(cmd *cobra.Command, boardPath, skillPath string, cols, prios []stri
 	}
 
 	now := nowFunc()
+	// --columns may carry explicit `*` suffixes; decoding them here is
+	// what lets a user choose the terminal columns instead of taking
+	// the automatic one.
+	names, done := board.DecodeColumns(cols)
 	b := &board.Board{
 		SchemaVersion: board.SupportedSchemaVersion,
 		Board: board.BoardConfig{
-			Columns:    cols,
+			Columns:    names,
 			Priorities: prios,
 		},
 		Cards: nil,
+	}
+	for name := range done {
+		b.Board.SetDoneColumn(name, true)
+	}
+	if len(done) == 0 {
+		if terminal := defaultTerminalColumn(names); terminal != "" {
+			b.Board.SetDoneColumn(terminal, true)
+		}
 	}
 	_ = now // reserved for future fields; currently unused.
 
@@ -117,6 +129,22 @@ func runInit(cmd *cobra.Command, boardPath, skillPath string, cols, prios []stri
 		fmt.Fprintln(out, "note: TOML comments are not preserved across ezida writes")
 	}
 	return nil
+}
+
+// defaultTerminalColumn applies the same rule `ezida migrate` uses: a
+// column named `done` when present, otherwise the last one. Keeping the
+// two commands on one rule means a migrated board and a fresh board
+// disagree about nothing.
+func defaultTerminalColumn(cols []string) string {
+	for _, col := range cols {
+		if col == "done" {
+			return col
+		}
+	}
+	if n := len(cols); n > 0 {
+		return cols[n-1]
+	}
+	return ""
 }
 
 // writeSkillFile writes the embedded skill bytes to path, creating any

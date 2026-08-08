@@ -1,0 +1,56 @@
+schema_version = 2
+
+[board]
+# a '*' suffix marks a terminal column: its cards count as done for epic progress
+columns = ["backlog", "todo", "done*"]
+priorities = ["low", "medium", "high"]
+
+[[cards]]
+id = "rl4m9x"
+title = "Card relations"
+column = "todo"
+description = "The epic itself.\n"
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+color = "#8b5cf6"
+
+[[cards]]
+id = "f20wbo"
+title = "Card dependencies"
+column = "backlog"
+description = ""
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = ["schema"]
+epic = "rl4m9x"
+
+[[cards]]
+id = "a3f2k9"
+title = "Refactor auth"
+column = "todo"
+description = "An unrelated card.\n"
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = ["security"]
+priority = "high"
+
+[[cards]]
+id = "wrshlo"
+title = "Card due dates"
+column = "done"
+description = ""
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+epic = "rl4m9x"
+
+[[cards]]
+id = "q7t6z2"
+title = "Card colors"
+column = "backlog"
+description = ""
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+epic = "rl4m9x"

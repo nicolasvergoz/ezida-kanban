@@ -41,6 +41,8 @@ func newRootCmd() *cobra.Command {
 	rootCmd.AddCommand(commands.NewRmCmd(&jsonOut))
 	rootCmd.AddCommand(commands.NewEditCmd(&jsonOut))
 	rootCmd.AddCommand(commands.NewColumnsCmd(&jsonOut))
+	rootCmd.AddCommand(commands.NewColorsCmd(&jsonOut))
+	rootCmd.AddCommand(commands.NewMigrateCmd(&jsonOut))
 	rootCmd.AddCommand(commands.NewPrioritiesCmd(&jsonOut))
 	rootCmd.AddCommand(commands.NewServeCmd(&jsonOut))
 	rootCmd.AddCommand(commands.NewExportCmd(&jsonOut))

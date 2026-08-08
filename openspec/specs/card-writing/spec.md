@@ -21,6 +21,13 @@ Optional flags:
 - `--tags=t1,t2,...`: comma-separated; each tag is trimmed; empty
   entries are rejected with `INVALID_TAG`.
 - `--description=<text>`: free-form multi-line string; defaults to empty.
+- `--epic=<id>`: when provided, MUST name an existing card that does not
+  itself carry an `epic`; any violation is rejected with `INVALID_EPIC`.
+  When the named parent carries no `color`, the command MUST assign it
+  one from the palette in the same write.
+- `--color=<name|hex>`: when provided, sets the new card's own color. A
+  palette name resolves to its hex; any other value MUST match
+  `^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`, else `INVALID_COLOR`.
 
 The CLI MUST set `id` (via `board.NewUniqueID` against existing card
 IDs), `created_at`, and `updated_at`. Both timestamps MUST equal the
@@ -36,6 +43,7 @@ current UTC time at second precision and MUST be identical at creation.
 - **AND** that card's `description` equals `""`
 - **AND** that card's `tags` equals `[]`
 - **AND** that card's `created_at` equals its `updated_at`
+- **AND** the saved card block contains neither an `epic` nor a `color` key
 - **AND** stdout (text mode) contains only the new card's ID followed
   by a newline
 
@@ -85,6 +93,30 @@ current UTC time at second precision and MUST be identical at creation.
   invoked (leading or trailing comma producing an empty tag)
 - **THEN** the process exits with code `1`
 - **AND** the error code (JSON mode) is `INVALID_TAG`
+
+#### Scenario: Add under an epic colors the parent
+
+- **WHEN** `ezida add "Card due dates" --column=backlog --epic=rl4m9x`
+  is invoked and card `rl4m9x` carries no `color`
+- **THEN** the new card has `epic = "rl4m9x"`
+- **AND** card `rl4m9x` has a `color` drawn from the palette
+- **AND** card `rl4m9x`'s `updated_at` is refreshed
+
+#### Scenario: Add under an unknown epic
+
+- **WHEN** `ezida add "Something" --column=todo --epic=zzzzzz` is
+  invoked and no card `zzzzzz` exists
+- **THEN** the process exits with code `1`
+- **AND** the error code is `INVALID_EPIC`
+- **AND** `kanban.toml` is byte-unchanged
+
+#### Scenario: Add under a card that is itself a child
+
+- **WHEN** `ezida add "Something" --column=todo --epic=f20wbo` is
+  invoked and card `f20wbo` already carries `epic = "rl4m9x"`
+- **THEN** the process exits with code `1`
+- **AND** the error code is `INVALID_EPIC`
+- **AND** `kanban.toml` is byte-unchanged
 
 ### Requirement: `ezida move` changes a card's column
 
@@ -150,6 +182,19 @@ rules:
 - If invoked with stdin redirected (non-TTY) and `--yes` is NOT
   passed, the command MUST exit `1` with code `INTERACTIVE_REQUIRED`.
 
+When the deleted card is referenced as the `epic` of other cards, the
+command SHALL clear the `epic` field on every one of them in the same
+write, rather than refusing the deletion. Orphaning MUST NOT refresh
+those cards' `updated_at` — losing a parent is a board-level
+consequence, not an edit to the child, consistent with how column
+rename propagates.
+
+The command MUST report the orphaned cards. In text mode the count and
+ids MUST appear on stderr after the success line. In JSON mode the
+success envelope MUST carry them.
+
+When the deleted card is a child, no other card is affected.
+
 #### Scenario: Remove with `--yes`
 
 - **WHEN** `ezida rm a3f2k9 --yes` is invoked against an existing card
@@ -197,7 +242,37 @@ rules:
 #### Scenario: JSON success envelope
 
 - **WHEN** `ezida rm a3f2k9 --yes --json` is invoked and succeeds
-- **THEN** stdout equals `{"id":"a3f2k9","deleted":true}\n`
+- **THEN** stdout equals `{"id":"a3f2k9","deleted":true,"orphaned":[]}\n`
+
+#### Scenario: Deleting a parent orphans its children
+
+- **WHEN** `ezida rm rl4m9x --yes` is invoked and three cards carry
+  `epic = "rl4m9x"`
+- **THEN** the process exits with code `0`
+- **AND** card `rl4m9x` no longer appears in `kanban.toml`
+- **AND** none of the three surviving cards contains an `epic` key
+- **AND** each surviving card's `updated_at` is unchanged
+
+#### Scenario: Orphaning is reported in JSON
+
+- **WHEN** `ezida rm rl4m9x --yes --json` is invoked and cards
+  `f20wbo`, `wrshlo`, `42q7t6` carry `epic = "rl4m9x"`
+- **THEN** stdout's `orphaned` array MUST contain exactly those three
+  ids in board file order
+
+#### Scenario: Orphaning is reported in text mode
+
+- **WHEN** `ezida rm rl4m9x --yes` is invoked and three cards carry
+  `epic = "rl4m9x"`
+- **THEN** stderr MUST name the count of orphaned cards and list their
+  ids
+
+#### Scenario: Deleting a child affects no other card
+
+- **WHEN** `ezida rm f20wbo --yes` is invoked and `f20wbo` carries
+  `epic = "rl4m9x"`
+- **THEN** card `rl4m9x` MUST be byte-unchanged, including its `color`
+  and `updated_at`
 
 ### Requirement: Mutating commands always re-validate before writing
 
@@ -221,8 +296,6 @@ refused if validation fails.
 - **THEN** the final `kanban.toml` is byte-identical to its
   pre-sequence state (except for content unrelated to that card)
 - **AND** every intermediate file state passes `board.Validate`
-
-## MODIFIED Requirements
 
 ### Requirement: Error envelope
 

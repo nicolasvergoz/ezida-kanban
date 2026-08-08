@@ -9,11 +9,56 @@ import (
 )
 
 // BoardEnvelope is the JSON shape for `ezida board --json` (ADR §D7).
+// Columns and DoneColumns both carry bare names — the on-disk `*`
+// suffix never reaches the wire.
 type BoardEnvelope struct {
 	SchemaVersion  int            `json:"schema_version"`
 	Columns        []string       `json:"columns"`
+	DoneColumns    []string       `json:"done_columns"`
 	Priorities     []string       `json:"priorities"`
 	CardsPerColumn map[string]int `json:"cards_per_column"`
+}
+
+// ColumnSummary is one entry of `ezida columns --json`.
+type ColumnSummary struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+	Done  bool   `json:"done"`
+}
+
+// ColumnsEnvelope is the JSON shape for `ezida columns --json`.
+type ColumnsEnvelope struct {
+	Columns []ColumnSummary `json:"columns"`
+}
+
+// ColorHolder names the epic currently holding a color.
+type ColorHolder struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+// ColorEntry is one entry of `ezida colors --json`. Name is null for a
+// color in use that is not part of the palette.
+type ColorEntry struct {
+	Name   *string      `json:"name"`
+	Hex    string       `json:"hex"`
+	HeldBy *ColorHolder `json:"held_by"`
+}
+
+// ColorsEnvelope is the JSON shape for `ezida colors --json`.
+type ColorsEnvelope struct {
+	Colors []ColorEntry `json:"colors"`
+}
+
+// MigrateEnvelope is the JSON shape for `ezida migrate --json`.
+type MigrateEnvelope struct {
+	Migrated      bool   `json:"migrated"`
+	FromVersion   int    `json:"from_version"`
+	ToVersion     int    `json:"to_version"`
+	DoneColumn    string `json:"done_column"`
+	DoneReason    string `json:"done_column_reason"`
+	BackupPath    string `json:"backup_path"`
+	SkillReminder string `json:"skill_reminder"`
 }
 
 // ListCard is the per-card shape inside `ezida list --json`. The
@@ -25,6 +70,8 @@ type ListCard struct {
 	Column    string    `json:"column"`
 	Priority  string    `json:"priority,omitempty"`
 	Tags      []string  `json:"tags"`
+	Epic      string    `json:"epic,omitempty"`
+	Color     string    `json:"color,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -34,22 +81,73 @@ type ListEnvelope struct {
 	Cards []ListCard `json:"cards"`
 }
 
+// EpicRef names the parent epic of a child card.
+type EpicRef struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+}
+
+// ChildRef is one child of an epic, in board file order.
+type ChildRef struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Column string `json:"column"`
+}
+
+// Progress is an epic's derived done/total pair. It is computed at read
+// time and never persisted (design D7).
+type Progress struct {
+	Done  int `json:"done"`
+	Total int `json:"total"`
+}
+
 // GetCard is the per-card shape inside `ezida get --json`, including
 // the full description.
+//
+// Epic and Children/Progress are mutually exclusive: one-level nesting
+// makes a card that is both a child and a parent unrepresentable, so a
+// card carries at most one of the two.
 type GetCard struct {
+	ID          string     `json:"id"`
+	Title       string     `json:"title"`
+	Column      string     `json:"column"`
+	Priority    string     `json:"priority,omitempty"`
+	Tags        []string   `json:"tags"`
+	Description string     `json:"description"`
+	Color       string     `json:"color,omitempty"`
+	Epic        *EpicRef   `json:"epic,omitempty"`
+	Children    []ChildRef `json:"children,omitempty"`
+	Progress    *Progress  `json:"progress,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+// GetEnvelope is the JSON shape for `ezida get --json`.
+type GetEnvelope struct {
+	Card GetCard `json:"card"`
+}
+
+// MutateCard is the per-card shape echoed by the mutating commands
+// (`add`, `edit`, `move`). It reports `epic` as the raw parent id
+// rather than the resolved {id, title} object `get` uses: the echo
+// answers "what did you just write", not "what does this card relate
+// to".
+type MutateCard struct {
 	ID          string    `json:"id"`
 	Title       string    `json:"title"`
 	Column      string    `json:"column"`
 	Priority    string    `json:"priority,omitempty"`
 	Tags        []string  `json:"tags"`
 	Description string    `json:"description"`
+	Epic        string    `json:"epic,omitempty"`
+	Color       string    `json:"color,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// GetEnvelope is the JSON shape for `ezida get --json`.
-type GetEnvelope struct {
-	Card GetCard `json:"card"`
+// MutateEnvelope is the JSON shape echoed by the mutating commands.
+type MutateEnvelope struct {
+	Card MutateCard `json:"card"`
 }
 
 // ExportCard mirrors the viewer's per-card response shape from
@@ -114,6 +212,15 @@ func List(env ListEnvelope) ([]byte, error) { return marshalLine(env) }
 // Get marshals a GetEnvelope and appends a newline.
 func Get(env GetEnvelope) ([]byte, error) { return marshalLine(env) }
 
+// Columns marshals a ColumnsEnvelope and appends a newline.
+func Columns(env ColumnsEnvelope) ([]byte, error) { return marshalLine(env) }
+
+// Colors marshals a ColorsEnvelope and appends a newline.
+func Colors(env ColorsEnvelope) ([]byte, error) { return marshalLine(env) }
+
+// Migrate marshals a MigrateEnvelope and appends a newline.
+func Migrate(env MigrateEnvelope) ([]byte, error) { return marshalLine(env) }
+
 // Export marshals an ExportEnvelope and appends a newline.
 func Export(env ExportEnvelope) ([]byte, error) { return marshalLine(env) }
 
@@ -130,13 +237,15 @@ func JSONCard(c board.Card) []byte {
 	if tags == nil {
 		tags = []string{}
 	}
-	env := GetEnvelope{Card: GetCard{
+	env := MutateEnvelope{Card: MutateCard{
 		ID:          c.ID,
 		Title:       c.Title,
 		Column:      c.Column,
 		Priority:    c.Priority,
 		Tags:        tags,
 		Description: c.Description,
+		Epic:        c.Epic,
+		Color:       c.Color,
 		CreatedAt:   c.CreatedAt,
 		UpdatedAt:   c.UpdatedAt,
 	}}

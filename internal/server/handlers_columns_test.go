@@ -283,7 +283,7 @@ func TestHandleColumnRename_EmptyTo(t *testing.T) {
 
 func TestHandleColumnDelete_Success(t *testing.T) {
 	// Build a board with a `review` column that has no cards.
-	const body = `schema_version = 1
+	const body = `schema_version = 2
 
 [board]
 columns = ["todo", "done", "review"]
@@ -343,7 +343,7 @@ func TestHandleColumnDelete_UnknownReturns404(t *testing.T) {
 }
 
 func TestHandleColumnDelete_LastColumnRefused(t *testing.T) {
-	const body = `schema_version = 1
+	const body = `schema_version = 2
 
 [board]
 columns = ["todo"]
@@ -428,7 +428,7 @@ func TestHandleColumnDelete_ColumnHasCards(t *testing.T) {
 
 func columnMoveBoard(t *testing.T) string {
 	t.Helper()
-	const body = `schema_version = 1
+	const body = `schema_version = 2
 
 [board]
 columns = ["todo", "ongoing", "done"]

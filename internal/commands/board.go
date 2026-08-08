@@ -43,6 +43,7 @@ func runBoard(cmd *cobra.Command, path string, asJSON bool) error {
 		env := output.BoardEnvelope{
 			SchemaVersion:  b.SchemaVersion,
 			Columns:        b.Board.Columns,
+			DoneColumns:    b.Board.DoneColumns(),
 			Priorities:     b.Board.Priorities,
 			CardsPerColumn: counts,
 		}
@@ -59,6 +60,10 @@ func runBoard(cmd *cobra.Command, path string, asJSON bool) error {
 	for i, col := range b.Board.Columns {
 		if i > 0 {
 			fmt.Fprint(out, " → ")
+		}
+		if b.Board.IsDoneColumn(col) {
+			fmt.Fprintf(out, "%s %s (%d)", col, doneMarker, counts[col])
+			continue
 		}
 		fmt.Fprintf(out, "%s (%d)", col, counts[col])
 	}

@@ -203,7 +203,7 @@ func TestRm_JSONSuccessEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("rm: %v", err)
 	}
-	want := "{\"id\":\"a3f2k9\",\"deleted\":true}\n"
+	want := "{\"id\":\"a3f2k9\",\"deleted\":true,\"orphaned\":[]}\n"
 	if stdout != want {
 		t.Errorf("stdout = %q, want %q", stdout, want)
 	}

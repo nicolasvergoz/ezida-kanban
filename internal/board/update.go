@@ -15,6 +15,8 @@ type CardPatch struct {
 	Description *string   `json:"description,omitempty"`
 	Tags        *[]string `json:"tags,omitempty"`
 	Priority    *string   `json:"priority,omitempty"`
+	Epic        *string   `json:"epic,omitempty"`
+	Color       *string   `json:"color,omitempty"`
 }
 
 // MissingTitleError is returned by UpdateCard when a patch attempts to
@@ -66,6 +68,11 @@ func (e *InvalidTagError) Error() string {
 //   - if p.Tags != nil and any element is empty/whitespace → *InvalidTagError
 //   - if p.Priority != nil and value is non-empty and not in
 //     b.Board.Priorities → *InvalidPriorityError
+//   - if p.Epic != nil and value is non-empty and names an unknown
+//     card, the card itself, or a card that already carries an epic →
+//     *InvalidEpicError
+//   - if p.Color != nil and value is non-empty and is not a hex value
+//     → *InvalidColorError
 //
 // On any error, the board is left unmutated.
 func UpdateCard(b *Board, id string, p CardPatch) error {
@@ -108,6 +115,16 @@ func UpdateCard(b *Board, id string, p CardPatch) error {
 			}
 		}
 	}
+	if p.Epic != nil && *p.Epic != "" {
+		if err := CheckEpicTarget(b, id, *p.Epic); err != nil {
+			return err
+		}
+	}
+	if p.Color != nil && *p.Color != "" {
+		if !hexColorPattern.MatchString(*p.Color) {
+			return &InvalidColorError{Value: *p.Color}
+		}
+	}
 
 	c := b.Cards[idx]
 	if p.Title != nil {
@@ -122,8 +139,26 @@ func UpdateCard(b *Board, id string, p CardPatch) error {
 	if p.Priority != nil {
 		c.Priority = *p.Priority
 	}
-	c.UpdatedAt = time.Now().UTC().Truncate(time.Second)
+	if p.Epic != nil {
+		c.Epic = *p.Epic
+	}
+	if p.Color != nil {
+		c.Color = *p.Color
+	}
+	now := time.Now().UTC().Truncate(time.Second)
+	c.UpdatedAt = now
 	b.Cards[idx] = c
+	// Acquiring a child is what turns the target into an epic, so it
+	// gets a color in the same write. That is a real edit to the
+	// parent, hence the timestamp refresh.
+	if p.Epic != nil && *p.Epic != "" && EnsureEpicColor(b, *p.Epic) {
+		for i := range b.Cards {
+			if b.Cards[i].ID == *p.Epic {
+				b.Cards[i].UpdatedAt = now
+				break
+			}
+		}
+	}
 
 	if verr := Validate(b); verr != nil {
 		return verr

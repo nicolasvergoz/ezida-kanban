@@ -9,7 +9,7 @@ import (
 
 // Violation describes a single broken validation rule.
 type Violation struct {
-	// Rule is the 1-based rule number from the spec (1..9).
+	// Rule is the 1-based rule number from the spec (1..17).
 	Rule int
 	// Message is a human-readable description of the problem.
 	Message string
@@ -60,8 +60,12 @@ var idValidationPattern = regexp.MustCompile(`^[0-9a-z]{6}$`)
 
 var hexColorPattern = regexp.MustCompile(`^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$`)
 
-// Validate runs the nine business rules in a single pass and returns a
+// Validate runs the seventeen business rules and returns a
 // *ValidationError listing every violation, or nil if the board is valid.
+//
+// Column rules run against decoded (bare) names — Load strips the
+// terminal marker before validating, so rule 16 can reject a `*`
+// appearing anywhere else outright.
 func Validate(b *Board) *ValidationError {
 	var vs []Violation
 
@@ -86,6 +90,45 @@ func Validate(b *Board) *ValidationError {
 				vs = append(vs, Violation{
 					Rule:    2,
 					Message: fmt.Sprintf("[board].columns contains duplicate %q", col),
+				})
+			}
+			seen[col] = struct{}{}
+		}
+	}
+
+	// Rule 16: every decoded column name is non-empty and `*`-free.
+	// The marker is reserved outright rather than silently mangled, so
+	// a name that would round-trip ambiguously is rejected at the door.
+	for _, col := range b.Board.Columns {
+		if strings.TrimSpace(col) == "" {
+			vs = append(vs, Violation{
+				Rule:    16,
+				Message: "[board].columns contains an empty column name",
+			})
+			continue
+		}
+		if strings.Contains(col, TerminalMarker) {
+			vs = append(vs, Violation{
+				Rule: 16,
+				Message: fmt.Sprintf(
+					"column %q contains the reserved character %q, which marks a terminal column only as a trailing suffix",
+					col, TerminalMarker,
+				),
+			})
+		}
+	}
+
+	// Rule 17: decoded column names are unique. Overlaps rule 2 by
+	// construction; it exists so `['done', 'done*']` — two distinct
+	// serialized entries collapsing to one name — is named as such.
+	{
+		seen := make(map[string]struct{}, len(b.Board.Columns))
+		for _, col := range b.Board.Columns {
+			if _, dup := seen[col]; dup {
+				vs = append(vs, Violation{
+					Rule: 17,
+					Message: fmt.Sprintf(
+						"column %q appears twice in [board].columns once terminal markers are decoded", col),
 				})
 			}
 			seen[col] = struct{}{}
@@ -131,6 +174,19 @@ func Validate(b *Board) *ValidationError {
 				Rule:    10,
 				Message: fmt.Sprintf("[board.priority_colors] value for %q is %q, expected hex color like #rgb or #rrggbb", k, v),
 			})
+		}
+	}
+
+	// Epic rules need two passes: the set of every card id, and the set
+	// of cards that themselves carry an epic (the ids rule 13 forbids
+	// as targets). Building both up front keeps the walk below O(n)
+	// with no traversal — see design D2 on why cycles cannot arise.
+	idSet := make(map[string]struct{}, len(b.Cards))
+	carriesEpic := make(map[string]struct{}, len(b.Cards))
+	for _, c := range b.Cards {
+		idSet[c.ID] = struct{}{}
+		if c.Epic != "" {
+			carriesEpic[c.ID] = struct{}{}
 		}
 	}
 
@@ -185,6 +241,54 @@ func Validate(b *Board) *ValidationError {
 					Message: fmt.Sprintf("priority %q is not declared in [board].priorities", c.Priority),
 				})
 			}
+		}
+
+		if c.Epic != "" {
+			// Rule 12: epic is not the card's own id.
+			if c.Epic == c.ID {
+				vs = append(vs, Violation{
+					Rule:    12,
+					CardID:  c.ID,
+					Message: "epic must not reference the card itself",
+				})
+			} else if _, ok := idSet[c.Epic]; !ok {
+				// Rule 11: epic names an existing card.
+				vs = append(vs, Violation{
+					Rule:    11,
+					CardID:  c.ID,
+					Message: fmt.Sprintf("epic %q does not match any card on the board", c.Epic),
+				})
+			} else if _, nested := carriesEpic[c.Epic]; nested {
+				// Rule 13: the target must not itself be a child.
+				vs = append(vs, Violation{
+					Rule:   13,
+					CardID: c.ID,
+					Message: fmt.Sprintf(
+						"epic %q already belongs to an epic; nesting is one level, so a child cannot also be a parent",
+						c.Epic),
+				})
+			}
+		}
+
+		// Rule 14: color, when present, is a hex value.
+		if c.Color != "" && !hexColorPattern.MatchString(c.Color) {
+			vs = append(vs, Violation{
+				Rule:   14,
+				CardID: c.ID,
+				Message: fmt.Sprintf(
+					"color %q is not a hex color like #rgb or #rrggbb", c.Color),
+			})
+		}
+
+		// Rule 15: epic and color are v2 fields.
+		if (c.Epic != "" || c.Color != "") && b.SchemaVersion < 2 {
+			vs = append(vs, Violation{
+				Rule:   15,
+				CardID: c.ID,
+				Message: fmt.Sprintf(
+					"epic and color require schema_version >= 2, file is v%d; run `ezida migrate`",
+					b.SchemaVersion),
+			})
 		}
 
 		// Rule 9: created_at and updated_at are non-zero and updated_at >= created_at.

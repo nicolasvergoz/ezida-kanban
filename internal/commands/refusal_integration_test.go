@@ -21,7 +21,7 @@ func seedBoardWithTwoTodoRefs(t *testing.T) string {
 	path := dir + "/kanban.toml"
 	at, _ := time.Parse(time.RFC3339, "2026-05-20T14:30:00Z")
 	b := &board.Board{
-		SchemaVersion: 1,
+		SchemaVersion: board.SupportedSchemaVersion,
 		Board: board.BoardConfig{
 			Columns:    []string{"todo", "ongoing", "done"},
 			Priorities: []string{"low", "medium", "high"},

@@ -192,8 +192,8 @@ func TestLoadSave_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load(valid.toml) returned err = %v", err)
 	}
-	if b.SchemaVersion != 1 {
-		t.Fatalf("schema_version = %d, want 1", b.SchemaVersion)
+	if b.SchemaVersion != SupportedSchemaVersion {
+		t.Fatalf("schema_version = %d, want %d", b.SchemaVersion, SupportedSchemaVersion)
 	}
 	if len(b.Cards) != 3 {
 		t.Fatalf("got %d cards, want 3", len(b.Cards))
@@ -262,8 +262,8 @@ func TestLoad_SchemaVersionMismatch(t *testing.T) {
 	if !errors.As(err, &sverr) {
 		t.Fatalf("Load returned %v, want *SchemaVersionError", err)
 	}
-	if sverr.FileVersion != 2 {
-		t.Fatalf("FileVersion = %d, want 2", sverr.FileVersion)
+	if sverr.FileVersion != 3 {
+		t.Fatalf("FileVersion = %d, want 3", sverr.FileVersion)
 	}
 	if sverr.SupportedVersion != SupportedSchemaVersion {
 		t.Fatalf("SupportedVersion = %d, want %d", sverr.SupportedVersion, SupportedSchemaVersion)
@@ -660,7 +660,7 @@ func TestValidate_MultipleViolations(t *testing.T) {
 	// Construct a board in-memory that breaks rule 6 (empty title) and
 	// rule 7 (unknown column) on the same card.
 	b := &Board{
-		SchemaVersion: 1,
+		SchemaVersion: SupportedSchemaVersion,
 		Board: BoardConfig{
 			Columns:    []string{"todo", "done"},
 			Priorities: []string{"low"},

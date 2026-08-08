@@ -2,10 +2,10 @@ package commands
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -79,18 +79,41 @@ func runRm(cmd *cobra.Command, path, id string, f rmFlags, asJSON bool, rio rmIO
 		}
 	}
 
-	b.Cards = slices.Delete(b.Cards, idx, idx+1)
+	// Deleting a parent orphans its children rather than refusing:
+	// `epic` is optional, so clearing it leaves a valid card (D6).
+	orphaned, err := board.DeleteCardOrphaning(b, id)
+	if err != nil {
+		return err
+	}
 	if err := board.Save(path, b); err != nil {
 		return err
 	}
 
 	out := cmd.OutOrStdout()
 	if asJSON {
-		_, err = fmt.Fprintf(out, "{\"id\":%q,\"deleted\":true}\n", id)
+		// A struct rather than a map: the key order is part of the
+		// documented envelope, and map marshalling sorts keys.
+		buf, merr := json.Marshal(struct {
+			ID       string   `json:"id"`
+			Deleted  bool     `json:"deleted"`
+			Orphaned []string `json:"orphaned"`
+		}{ID: id, Deleted: true, Orphaned: orphaned})
+		if merr != nil {
+			return merr
+		}
+		_, err = fmt.Fprintf(out, "%s\n", buf)
 		return err
 	}
-	_, err = fmt.Fprintf(out, "removed %s\n", id)
-	return err
+	if _, err := fmt.Fprintf(out, "removed %s\n", id); err != nil {
+		return err
+	}
+	// The orphaning write is never silent: it touched cards the user
+	// did not name.
+	if len(orphaned) > 0 {
+		fmt.Fprintf(rio.err, "detached %d card(s) from this epic: %s\n",
+			len(orphaned), strings.Join(orphaned, ", "))
+	}
+	return nil
 }
 
 // promptConfirm writes msg to w, reads one line from r, and returns

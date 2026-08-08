@@ -22,12 +22,17 @@ type editFlags struct {
 	priority    *string
 	tags        *string
 	column      *string
+	epic        *string
+	noEpic      bool
+	color       *string
+	noColor     bool
 }
 
 // any reports whether at least one field was passed.
 func (f editFlags) any() bool {
 	return f.title != nil || f.description != nil || f.priority != nil ||
-		f.tags != nil || f.column != nil
+		f.tags != nil || f.column != nil || f.epic != nil || f.noEpic ||
+		f.color != nil || f.noColor
 }
 
 // editFlagState holds the raw string targets used by cobra. The
@@ -39,6 +44,10 @@ type editFlagState struct {
 	priority    string
 	tags        string
 	column      string
+	epic        string
+	noEpic      bool
+	color       string
+	noColor     bool
 }
 
 // buildEditFlags walks cobra's "was flag passed?" map and produces an
@@ -66,6 +75,16 @@ func buildEditFlags(cmd *cobra.Command, raw editFlagState) editFlags {
 		v := raw.column
 		f.column = &v
 	}
+	if cmd.Flags().Changed("epic") {
+		v := raw.epic
+		f.epic = &v
+	}
+	if cmd.Flags().Changed("color") {
+		v := raw.color
+		f.color = &v
+	}
+	f.noEpic = raw.noEpic
+	f.noColor = raw.noColor
 	return f
 }
 
@@ -86,6 +105,11 @@ func NewEditCmd(jsonOut *bool) *cobra.Command {
 	cmd.Flags().StringVar(&state.priority, "priority", "", "new priority (pass \"\" to clear)")
 	cmd.Flags().StringVar(&state.tags, "tags", "", "comma-separated replacement tag list")
 	cmd.Flags().StringVar(&state.column, "column", "", "move the card to this column (re-orders to bottom)")
+	cmd.Flags().StringVar(&state.epic, "epic", "", "id of the card this one belongs to")
+	cmd.Flags().BoolVar(&state.noEpic, "no-epic", false, "detach the card from its epic")
+	cmd.Flags().StringVar(&state.color, "color", "",
+		"palette name ("+strings.Join(board.PaletteNames(), ", ")+") or hex value")
+	cmd.Flags().BoolVar(&state.noColor, "no-color", false, "clear the card's color")
 	return cmd
 }
 
@@ -94,6 +118,24 @@ func runEdit(cmd *cobra.Command, path, id string, f editFlags, asJSON bool) erro
 	if !f.any() {
 		return &NothingToEditError{}
 	}
+	// Contradictory flags are refused before the board is even loaded:
+	// there is no defensible reading of "set and clear the same field".
+	if f.epic != nil && f.noEpic {
+		return &InvalidEpicError{
+			ID:     *f.epic,
+			Reason: "--epic and --no-epic are mutually exclusive",
+		}
+	}
+	if f.color != nil && f.noColor {
+		return &InvalidColorError{
+			Value:  *f.color,
+			Reason: "--color and --no-color are mutually exclusive",
+		}
+	}
+
+	// Set when the edit also wrote a color onto the parent, so text
+	// mode can report the second card the command touched.
+	var coloredParent string
 
 	card, err := mutateAndSave(path, func(b *board.Board) (board.Card, error) {
 		idx := indexCardByID(b.Cards, id)
@@ -124,7 +166,25 @@ func runEdit(cmd *cobra.Command, path, id string, f editFlags, asJSON bool) erro
 			}
 			c.Tags = tags
 		}
-		c.UpdatedAt = nowFunc().UTC().Truncate(time.Second)
+		if f.epic != nil && *f.epic != "" {
+			if eerr := board.CheckEpicTarget(b, id, *f.epic); eerr != nil {
+				return board.Card{}, asEpicError(eerr)
+			}
+			c.Epic = *f.epic
+		} else if f.noEpic || (f.epic != nil && *f.epic == "") {
+			c.Epic = ""
+		}
+		if f.color != nil {
+			resolved, cerr := board.ResolveColor(*f.color)
+			if cerr != nil {
+				return board.Card{}, &InvalidColorError{Value: *f.color}
+			}
+			c.Color = resolved
+		} else if f.noColor {
+			c.Color = ""
+		}
+		now := nowFunc().UTC().Truncate(time.Second)
+		c.UpdatedAt = now
 
 		if f.column != nil {
 			if !slices.Contains(b.Board.Columns, *f.column) {
@@ -136,6 +196,20 @@ func runEdit(cmd *cobra.Command, path, id string, f editFlags, asJSON bool) erro
 		} else {
 			b.Cards[idx] = c
 		}
+		// Acquiring a child turns the parent into an epic, so it gets
+		// a color in the same write. Both writes ride one Save, so
+		// there is no partial state; the JSON echo still returns only
+		// the edited card, and the parent's change is reported in text
+		// mode.
+		if c.Epic != "" && board.EnsureEpicColor(b, c.Epic) {
+			for i := range b.Cards {
+				if b.Cards[i].ID == c.Epic {
+					b.Cards[i].UpdatedAt = now
+					coloredParent = b.Cards[i].ID
+					break
+				}
+			}
+		}
 		return c, nil
 	})
 	if err != nil {
@@ -146,6 +220,9 @@ func runEdit(cmd *cobra.Command, path, id string, f editFlags, asJSON bool) erro
 	if asJSON {
 		_, err = out.Write(output.JSONCard(card))
 		return err
+	}
+	if coloredParent != "" {
+		fmt.Fprintf(cmd.ErrOrStderr(), "assigned a color to epic %s\n", coloredParent)
 	}
 	_, err = fmt.Fprintln(out, card.ID)
 	return err

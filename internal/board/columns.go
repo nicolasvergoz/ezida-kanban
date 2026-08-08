@@ -6,6 +6,92 @@ import (
 	"strings"
 )
 
+// TerminalMarker is the suffix that marks a column as terminal in the
+// serialized `[board].columns` array — `done*`. A column so marked is
+// one whose cards count as done for epic progress.
+//
+// The marker exists only on disk. Load decodes it away; Save puts it
+// back. Rule 16 reserves the character outright so a column can never
+// carry it as part of its real name.
+const TerminalMarker = "*"
+
+// ColumnsComment is written by Save immediately above the `columns`
+// key so the suffix is decodable from the file itself rather than only
+// from the docs (design D3).
+const ColumnsComment = "# a '*' suffix marks a terminal column: its cards count as done for epic progress"
+
+// DecodeColumns splits the serialized column list into bare names and
+// the set of names that carried the terminal marker. It is a pure
+// function; EncodeColumns is its inverse.
+//
+// A `*` anywhere but at the end is left in the name untouched — the
+// validator (rule 16) rejects it rather than the codec mangling it.
+// When two entries decode to the same name (`['done', 'done*']`), both
+// names are returned so rule 17 can report the duplicate; that input is
+// therefore not round-trip stable by design.
+func DecodeColumns(raw []string) (names []string, done map[string]bool) {
+	names = make([]string, 0, len(raw))
+	done = make(map[string]bool, len(raw))
+	for _, entry := range raw {
+		if strings.HasSuffix(entry, TerminalMarker) {
+			name := strings.TrimSuffix(entry, TerminalMarker)
+			names = append(names, name)
+			done[name] = true
+			continue
+		}
+		names = append(names, entry)
+	}
+	return names, done
+}
+
+// EncodeColumns re-attaches the terminal marker to every name present
+// in done, preserving the order of names. Entries of done that name no
+// column are dropped, which is what makes column deletion free of any
+// propagation obligation.
+func EncodeColumns(names []string, done map[string]bool) []string {
+	out := make([]string, 0, len(names))
+	for _, name := range names {
+		if done[name] {
+			out = append(out, name+TerminalMarker)
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
+// IsDoneColumn reports whether the named column is terminal.
+func (c *BoardConfig) IsDoneColumn(name string) bool {
+	return c.doneColumns[name]
+}
+
+// DoneColumns returns the terminal columns in `[board].columns` order.
+// The result is always non-nil so JSON surfaces emit `[]` rather than
+// `null` on a board with no terminal column.
+func (c *BoardConfig) DoneColumns() []string {
+	out := make([]string, 0, len(c.doneColumns))
+	for _, name := range c.Columns {
+		if c.doneColumns[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// SetDoneColumn marks or clears the terminal flag for name. It is the
+// only way to mutate the set, so the flag can never be written for a
+// column that the caller has not also placed in Columns.
+func (c *BoardConfig) SetDoneColumn(name string, done bool) {
+	if !done {
+		delete(c.doneColumns, name)
+		return
+	}
+	if c.doneColumns == nil {
+		c.doneColumns = make(map[string]bool, 1)
+	}
+	c.doneColumns[name] = true
+}
+
 // affectedCard is the {id, title} pair carried by ColumnHasCardsError
 // so the HTTP layer can serialize the blocking cards in the error
 // envelope without re-walking the board. JSON tags match the wire
@@ -123,6 +209,13 @@ func RenameColumn(b *Board, from, to string) error {
 	}
 
 	b.Board.Columns[idx] = trimmed
+	// The terminal flag belongs to the column, not to its name: a
+	// rename carries it across (spec "Terminal status survives a
+	// rename").
+	if b.Board.IsDoneColumn(from) {
+		b.Board.SetDoneColumn(from, false)
+		b.Board.SetDoneColumn(trimmed, true)
+	}
 	for i := range b.Cards {
 		if b.Cards[i].Column == from {
 			b.Cards[i].Column = trimmed
@@ -166,6 +259,7 @@ func DeleteColumn(b *Board, name string) error {
 		return &ColumnHasCardsError{Name: name, Cards: blocking}
 	}
 	b.Board.Columns = slices.Delete(b.Board.Columns, idx, idx+1)
+	b.Board.SetDoneColumn(name, false)
 	return nil
 }
 

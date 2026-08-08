@@ -16,6 +16,7 @@ type listFlags struct {
 	titleContains string
 	tag           string
 	priority      string
+	epic          string
 }
 
 // NewListCmd builds the `ezida list` command.
@@ -34,6 +35,7 @@ func NewListCmd(jsonOut *bool) *cobra.Command {
 		"keep only cards whose title contains this substring (case-insensitive)")
 	cmd.Flags().StringVar(&f.tag, "tag", "", "keep only cards carrying this tag")
 	cmd.Flags().StringVar(&f.priority, "priority", "", "keep only cards with this priority")
+	cmd.Flags().StringVar(&f.epic, "epic", "", "keep only this card and the cards belonging to it")
 	return cmd
 }
 
@@ -68,6 +70,17 @@ func buildFilters(f listFlags, b *board.Board) ([]filter, error) {
 		}
 		pri := f.priority
 		fs = append(fs, func(c board.Card) bool { return c.Priority == pri })
+	}
+	if f.epic != "" {
+		if indexCardByID(b.Cards, f.epic) < 0 {
+			return nil, &InvalidFilterError{Flag: "epic", Value: f.epic}
+		}
+		epic := f.epic
+		// The parent is kept alongside its children: scoping to an
+		// epic must never hide the epic itself.
+		fs = append(fs, func(c board.Card) bool {
+			return c.ID == epic || c.Epic == epic
+		})
 	}
 	return fs, nil
 }
@@ -116,6 +129,8 @@ func runList(cmd *cobra.Command, path string, f listFlags, asJSON bool) error {
 				Column:    c.Column,
 				Priority:  c.Priority,
 				Tags:      tags,
+				Epic:      c.Epic,
+				Color:     c.Color,
 				CreatedAt: c.CreatedAt,
 				UpdatedAt: c.UpdatedAt,
 			})

@@ -28,6 +28,8 @@ func newDummyAddForPath(path string, asJSON bool) *cobra.Command {
 	cmd.Flags().StringVar(&f.priority, "priority", "", "")
 	cmd.Flags().StringVar(&f.tagsCSV, "tags", "", "")
 	cmd.Flags().StringVar(&f.description, "description", "", "")
+	cmd.Flags().StringVar(&f.epic, "epic", "", "")
+	cmd.Flags().StringVar(&f.color, "color", "", "")
 	return cmd
 }
 

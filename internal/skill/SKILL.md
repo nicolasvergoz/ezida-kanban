@@ -55,16 +55,48 @@ ezida list --column=todo             # filter by column
 ezida list --title-contains=auth     # filter by title substring
 ezida list --tag=security            # filter by tag
 ezida list --priority=high           # filter by priority
+ezida list --epic=<id>               # the epic itself plus its children
 ezida get <id>                       # full details for one card
+ezida colors                         # epic palette and which card holds each color
 ```
+
+`ezida get` on a child reports its parent; on a parent it reports the
+children and a done/total count.
 
 ### Writing
 ```bash
-ezida add "Title" --column=todo [--priority=high] [--tags=a,b] [--description="..."]
+ezida add "Title" --column=todo [--priority=high] [--tags=a,b] [--description="..."] [--epic=<id>] [--color=violet]
 ezida edit <id> [--title="..."] [--description="..."] [--priority=...] [--tags=...]
+ezida edit <id> --epic=<id> | --no-epic | --color=<name|hex> | --no-color
 ezida move <id> <column>
 ezida rm <id>
 ```
+
+## Epics
+
+An epic is just a card. Any card may point at another card with
+`epic = "<id>"`; the parent is the epic and the pointing cards are its
+children. There is no separate entity and no second id space.
+
+**Nesting is exactly one level.** A card that carries an `epic` may not
+itself be named as another card's epic. Attempting it fails with
+`INVALID_EPIC`. So do not try to build a tree — if the user asks for
+sub-epics, say the model is flat by design and offer tags for the finer
+grouping.
+
+The relation is documentary: it never blocks anything. A child moves
+between columns freely, and deleting a parent detaches its children
+rather than refusing (the command reports which cards it detached).
+
+A parent carries a `color`, assigned automatically from a named palette
+(`violet`, `emerald`, `orange`, `blue`, `pink`, `lime`, `cyan`,
+`fuchsia`) the first time it acquires a child. The file always stores a
+hex value; the names are a CLI convenience. `ezida colors` shows which
+epic holds which color.
+
+Progress (`done/total`) counts a child as done when its column is
+**terminal** — see below. A board with no terminal column reports `0/N`
+for every epic, which is a truthful reading, not an error.
 
 ### Viewer (browser UI)
 ```bash
@@ -86,28 +118,52 @@ If the user has already started the server in another terminal and just wants th
 ### Board config
 ```bash
 ezida init [--columns="a,b,c"] [--priorities="low,med,high"]
+ezida columns                        # list columns with counts and terminal marks
 ezida columns add <name> [--position=N]
 ezida columns rename <old> <new>     # propagates to all cards automatically
 ezida columns rm <name>              # fails if cards still reference it
+ezida columns done <name>            # mark a column terminal (cards count as done)
+ezida columns undone <name>          # clear the terminal mark
 
 ezida priorities add <name>
 ezida priorities rename <old> <new>  # propagates to all cards automatically
 ezida priorities rm <name>           # fails if cards still reference it
+
+ezida migrate                        # upgrade a schema_version = 1 board to 2
 ```
+
+### Terminal columns
+
+A column whose cards count as done for epic progress is marked with a
+`*` suffix **in the file only**: `columns = ['todo', 'ongoing', 'done*']`.
+
+Never pass the suffix as an argument and never expect it in output — the
+CLI always speaks bare names. Use `ezida columns done|undone <name>` to
+toggle it. The suffix is encoded in the name precisely so it cannot
+desync from the column list under a hand edit or a git merge.
+
+### Migration
+
+Every command refuses a `schema_version = 1` board with
+`SCHEMA_VERSION_MISMATCH`. The fix is `ezida migrate`: it backs up to
+`kanban.toml.v1.bak`, upgrades to version 2, marks one column terminal
+(a column named `done` if present, otherwise the last one) and reports
+its choice. After migrating, run `ezida init --skill-only` to refresh
+this skill file.
 
 ## Schema reference
 
 ```toml
-schema_version = 1
+schema_version = 2
 
 [board]
-columns = ["todo", "ongoing", "done"]    # left-to-right display order
+columns = ["todo", "ongoing", "done*"]   # left-to-right; '*' = terminal column
 priorities = ["low", "medium", "high"]   # ascending: low → high
 
 [[cards]]
 id = "a3f2k9"                  # 6 chars from [0-9a-z], unique board-wide
 title = "Card title"            # non-empty
-column = "todo"                 # must match a value in [board].columns
+column = "todo"                 # must match a value in [board].columns (bare name)
 description = """               # multi-line, may be empty
 Optional description.
 """
@@ -115,6 +171,9 @@ created_at = 2026-05-20T14:30:00Z   # ISO 8601 UTC, set once at creation
 updated_at = 2026-05-20T14:30:00Z   # ISO 8601 UTC, refreshed on any change
 tags = ["security"]             # array of strings, may be empty
 priority = "high"               # optional; must match [board].priorities if present
+epic = "rl4m9x"                 # optional; id of another card. One level only:
+                                # a card with an epic cannot be one.
+color = "#8b5cf6"               # optional; hex only. Carried by epics.
 ```
 
 ## Manual editing (last-resort fallback)
@@ -125,8 +184,11 @@ If neither `ezida` nor Python is available, edit `kanban.toml` directly with pre
 - **`id`**: generate 6 random chars from `[0-9a-z]`. Verify uniqueness across all cards before assigning.
 - **`updated_at`**: refresh to the current UTC timestamp on any modification.
 - **`column` and `priority`**: must reference values defined in `[board]`.
-- **Renaming a column or priority in `[board]`**: also propagate the new name to every referencing card in the same edit.
+- **Renaming a column or priority in `[board]`**: also propagate the new name to every referencing card in the same edit. Keep any `*` suffix on the renamed column.
 - **Removing a column or priority** still referenced by cards: refuse. List the affected cards and ask the user how to proceed.
+- **`epic`**: must name an existing card that does not itself carry an `epic`, and never the card's own id.
+- **Removing a card cited as an `epic`**: delete the `epic` line from every card that pointed at it, without touching their `updated_at`.
+- **`color`**: a hex string only. Never write a palette name to the file.
 
 ## Common patterns
 

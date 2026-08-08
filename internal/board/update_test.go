@@ -15,7 +15,7 @@ func ptr[T any](v T) *T { return &v }
 func updateTestBoard() *Board {
 	now := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
 	return &Board{
-		SchemaVersion: 1,
+		SchemaVersion: SupportedSchemaVersion,
 		Board: BoardConfig{
 			Columns:    []string{"todo", "done"},
 			Priorities: []string{"low", "medium", "high"},

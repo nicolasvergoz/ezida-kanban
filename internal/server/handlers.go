@@ -510,8 +510,12 @@ func (s *serverState) handleIndex(w http.ResponseWriter, r *http.Request) {
 // Field order and snake_case names match ADR 0002 §D7 — the viewer
 // UI consumes this shape directly.
 type boardResponse struct {
-	SchemaVersion  int               `json:"schema_version"`
-	Columns        []string          `json:"columns"`
+	SchemaVersion int      `json:"schema_version"`
+	Columns       []string `json:"columns"`
+	// DoneColumns lists the terminal columns by bare name. Always
+	// non-nil so the JSON renders `[]` rather than `null`; the on-disk
+	// `*` marker never reaches the wire.
+	DoneColumns    []string          `json:"done_columns"`
 	Priorities     []string          `json:"priorities"`
 	PriorityColors map[string]string `json:"priority_colors"`
 	CardsPerColumn map[string]int    `json:"cards_per_column"`
@@ -526,6 +530,11 @@ type boardResponse struct {
 // boardResponse. Snake_case keys match ADR 0002 §D7; the
 // description field is always present (empty string when unset)
 // because the UI's edit modal renders it without a second fetch.
+//
+// Epic and Color are the raw stored values, never resolved: the
+// envelope already carries every card on the board, so the client
+// looks a parent up by id and counts children itself. No epic_title,
+// epic_color, children, or progress belongs here (design D1).
 type cardResponse struct {
 	ID          string    `json:"id"`
 	Title       string    `json:"title"`
@@ -533,6 +542,8 @@ type cardResponse struct {
 	Priority    string    `json:"priority,omitempty"`
 	Tags        []string  `json:"tags"`
 	Description string    `json:"description"`
+	Epic        string    `json:"epic,omitempty"`
+	Color       string    `json:"color,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -552,6 +563,8 @@ func cardToResponse(c board.Card) cardResponse {
 		Priority:    c.Priority,
 		Tags:        tags,
 		Description: c.Description,
+		Epic:        c.Epic,
+		Color:       c.Color,
 		CreatedAt:   c.CreatedAt,
 		UpdatedAt:   c.UpdatedAt,
 	}
@@ -582,6 +595,7 @@ func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
 	resp := boardResponse{
 		SchemaVersion:  b.SchemaVersion,
 		Columns:        b.Board.Columns,
+		DoneColumns:    b.Board.DoneColumns(),
 		Priorities:     b.Board.Priorities,
 		PriorityColors: board.ResolvePriorityColors(b.Board.Priorities, b.Board.PriorityColors),
 		CardsPerColumn: counts,

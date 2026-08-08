@@ -153,6 +153,10 @@ type MutateEnvelope struct {
 // ExportCard mirrors the viewer's per-card response shape from
 // internal/server/handlers.go (cardResponse). Includes description so
 // the demo viewer can render the edit modal without a second fetch.
+//
+// Shape parity with cardResponse is the contract: a field added to one
+// must be added to the other in the same change. Like cardResponse, it
+// carries the raw epic id and color and no denormalized relation data.
 type ExportCard struct {
 	ID          string    `json:"id"`
 	Title       string    `json:"title"`
@@ -160,6 +164,8 @@ type ExportCard struct {
 	Priority    string    `json:"priority,omitempty"`
 	Tags        []string  `json:"tags"`
 	Description string    `json:"description"`
+	Epic        string    `json:"epic,omitempty"`
+	Color       string    `json:"color,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -168,8 +174,11 @@ type ExportCard struct {
 // the viewer's boardResponse (GET /api/board) so the demo viewer can
 // consume the snapshot through the same code path as the live server.
 type ExportEnvelope struct {
-	SchemaVersion  int               `json:"schema_version"`
-	Columns        []string          `json:"columns"`
+	SchemaVersion int      `json:"schema_version"`
+	Columns       []string `json:"columns"`
+	// DoneColumns mirrors boardResponse.DoneColumns: bare terminal
+	// column names, always non-nil.
+	DoneColumns    []string          `json:"done_columns"`
 	Priorities     []string          `json:"priorities"`
 	PriorityColors map[string]string `json:"priority_colors"`
 	CardsPerColumn map[string]int    `json:"cards_per_column"`

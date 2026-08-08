@@ -2,38 +2,102 @@ const { useState, useEffect, useRef, useCallback, useMemo } = React;
 
 /* =========================================================
    Wire-shape ↔ UI-shape adapter
-   Server JSON:  { columns[], cards[{ id, title, column, priority,
-                   tags[], description, created_at, updated_at }],
+   Server JSON:  { columns[], done_columns[], cards[{ id, title,
+                   column, priority, tags[], description, epic, color,
+                   created_at, updated_at }],
                    priorities[], priority_colors{}, project_name }
-   UI tree:      { title, lists:[{ id=columnName, title=DISPLAY,
+   UI tree:      { title, lists:[{ id=columnName, title=DISPLAY, done,
                    cards:[{ id, text, tags, priority, description,
-                   createdAt, updatedAt }] }],
-                   priorities[], priorityColors{} }
+                   epic, color, createdAt, updatedAt }] }],
+                   priorities[], priorityColors{}, epics }
+
+   The wire carries no denormalized relation data — no parent title,
+   no children, no progress — because the payload already holds every
+   card on the board. This adapter is therefore the single place that
+   resolves a relation: it builds one id → card index per load and
+   exposes parent / children / progress off it, so the resolution cost
+   is paid once per load rather than once per rendered card.
 ========================================================= */
 function toUiBoard(server) {
+  const doneColumns = server.done_columns || [];
+  const doneSet = new Set(doneColumns);
   const cardsByCol = {};
+  const allCards = [];
   for (const c of server.cards || []) {
-    (cardsByCol[c.column] = cardsByCol[c.column] || []).push({
+    const ui = {
       id: c.id,
       text: c.title || "",
+      column: c.column,
       tags: c.tags || [],
       priority: c.priority || "",
       description: c.description || "",
+      epic: c.epic || "",
+      color: c.color || "",
       createdAt: c.created_at,
       updatedAt: c.updated_at,
-    });
+    };
+    allCards.push(ui);
+    (cardsByCol[c.column] = cardsByCol[c.column] || []).push(ui);
   }
   return {
     title: server.project_name || "",
     lists: (server.columns || []).map((name) => ({
       id: name,
       title: String(name).toUpperCase(),
+      done: doneSet.has(name),
       cards: cardsByCol[name] || [],
     })),
     priorities: server.priorities || [],
     priorityColors: server.priority_colors || {},
+    doneColumns,
+    epics: buildEpicIndex(allCards, doneSet),
   };
 }
+
+/* Epic index — built once per board load over the full payload, so a
+   parent's counts report the board and never the active filter. An
+   `epic` naming a card that is not in the payload resolves to no
+   parent rather than throwing: validation forbids a dangling
+   reference on disk, but a board rewritten between fetch and render
+   can still produce one. */
+function buildEpicIndex(cards, doneSet) {
+  const byId = new Map();
+  for (const c of cards) byId.set(c.id, c);
+
+  const kids = new Map(); // parent id → children, in payload order
+  for (const c of cards) {
+    if (!c.epic || !byId.has(c.epic)) continue;
+    const list = kids.get(c.epic);
+    if (list) list.push(c);
+    else kids.set(c.epic, [c]);
+  }
+
+  const progress = new Map(); // parent id → { done, total }
+  for (const [id, children] of kids) {
+    let done = 0;
+    for (const c of children) if (doneSet.has(c.column)) done++;
+    progress.set(id, { done, total: children.length });
+  }
+
+  // The epics themselves, in payload order — walked over `cards` rather
+  // than over `kids`, whose insertion order is the order each parent's
+  // *first child* appears, not the parent's own position. A card
+  // carrying a color but referenced by nobody is not an epic and stays
+  // out.
+  const all = cards.filter((c) => kids.has(c.id));
+
+  return {
+    parentOf: (card) => (card && card.epic ? byId.get(card.epic) || null : null),
+    childrenOf: (id) => kids.get(id) || [],
+    progressOf: (id) => progress.get(id) || { done: 0, total: 0 },
+    isEpic: (id) => kids.has(id),
+    all: () => all,
+  };
+}
+
+/* An empty index keeps components total while the board is loading or
+   when an optimistic update rebuilds a list without one. */
+const EMPTY_EPIC_INDEX = buildEpicIndex([], new Set());
 
 /* =========================================================
    REST client — all mutations call existing endpoints.
@@ -70,17 +134,28 @@ const DEFAULT_FILTER = {
   inTags: true,
   inId: true,
   priorities: [], // empty = all pass
+  epics: [],      // parent card ids; NO_EPIC for "belongs to none"
 };
 
+/* The `No epic` pseudo-scope rides in the same array as the real epic
+   ids. A card id is always six characters, so the empty string can
+   never collide with one — no second field, no fourth state. */
+const NO_EPIC = "";
+
+/* The query, the priority set, and the epic set are independent
+   dimensions: a card must satisfy every dimension that is set. */
 function filterIsActive(f) {
-  return (f.query && f.query.trim().length > 0) || (f.priorities && f.priorities.length > 0);
+  return (f.query && f.query.trim().length > 0) ||
+    (f.priorities && f.priorities.length > 0) ||
+    (f.epics && f.epics.length > 0);
 }
 
-function matchCard(card, f) {
+function matchCard(card, f, epics) {
   if (f.priorities && f.priorities.length > 0) {
     const p = card.priority || "";
     if (!f.priorities.includes(p)) return false;
   }
+  if (f.epics && f.epics.length > 0 && !matchesEpicScope(card, f.epics, epics)) return false;
   const q = (f.query || "").trim().toLowerCase();
   if (!q) return true;
   if (!f.inTitle && !f.inDescription && !f.inTags && !f.inId) return false;
@@ -88,6 +163,26 @@ function matchCard(card, f) {
   if (f.inDescription && (card.description || "").toLowerCase().includes(q)) return true;
   if (f.inTags && (card.tags || []).some((t) => String(t).toLowerCase().includes(q))) return true;
   if (f.inId && (card.id || "").toLowerCase().includes(q)) return true;
+  return false;
+}
+
+/* OR across the selected ids. A card passes an id either by belonging
+   to it or by BEING it: an epic's parent carries no `epic` field, so
+   matching on `card.epic` alone would hide the parent — and with it
+   the glyph, the tinted border and the progress bar that are the whole
+   reason to focus an epic.
+
+   NO_EPIC means "unrelated to any epic", which is stricter than
+   "carries no epic": a parent card carries none either, and a card six
+   others point at is the least epic-less card on the board. */
+function matchesEpicScope(card, selected, epics) {
+  for (const id of selected) {
+    if (id === NO_EPIC) {
+      if (!card.epic && !(epics && epics.isEpic(card.id))) return true;
+      continue;
+    }
+    if (card.epic === id || card.id === id) return true;
+  }
   return false;
 }
 
@@ -104,6 +199,9 @@ const IconMonitor = (p) => <Icon {...p} d={<><rect x="2" y="4" width="20" height
 const IconClose = (p) => <Icon {...p} d={<><line x1="6" y1="6" x2="18" y2="18" /><line x1="6" y1="18" x2="18" y2="6" /></>} />;
 const IconDots = (p) => <Icon {...p} d={<><circle cx="5" cy="12" r="1.2" /><circle cx="12" cy="12" r="1.2" /><circle cx="19" cy="12" r="1.2" /></>} stroke={2.4} />;
 const IconCheck = (p) => <Icon {...p} d={<polyline points="20 6 9 17 4 12" />} />;
+/* Four squares — one epic holding its children. Marks both the chip on
+   a child card and the title of the parent it points at. */
+const IconEpic = (p) => <Icon {...p} d={<><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" /></>} />;
 
 /* =========================================================
    Copyable ID — click to copy, brief "Copied" feedback.
@@ -335,11 +433,19 @@ function App() {
     catch (e) { console.error(e); fetchBoard(); }
   };
 
+  // Clicking a card's epic chip toggles that epic's scope — adding to
+  // the filter rather than replacing it, like the tag chip.
+  const focusEpic = (id) => setFilter((f) => {
+    const set = new Set(f.epics || []);
+    if (set.has(id)) set.delete(id); else set.add(id);
+    return { ...f, epics: Array.from(set) };
+  });
+
   const filterActive = filterIsActive(filter);
   const filteredCount = useMemo(() => {
     if (!board || !filterActive) return 0;
     return board.lists.reduce(
-      (acc, l) => acc + l.cards.filter((c) => matchCard(c, filter)).length,
+      (acc, l) => acc + l.cards.filter((c) => matchCard(c, filter, board.epics)).length,
       0
     );
   }, [board, filter, filterActive]);
@@ -376,6 +482,7 @@ function App() {
         filteredCount={filteredCount}
         priorities={board.priorities}
         priorityColors={board.priorityColors}
+        epics={board.epics}
         theme={theme}
         sseStatus={sseStatus}
       />
@@ -385,6 +492,7 @@ function App() {
         filter={filter}
         filterActive={filterActive}
         priorityColors={board.priorityColors}
+        epics={board.epics}
         onAddList={addList}
         onRenameList={renameList}
         onRemoveList={removeList}
@@ -395,6 +503,7 @@ function App() {
         onMoveCard={moveCard}
         onMoveList={moveList}
         onOpenCard={(cardId) => setOpenCardId(cardId)}
+        onFocusEpic={focusEpic}
       />
 
       {openCardId && (() => {
@@ -408,6 +517,7 @@ function App() {
             allLists={board.lists}
             priorities={board.priorities}
             priorityColors={board.priorityColors}
+            epics={board.epics}
             onClose={() => setOpenCardId(null)}
             onPatch={(patch) => patchCard(card.id, patch)}
             onMoveColumn={(toListId) => moveCard(list.id, card.id, toListId, board.lists.find((l) => l.id === toListId).cards.length)}
@@ -423,7 +533,7 @@ function App() {
 /* =========================================================
    TopBar
 ========================================================= */
-function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFilterOpen, filteredCount, priorities, priorityColors, theme, sseStatus }) {
+function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFilterOpen, filteredCount, priorities, priorityColors, epics, theme, sseStatus }) {
   const popRef = useRef(null);
   useClickOutside(popRef, () => setFilterOpen(false), filterOpen);
 
@@ -433,6 +543,15 @@ function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFi
     if (set.has(id)) set.delete(id); else set.add(id);
     onFilterChange({ ...filter, priorities: Array.from(set) });
   };
+  const toggleEpic = (id) => {
+    const set = new Set(filter.epics || []);
+    if (set.has(id)) set.delete(id); else set.add(id);
+    onFilterChange({ ...filter, epics: Array.from(set) });
+  };
+  // Payload order, straight from the adapter: the same order the modal
+  // lists children in, and the only order the board gives them.
+  const epicList = (epics || EMPTY_EPIC_INDEX).all();
+  const selectedEpics = filter.epics || [];
   const clearFilter = () => onFilterChange({ ...DEFAULT_FILTER });
 
   return (
@@ -483,6 +602,36 @@ function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFi
                         {p[0].toUpperCase() + p.slice(1)}
                       </button>);
                   })}
+                </div>
+              </>}
+              {epicList.length > 0 && <>
+                <p className="popover-sub">Epic</p>
+                <div className="filter-pills">
+                  {epicList.map((e) => {
+                    const on = selectedEpics.includes(e.id);
+                    return (
+                      <button
+                        key={e.id}
+                        type="button"
+                        className={"filter-pill filter-pill-epic" + (on ? " on" : "")}
+                        onClick={() => toggleEpic(e.id)}
+                        aria-pressed={on}
+                        title={e.text}>
+                        <span className="filter-pill-dot" style={{ background: e.color || "var(--text-muted)" }} aria-hidden="true" />
+                        <span className="filter-pill-label">{e.text}</span>
+                      </button>);
+                  })}
+                  {(() => {
+                    const on = selectedEpics.includes(NO_EPIC);
+                    return (
+                      <button
+                        type="button"
+                        className={"filter-pill" + (on ? " on" : "")}
+                        onClick={() => toggleEpic(NO_EPIC)}
+                        aria-pressed={on}>
+                        No epic
+                      </button>);
+                  })()}
                 </div>
               </>}
               {filterActive &&
@@ -561,7 +710,7 @@ function ThemeToggle({ theme }) {
 /* =========================================================
    Board
 ========================================================= */
-function Board({ board, filter, filterActive, priorityColors, onAddList, onRenameList, onRemoveList, onAddCard, onEditCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard }) {
+function Board({ board, filter, filterActive, priorityColors, epics, onAddList, onRenameList, onRemoveList, onAddCard, onEditCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
   const [addingList, setAddingList] = useState(false);
   const dragRef = useRef({ kind: null, cardId: null, fromListId: null, listIdx: null });
   const wrapRef = useRef(null);
@@ -616,6 +765,7 @@ function Board({ board, filter, filterActive, priorityColors, onAddList, onRenam
             filter={filter}
             filterActive={filterActive}
             priorityColors={priorityColors}
+            epics={epics}
             dragRef={dragRef}
             onRename={(t) => onRenameList(list.id, t)}
             onRemove={() => onRemoveList(list.id)}
@@ -626,6 +776,7 @@ function Board({ board, filter, filterActive, priorityColors, onAddList, onRenam
             onMoveCard={onMoveCard}
             onMoveList={onMoveList}
             onOpenCard={(cid) => onOpenCard(cid)}
+            onFocusEpic={onFocusEpic}
           />)}
 
         {addingList ?
@@ -642,7 +793,7 @@ function Board({ board, filter, filterActive, priorityColors, onAddList, onRenam
 /* =========================================================
    List column
 ========================================================= */
-function ListColumn({ list, index, filter, filterActive, priorityColors, dragRef, onRename, onRemove, onAddCard, onEditCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard }) {
+function ListColumn({ list, index, filter, filterActive, priorityColors, epics, dragRef, onRename, onRemove, onAddCard, onEditCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
   const [adding, setAdding] = useState(false);
   const [isOver, setIsOver] = useState(false);
   const [draggingSelf, setDraggingSelf] = useState(false);
@@ -665,8 +816,8 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, dragRef
 
   const visibleCards = useMemo(() => {
     if (!filterActive) return list.cards;
-    return list.cards.filter((c) => matchCard(c, filter));
-  }, [list.cards, filter, filterActive]);
+    return list.cards.filter((c) => matchCard(c, filter, epics));
+  }, [list.cards, filter, filterActive, epics]);
 
   const onDragOver = (e) => {
     if (dragRef.current.kind === "card") {
@@ -719,6 +870,14 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, dragRef
           original={list.id}
           onChange={(t) => onRename(t)}
           uppercase />
+        {list.done &&
+          <span
+            className="list-done-mark"
+            title="Cards in this column count as done"
+            aria-label={`${list.title} is a terminal column`}
+            role="img">
+            <IconCheck size={12} />
+          </span>}
         <span className="list-count" title={`${list.cards.length} cards`}>{list.cards.length}</span>
         <ListMenu onRemove={onRemove} />
       </header>
@@ -734,11 +893,13 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, dragRef
             index={i}
             dragRef={dragRef}
             priorityColors={priorityColors}
+            epics={epics}
             onEdit={(t) => onEditCard(card.id, t)}
             onRemove={() => onRemoveCard(card.id)}
             onToggleTag={(tag) => onToggleTag(card.id, tag)}
             onMoveCard={onMoveCard}
-            onOpen={() => onOpenCard(card.id)} />)}
+            onOpen={() => onOpenCard(card.id)}
+            onFocusEpic={onFocusEpic} />)}
         {adding &&
           <CardComposer
             onAdd={(t) => { onAddCard(t); }}
@@ -776,7 +937,7 @@ function ListMenu({ onRemove }) {
 /* =========================================================
    Card
 ========================================================= */
-function CardItem({ card, listId, index, dragRef, priorityColors, onEdit, onRemove, onToggleTag, onMoveCard, onOpen }) {
+function CardItem({ card, listId, index, dragRef, priorityColors, epics, onEdit, onRemove, onToggleTag, onMoveCard, onOpen, onFocusEpic }) {
   const [editing, setEditing] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [dropPos, setDropPos] = useState(null);
@@ -830,10 +991,18 @@ function CardItem({ card, listId, index, dragRef, priorityColors, onEdit, onRemo
 
   const prioColor = card.priority ? (priorityColors[card.priority] || "var(--text-muted)") : null;
   const hasDesc = !!(card.description && card.description.trim());
+  const idx = epics || EMPTY_EPIC_INDEX;
+  const parent = idx.parentOf(card);
+  // The parent signals key off actually having children, not off
+  // carrying a color: a card whose last child was reassigned keeps its
+  // color and must render as an ordinary card again.
+  const isEpic = idx.isEpic(card.id);
+  const progress = isEpic ? idx.progressOf(card.id) : null;
 
   return (
     <article
-      className={"card" + (dragging ? " dragging" : "") + (dropPos ? " drop-" + dropPos : "")}
+      className={"card" + (isEpic ? " is-epic" : "") + (dragging ? " dragging" : "") + (dropPos ? " drop-" + dropPos : "")}
+      style={isEpic ? { "--epic-color": card.color || "var(--text-muted)" } : undefined}
       data-card-id={card.id}
       draggable
       onDragStart={onDragStart}
@@ -842,16 +1011,21 @@ function CardItem({ card, listId, index, dragRef, priorityColors, onEdit, onRemo
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       onClick={(e) => {
-        if (e.target.closest('.card-tag-chip, .card-tag-add, .card-tag-input, .card-delete')) return;
+        if (e.target.closest('.card-tag-chip, .card-tag-add, .card-tag-input, .card-delete, .card-epic-chip')) return;
         onOpen?.();
       }}
       onDoubleClick={(e) => {
         if (e.target.closest('.card-title')) { e.stopPropagation(); setEditing(true); }
       }}>
       <CopyableId className="card-id" value={card.id} />
-      <div className="card-title">{card.text}</div>
+      <div className="card-title">
+        {isEpic && <span className="card-epic-glyph" aria-label="Epic"><IconEpic size={12} /></span>}
+        {card.text}
+      </div>
+      {progress && <EpicProgress done={progress.done} total={progress.total} />}
       <div className="card-foot">
         {prioColor && <span className="card-prio-pill" style={{ background: prioColor }} aria-label={"Priority " + card.priority} />}
+        {parent && <EpicChip card={parent} onFocus={onFocusEpic} />}
         {hasDesc &&
           <span className="card-desc-icon" title="This card has a description" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -866,6 +1040,50 @@ function CardItem({ card, listId, index, dragRef, priorityColors, onEdit, onRemo
         <IconClose />
       </button>
     </article>);
+}
+
+/* =========================================================
+   Epic presentation — the chip a child wears, and the progress a
+   parent reports. Both are inert: assigning or recoloring an epic is
+   the CLI's job in this version.
+========================================================= */
+/* onFocus toggles this epic in the filter, mirroring the tag chip,
+   which already edits the filter on click. Passed only on the board:
+   the chip in the modal's parent row stays inert, because it sits over
+   a board the user cannot see, so a scope set from it would have no
+   observable effect until the modal closes. */
+function EpicChip({ card, onFocus }) {
+  const style = { "--epic-color": card.color || "var(--text-muted)" };
+  const body = <><IconEpic size={10} /><span className="card-epic-text">{card.text}</span></>;
+  if (!onFocus) {
+    return <span className="card-epic-chip" style={style} title={card.text}>{body}</span>;
+  }
+  return (
+    <button
+      type="button"
+      className="card-epic-chip is-clickable"
+      style={style}
+      title={`Focus ${card.text}`}
+      onClick={(e) => { e.stopPropagation(); onFocus(card.id); }}>
+      {body}
+    </button>);
+}
+
+function EpicProgress({ done, total, className }) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  return (
+    <div className={"epic-progress" + (className ? " " + className : "")}>
+      <div
+        className="epic-bar"
+        role="progressbar"
+        aria-valuenow={done}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={`${done} of ${total} children done`}>
+        <span className="epic-bar-fill" style={{ width: pct + "%" }} />
+      </div>
+      <span className="epic-count">{done}/{total}</span>
+    </div>);
 }
 
 function CardTags({ tags, onToggle }) {
@@ -1066,7 +1284,7 @@ function formatAbsolute(iso) {
   return d.toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function CardDetailModal({ card, list, allLists, priorities, priorityColors, onClose, onPatch, onMoveColumn, onToggleTag, onRemove }) {
+function CardDetailModal({ card, list, allLists, priorities, priorityColors, epics, onClose, onPatch, onMoveColumn, onToggleTag, onRemove }) {
   const overlayRef = useRef(null);
   const [descDraft, setDescDraft] = useState(card.description || "");
   const [editingDesc, setEditingDesc] = useState(false);
@@ -1118,6 +1336,14 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, onC
   const prio = card.priority;
   const prioColor = prio ? (priorityColors[prio] || "var(--text-muted)") : null;
   const tags = card.tags || [];
+
+  // One-level nesting makes "child and parent at once" unrepresentable,
+  // so at most one of these two sections ever renders.
+  const idx = epics || EMPTY_EPIC_INDEX;
+  const parent = idx.parentOf(card);
+  const children = idx.childrenOf(card.id);
+  const progress = children.length > 0 ? idx.progressOf(card.id) : null;
+  const columnTitle = (name) => (allLists.find((l) => l.id === name) || {}).title || name;
 
   return (
     <div
@@ -1245,6 +1471,33 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, onC
                   No description. Click to add one.
                 </button>}
           </section>
+
+          {/* Relation sections are read-only in this version: no add,
+              remove, reassign, or color control. The next change drops
+              the card picker and the swatches into these containers. */}
+          {parent &&
+            <section className="modal-section modal-epic">
+              <div className="modal-section-head"><label className="modal-label">Epic</label></div>
+              <div className="modal-epic-parent">
+                <EpicChip card={parent} />
+                <span className="modal-epic-id">{parent.id}</span>
+              </div>
+            </section>}
+
+          {progress &&
+            <section
+              className="modal-section modal-epic"
+              style={{ "--epic-color": card.color || "var(--text-muted)" }}>
+              <div className="modal-section-head"><label className="modal-label">Children</label></div>
+              <EpicProgress done={progress.done} total={progress.total} className="modal-epic-progress" />
+              <ul className="modal-epic-children">
+                {children.map((c) =>
+                  <li key={c.id} className="modal-epic-child">
+                    <span className="modal-epic-child-title" title={c.text}>{c.text}</span>
+                    <span className="modal-epic-child-col">{columnTitle(c.column)}</span>
+                  </li>)}
+              </ul>
+            </section>}
 
           <section className="modal-section">
             <div className="modal-section-head"><label className="modal-label">Tags</label></div>

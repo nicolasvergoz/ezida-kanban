@@ -282,6 +282,16 @@ input, textarea { font: inherit; color: inherit; }
   display: inline-block;
   flex-shrink: 0;
 }
+/* An epic pill is labelled with a card title, so unlike a priority it
+   has no bounded length. Cap it and truncate; the full title lives in
+   the `title` attribute. A popover that stretched to the longest epic
+   title would be worse than a clipped pill. */
+.filter-pill-epic { max-width: 150px; }
+.filter-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .filter-clear {
   margin-top: 10px;
   font-size: 12px;
@@ -634,6 +644,120 @@ input, textarea { font: inherit; color: inherit; }
   min-width: 60px;
 }
 .card-tag-input::placeholder { color: var(--text-faint); }
+
+/* ============ Epics ============
+   One hex is stored per epic and has to stay legible on both the cream
+   and the navy ground. The chip never paints the stored hex directly:
+   it mixes it toward the theme's current --text (near-black on light,
+   near-white on dark) into --epic-tone, then derives background,
+   border, and text from that single tone — the same per-theme mix
+   pattern .card-tag-chip already uses.
+
+   Colour alone is what separates an epic chip from a tag chip, so both
+   keep the pill shape and no new shape vocabulary enters the card. */
+.card-epic-chip {
+  --epic-tone: color-mix(in srgb, var(--epic-color) 70%, var(--text));
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--epic-tone) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--epic-tone) 36%, transparent);
+  color: var(--epic-tone);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  max-width: 140px;
+  flex-shrink: 0;
+}
+[data-theme="light"] .card-epic-chip {
+  --epic-tone: color-mix(in srgb, var(--epic-color) 62%, var(--text));
+  background: color-mix(in srgb, var(--epic-tone) 10%, transparent);
+  border-color: color-mix(in srgb, var(--epic-tone) 24%, transparent);
+}
+.card-epic-chip svg { width: 10px; height: 10px; flex-shrink: 0; opacity: 0.9; }
+/* Clickable only on the board. The chip in the modal's parent row is a
+   span and keeps the default cursor, because there is nothing behind
+   the dialog for a scope to act on. */
+.card-epic-chip.is-clickable {
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.card-epic-chip.is-clickable:hover {
+  background: color-mix(in srgb, var(--epic-tone) 30%, transparent);
+  border-color: color-mix(in srgb, var(--epic-tone) 55%, transparent);
+}
+[data-theme="light"] .card-epic-chip.is-clickable:hover {
+  background: color-mix(in srgb, var(--epic-tone) 18%, transparent);
+  border-color: color-mix(in srgb, var(--epic-tone) 38%, transparent);
+}
+.card-epic-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Parent signals: glyph, tinted border, progress bar. All three are
+   gated in app.jsx on the card actually having children, so a board
+   with no epic relations renders exactly as it did before. */
+.card.is-epic {
+  border-color: color-mix(in srgb, var(--epic-color) 45%, var(--border));
+}
+.card.is-epic:hover {
+  border-color: color-mix(in srgb, var(--epic-color) 62%, var(--border-strong));
+}
+.card-epic-glyph {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: -1px;
+  margin-right: 5px;
+  color: color-mix(in srgb, var(--epic-color) 70%, var(--text));
+}
+[data-theme="light"] .card-epic-glyph {
+  color: color-mix(in srgb, var(--epic-color) 62%, var(--text));
+}
+.card-epic-glyph svg { width: 12px; height: 12px; }
+
+.epic-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.epic-bar {
+  flex: 1;
+  height: 4px;
+  min-width: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  overflow: hidden;
+}
+.epic-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--epic-color, var(--text-muted)) 72%, var(--text));
+  transition: width 0.18s ease;
+}
+.epic-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+
+/* Terminal-column marker — metadata, not an action, so it reads in the
+   faint foreground and never as a button. */
+.list-done-mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
+.list-done-mark svg { width: 12px; height: 12px; }
 
 .card-delete {
   position: absolute;
@@ -1281,6 +1405,63 @@ button:active:not(:disabled) { transform: translateY(0.5px); }
   border-radius: 4px;
 }
 .modal-section-edit:hover { background: var(--surface-2); color: var(--text); }
+
+/* Read-only relation sections. The containers are sized for what the
+   next change drops into them — a card picker beside the parent chip,
+   colour swatches under the children list — so adding those does not
+   re-lay-out the modal. */
+.modal-epic-parent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.modal-epic-id {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.modal-epic-progress { padding: 0 2px; }
+.modal-epic-children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.modal-epic-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--surface-2);
+  font-size: 13px;
+  color: var(--text);
+}
+.modal-epic-child + .modal-epic-child { border-top: 1px solid var(--border); }
+.modal-epic-child-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.modal-epic-child-col {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  flex-shrink: 0;
+}
 
 .modal-desc {
   font-size: 14px;

@@ -1,5 +1,14 @@
 # viewer-server
 
+## Purpose
+
+The HTTP server behind `ezida serve`. Binds loopback-only, serves the
+embedded viewer assets, and exposes the REST surface the viewer
+mutates the board through — `/api/board`, the card and column
+endpoints, and the `/api/events` SSE stream that pushes external
+edits to `kanban.toml`. Every response, including errors, uses the
+same JSON envelope the CLI emits under `--json`.
+## Requirements
 ### Requirement: `ezida serve` launches an HTTP server on localhost
 
 `ezida serve [--port=N] [--no-open]` SHALL bind an HTTP server on
@@ -110,10 +119,29 @@ in-flight requests with a 5 s timeout, then exit with code `0`.
 
 `GET /api/board` SHALL load `kanban.toml` from the current working
 directory at request time and respond with a JSON object containing
-`schema_version`, `columns`, `priorities`, `priority_colors`,
-`cards_per_column`, `cards`, and `project_name`. The `cards` array
-MUST include the full `description` field for every card. Response
-`Content-Type` MUST be `application/json`.
+`schema_version`, `columns`, `done_columns`, `priorities`,
+`priority_colors`, `cards_per_column`, `cards`, and `project_name`. The
+`cards` array MUST include the full `description` field for every card.
+Response `Content-Type` MUST be `application/json`.
+
+Each card object MAY carry `epic` (the six-character id of another card
+on the board) and `color` (a CSS hex string). Both fields use
+`omitempty` semantics — a card with neither produces a payload
+byte-identical to the pre-epic shape.
+
+The response MUST NOT carry any denormalized relation data: no
+`epic_title`, no `epic_color`, no `children`, no `progress`. The
+envelope already contains every card on the board, so a client resolves
+a parent by id and counts children itself. Duplicating that data would
+create a second source of truth that every mutation endpoint would have
+to keep correct.
+
+The top-level `columns` array MUST contain bare column names. Terminal
+status is reported separately in `done_columns`, a string array listing
+the names of columns whose cards count as done. The `*` marker used in
+`kanban.toml` MUST NEVER appear in any response field. `done_columns`
+MUST always be present, even when empty (`[]`), and every entry MUST
+also appear in `columns`.
 
 The top-level `project_name` field is a string set at server start
 to `filepath.Base(filepath.Dir(<resolved boardPath>))` — i.e. the
@@ -145,12 +173,14 @@ values MUST always win over defaults.
   `kanban.toml` contains 2 columns and 3 cards
 - **THEN** the response status is `200`
 - **AND** `Content-Type` is `application/json`
-- **AND** the body's `schema_version` equals `1`
+- **AND** the body's `schema_version` equals `2`
 - **AND** `cards_per_column` reflects the per-column count
 - **AND** each card in `cards` has a `description` field (may be
   empty string)
 - **AND** the body contains a top-level string field `project_name`
 - **AND** the body contains a top-level object field `priority_colors`
+  (possibly empty)
+- **AND** the body contains a top-level array field `done_columns`
   (possibly empty)
 
 #### Scenario: Project name reflects parent directory
@@ -182,7 +212,7 @@ values MUST always win over defaults.
 #### Scenario: Board file has wrong schema version
 
 - **WHEN** `GET /api/board` is called against a `kanban.toml` whose
-  `schema_version` is not `1`
+  `schema_version` is not `2`
 - **THEN** the response status is `500`
 - **AND** the body's `error.code` is `SCHEMA_VERSION_MISMATCH`
 
@@ -215,6 +245,44 @@ values MUST always win over defaults.
   `[board.priority_colors] = { urgent = "#ff0000" }`
 - **THEN** the response body's `priority_colors` equals
   `{"urgent":"#ff0000"}`
+
+#### Scenario: Epic and color are carried per card
+
+- **WHEN** `GET /api/board` is called against a board where card
+  `f20wbo` has `epic = 'rl4m9x'` and card `rl4m9x` has
+  `color = '#8b5cf6'`
+- **THEN** the `f20wbo` object's `epic` equals `"rl4m9x"`
+- **AND** the `rl4m9x` object's `color` equals `"#8b5cf6"`
+
+#### Scenario: Cards without epic or color omit the keys
+
+- **WHEN** `GET /api/board` is called against a board where no card
+  carries an `epic` or a `color`
+- **THEN** no object in `cards` contains an `epic` key
+- **AND** no object in `cards` contains a `color` key
+
+#### Scenario: No relation data is denormalized
+
+- **WHEN** `GET /api/board` is called against a board containing an
+  epic with three children
+- **THEN** no object in `cards` contains `epic_title`, `epic_color`,
+  `children`, or `progress`
+
+#### Scenario: Terminal columns are reported separately from names
+
+- **WHEN** `GET /api/board` is called against a board whose
+  `[board].columns` is `['todo', 'shipped*', 'wont-fix*']`
+- **THEN** the response body's `columns` equals
+  `["todo","shipped","wont-fix"]`
+- **AND** `done_columns` equals `["shipped","wont-fix"]`
+- **AND** no string anywhere in the response contains a `*` character
+
+#### Scenario: A board with no terminal column reports an empty array
+
+- **WHEN** `GET /api/board` is called against a board where no column
+  carries the marker
+- **THEN** `done_columns` equals `[]`
+- **AND** the response status is `200`
 
 ### Requirement: Static assets served from embedded FS
 
@@ -970,3 +1038,4 @@ Existing codes reused: `INVALID_BODY`, `COLUMN_NOT_FOUND`,
 - **THEN** the literal `error.code` string MUST match the code
   exactly (UPPER_SNAKE_CASE), with no version suffix or namespace
   prefix
+

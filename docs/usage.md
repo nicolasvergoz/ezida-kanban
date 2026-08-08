@@ -258,6 +258,19 @@ drains in-flight requests within 5 seconds.
 - Add a new column, rename a column inline, delete an empty
   column, or drag columns to reorder them.
 - Filter visible cards by title, tag, or priority.
+- See which epic a card belongs to: a colored chip in the card
+  footer, named after the parent card.
+- Spot an epic at a glance: a four-square glyph before its title, a
+  border tinted with its color, and a `done/total` progress bar.
+- See which columns count as done — a check mark in the column
+  header — so the progress numbers are readable.
+- Read the full relation in the card modal: the parent a card belongs
+  to, or the children an epic holds with their columns. Assigning and
+  recoloring an epic is CLI-only for now (`ezida epic`).
+- Focus one epic: click its chip on any card, or pick it in the
+  filter popover's Epic section — the viewer's counterpart to
+  `ezida list --epic`. The parent stays visible with its progress
+  bar. A `No epic` pill shows the work that belongs to nothing.
 - Toggle between light and dark themes.
 
 The authoritative behavioural contract lives in

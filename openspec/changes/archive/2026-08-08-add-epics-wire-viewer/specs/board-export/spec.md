@@ -1,9 +1,7 @@
-# board-export Specification
+# board-export Specification (delta)
 
-## Purpose
+## MODIFIED Requirements
 
-The `ezida export` command emits a JSON snapshot of the board with the same shape as the viewer's `GET /api/board` endpoint, so static consumers (the demo viewer, scripts, integrations) can ingest the board through the exact response format the live viewer uses.
-## Requirements
 ### Requirement: `ezida export --json` emits the full board envelope
 The CLI SHALL provide an `export` subcommand that, when invoked with `--json`, writes the same JSON envelope to stdout as the viewer's `GET /api/board` endpoint.
 
@@ -41,11 +39,3 @@ Like `GET /api/board`, the export MUST NOT carry denormalized relation data — 
 - **WHEN** `ezida export --json` and `GET /api/board` are run against the same `kanban.toml` containing an epic with children
 - **THEN** both documents MUST contain the same set of top-level keys
 - **AND** the corresponding card objects MUST contain the same set of keys
-
-### Requirement: Exit codes mirror other read commands
-The command SHALL exit non-zero on any error loading the board (missing file, invalid TOML, validation error) using the same error envelope format as `ezida board` and `ezida list`.
-
-#### Scenario: Missing kanban.toml
-- **WHEN** `ezida export --json` is run from a directory without `kanban.toml`
-- **THEN** the command exits non-zero and emits a JSON error envelope to stdout
-

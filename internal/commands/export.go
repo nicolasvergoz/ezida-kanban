@@ -58,6 +58,8 @@ func runExport(cmd *cobra.Command, path string, asJSON bool) error {
 			Priority:    c.Priority,
 			Tags:        tags,
 			Description: c.Description,
+			Epic:        c.Epic,
+			Color:       c.Color,
 			CreatedAt:   c.CreatedAt,
 			UpdatedAt:   c.UpdatedAt,
 		})
@@ -66,6 +68,7 @@ func runExport(cmd *cobra.Command, path string, asJSON bool) error {
 	env := output.ExportEnvelope{
 		SchemaVersion:  b.SchemaVersion,
 		Columns:        b.Board.Columns,
+		DoneColumns:    b.Board.DoneColumns(),
 		Priorities:     b.Board.Priorities,
 		PriorityColors: board.ResolvePriorityColors(b.Board.Priorities, b.Board.PriorityColors),
 		CardsPerColumn: counts,

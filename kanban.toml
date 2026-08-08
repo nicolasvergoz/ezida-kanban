@@ -16,28 +16,8 @@ title = 'Windows support'
 column = 'backlog'
 description = "Verify and document Windows compatibility for ezida CLI + viewer: path handling, file locking, browser auto-open ('start' instead of 'open'/'xdg-open'), install script, build artifacts."
 created_at = 2026-05-21T22:09:43Z
-updated_at = 2026-05-28T09:35:44Z
+updated_at = 2026-08-08T14:54:45Z
 tags = ['cli', 'platform']
-priority = 'medium'
-
-[[cards]]
-id = 'f20wbo'
-title = 'Card dependencies'
-column = 'backlog'
-description = "Allow a card to declare dependencies on other cards (blocked-by / blocks). CLI: ezida edit <id> --depends-on <id>,<id> (and --no-depends-on to clear). Viewer: show linked cards in the detail modal with their status, and a small badge on the card when it has unmet dependencies (deps not in 'done'). Goal: surface blocking relationships so the board reflects what is actually actionable now."
-created_at = 2026-05-23T09:09:28Z
-updated_at = 2026-05-23T09:10:22Z
-tags = ['cli', 'viewer', 'schema']
-priority = 'medium'
-
-[[cards]]
-id = 'wrshlo'
-title = 'Card due dates'
-column = 'backlog'
-description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance.\n\nNotifications / events list: because cards can have deadlines, surface overdue + due-soon cards in a dedicated list somewhere in the UI (notification panel, events feed, sidebar widget — form TBD). Lets the user see at a glance what slipped or is about to slip without scanning the whole board. Each entry links back to the card."
-created_at = 2026-05-23T09:09:28Z
-updated_at = 2026-05-29T08:44:18Z
-tags = ['cli', 'viewer', 'schema']
 priority = 'medium'
 
 [[cards]]
@@ -48,16 +28,6 @@ description = 'Generate site/assets/screenshot-{light,dark}.png from the live /d
 created_at = 2026-05-23T09:20:45Z
 updated_at = 2026-05-23T09:20:45Z
 tags = ['site']
-priority = 'low'
-
-[[cards]]
-id = 'o3d4aa'
-title = 'Archive cards'
-column = 'backlog'
-description = "Archive cards out of the active board into separate storage (e.g. kanban.archive.toml or .kanban/archive/ folder — TBD). CLI: 'ezida archive <id>'. Viewer: archive action on card. Archived cards excluded from board/list by default; surface via 'ezida archive list' or viewer toggle."
-created_at = 2026-05-21T22:09:11Z
-updated_at = 2026-05-23T09:27:26Z
-tags = ['cli', 'viewer', 'schema']
 priority = 'low'
 
 [[cards]]
@@ -77,6 +47,16 @@ column = 'backlog'
 description = ''
 created_at = 2026-05-29T08:41:50Z
 updated_at = 2026-05-29T08:41:50Z
+tags = []
+priority = 'low'
+
+[[cards]]
+id = '5fdy8j'
+title = 'Fix mobile version'
+column = 'done'
+description = ''
+created_at = 2026-05-26T07:04:16Z
+updated_at = 2026-08-08T14:54:23Z
 tags = []
 priority = 'low'
 
@@ -219,11 +199,45 @@ tags = ['viewer', 'ux']
 priority = 'medium'
 
 [[cards]]
-id = '5fdy8j'
-title = 'Fix mobile version'
+id = 'nzmotf'
+title = 'Card model extensions'
 column = 'todo'
-description = ''
-created_at = 2026-05-26T07:04:16Z
-updated_at = 2026-05-28T08:55:42Z
-tags = []
+description = 'Umbrella for the card-schema features that extend what a card can hold.'
+created_at = 2026-08-08T14:48:46Z
+updated_at = 2026-08-08T15:00:45Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'medium'
+color = '#8b5cf6'
+
+[[cards]]
+id = 'f20wbo'
+title = 'Card dependencies'
+column = 'todo'
+description = "Allow a card to declare dependencies on other cards (blocked-by / blocks). CLI: ezida edit <id> --depends-on <id>,<id> (and --no-depends-on to clear). Viewer: show linked cards in the detail modal with their status, and a small badge on the card when it has unmet dependencies (deps not in 'done'). Goal: surface blocking relationships so the board reflects what is actually actionable now."
+created_at = 2026-05-23T09:09:28Z
+updated_at = 2026-08-08T15:00:25Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'medium'
+epic = 'nzmotf'
+
+[[cards]]
+id = 'wrshlo'
+title = 'Card due dates'
+column = 'todo'
+description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance.\n\nNotifications / events list: because cards can have deadlines, surface overdue + due-soon cards in a dedicated list somewhere in the UI (notification panel, events feed, sidebar widget — form TBD). Lets the user see at a glance what slipped or is about to slip without scanning the whole board. Each entry links back to the card."
+created_at = 2026-05-23T09:09:28Z
+updated_at = 2026-08-08T15:00:38Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'medium'
+epic = 'nzmotf'
+
+[[cards]]
+id = 'o3d4aa'
+title = 'Archive cards'
+column = 'todo'
+description = "Archive cards out of the active board into separate storage (e.g. kanban.archive.toml or .kanban/archive/ folder — TBD). CLI: 'ezida archive <id>'. Viewer: archive action on card. Archived cards excluded from board/list by default; surface via 'ezida archive list' or viewer toggle."
+created_at = 2026-05-21T22:09:11Z
+updated_at = 2026-08-08T15:00:51Z
+tags = ['cli', 'viewer', 'schema']
 priority = 'low'
+epic = 'nzmotf'

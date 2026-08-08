@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -11,17 +12,73 @@ import (
 	"github.com/nicolasvergoz/ezida-kanban/internal/output"
 )
 
-// TestExport_DoesNotExposeEpicOrColor pins a deliberate, time-boxed
-// inconsistency: `ezida get --json` reports epic data while
-// `ezida export` does not.
+// TestExport_ExposesEpicAndColor closes the deliberate, time-boxed
+// inconsistency this file used to pin: `ezida get --json` reported epic
+// data while `ezida export` did not.
 //
 // output.ExportCard and server.cardResponse are parallel structs kept
-// in shape-sync by convention, and they move together in the wire
-// change. Until then this test exists so the gap is a recorded decision
-// rather than something rediscovered as a bug — and so that closing it
-// is a deliberate edit here, not a silent one.
-func TestExport_DoesNotExposeEpicOrColor(t *testing.T) {
-	path := copyEpicsFixture(t)
+// in shape-sync by convention; the structural half of that contract is
+// enforced by TestWireShape_ExportMatchesBoard in internal/server. This
+// test covers the other half — that runExport actually populates the
+// fields it declares.
+func TestExport_ExposesEpicAndColor(t *testing.T) {
+	env := exportFixture(t, copyEpicsFixture(t))
+	byID := make(map[string]map[string]any, len(env.Cards))
+	for _, c := range env.Cards {
+		byID[c["id"].(string)] = c
+	}
+	if len(byID) == 0 {
+		t.Fatal("export returned no cards")
+	}
+	if got := byID["f20wbo"]["epic"]; got != "rl4m9x" {
+		t.Errorf("f20wbo.epic = %v, want rl4m9x", got)
+	}
+	if got := byID["rl4m9x"]["color"]; got != "#8b5cf6" {
+		t.Errorf("rl4m9x.color = %v, want #8b5cf6", got)
+	}
+	// Like /api/board, the export carries the raw ids only — resolving
+	// the relation is the consumer's job (design D1).
+	for _, c := range env.Cards {
+		for _, key := range []string{"epic_title", "epic_color", "children", "progress"} {
+			if _, present := c[key]; present {
+				t.Errorf("card %v carries denormalized field %q", c["id"], key)
+			}
+		}
+	}
+}
+
+// TestExport_TerminalColumnsAreBarePlusDoneColumns checks that the
+// `*` spelling stays on disk and terminal status travels in its own
+// array, exactly as GET /api/board reports it.
+func TestExport_TerminalColumnsAreBarePlusDoneColumns(t *testing.T) {
+	env := exportFixture(t, copyEpicsFixture(t))
+	wantCols := []string{"backlog", "todo", "done"}
+	if !reflect.DeepEqual(env.Columns, wantCols) {
+		t.Errorf("columns = %v, want %v", env.Columns, wantCols)
+	}
+	wantDone := []string{"done"}
+	if !reflect.DeepEqual(env.DoneColumns, wantDone) {
+		t.Errorf("done_columns = %v, want %v", env.DoneColumns, wantDone)
+	}
+	if strings.Contains(env.raw, "*") {
+		t.Errorf("export output contains a '*' character: %s", env.raw)
+	}
+}
+
+// exportEnvelope is the decoded export output plus the raw bytes, so
+// tests can assert both on structure and on key presence (omitempty is
+// only observable through the generic card maps).
+type exportEnvelope struct {
+	Columns     []string         `json:"columns"`
+	DoneColumns []string         `json:"done_columns"`
+	Cards       []map[string]any `json:"cards"`
+	raw         string
+}
+
+// exportFixture runs `ezida export` against the board at path and
+// returns the decoded envelope.
+func exportFixture(t *testing.T, path string) exportEnvelope {
+	t.Helper()
 	cmd := &cobra.Command{
 		Use: "export", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -32,23 +89,12 @@ func TestExport_DoesNotExposeEpicOrColor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("export: %v", err)
 	}
-	var env struct {
-		Cards []map[string]any `json:"cards"`
-	}
+	var env exportEnvelope
 	if err := json.Unmarshal([]byte(stdout), &env); err != nil {
 		t.Fatalf("not JSON: %v", err)
 	}
-	if len(env.Cards) == 0 {
-		t.Fatal("export returned no cards")
-	}
-	for _, c := range env.Cards {
-		for _, key := range []string{"epic", "color"} {
-			if _, present := c[key]; present {
-				t.Errorf("card %v exposes %q — if the wire change has landed, "+
-					"update this test rather than deleting it", c["id"], key)
-			}
-		}
-	}
+	env.raw = stdout
+	return env
 }
 
 // The two directions of a version mismatch have different answers, and

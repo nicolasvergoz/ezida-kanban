@@ -10,13 +10,46 @@ The project's specs and change history live under
 [`openspec/`](../openspec/). Each phase of v1 was developed as an
 OpenSpec change with proposal, design, and per-capability spec deltas.
 
-To run the test suite locally:
+To run the full verification loop locally:
 
 ```sh
-go test ./...
-go vet ./...
-shellcheck -s sh scripts/install.sh
+./scripts/verify.sh
 ```
+
+That is gofmt, `go vet`, `go test ./...`, shellcheck, and the browser
+tests. Pass `--go` to skip the browser half when you have not set it
+up, or `--visual` to also compare the viewer against pixel baselines.
+
+### Browser tests
+
+The viewer is covered by [Playwright](https://playwright.dev) specs in
+[`e2e/`](../e2e/). Each one compiles the CLI from the working tree,
+boots the real `ezida serve` against a throwaway fixture board, and
+drives the page — so a single run covers the Go handlers, the JSON
+wire, the adapter, and the rendering.
+
+They need their dependencies once per checkout:
+
+```sh
+npm install
+npx playwright install chromium
+npx playwright test           # or: npm run test:e2e
+npx playwright test --ui      # pick and debug individual tests
+```
+
+Visual comparisons are opt-in, because their baselines are captured on
+one machine's font stack and will not match elsewhere:
+
+```sh
+npm run test:e2e:visual
+npm run test:e2e:update-snapshots   # after an intended visual change
+```
+
+Two things the suite deliberately does not cover: whether the UI
+*looks* right, which still needs a human, and native HTML5 drag and
+drop, which Playwright's mouse synthesis cannot reliably drive.
+
+CI runs the Go gate only — the browser tests are a local loop for now.
 
 Development uses the OpenSpec workflow. The relevant slash commands
 in Claude Code are:

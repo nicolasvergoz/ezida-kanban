@@ -1,0 +1,27 @@
+# No epic, no color, no terminal column. Everything the epic features
+# add must be absent here — this fixture is the "unchanged for anyone
+# not using the feature" guarantee.
+schema_version = 2
+
+[board]
+columns = ['todo', 'done']
+priorities = ['low', 'high']
+
+[[cards]]
+id = 'aaaaaa'
+title = 'Write the docs'
+column = 'todo'
+description = 'A plain card.'
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = ['docs']
+priority = 'high'
+
+[[cards]]
+id = 'bbbbbb'
+title = 'Ship it'
+column = 'done'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []

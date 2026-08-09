@@ -44,3 +44,11 @@ site/assets/screenshot-light.png
 
 # Migration backups written by `ezida migrate`
 kanban.toml.*.bak
+
+# Node tooling for the browser tests (the Go module is the project)
+/node_modules/
+/e2e/.bin/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

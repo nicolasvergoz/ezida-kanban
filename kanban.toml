@@ -11,6 +11,28 @@ low = '#22c55e'
 medium = '#f59e0b'
 
 [[cards]]
+id = 'wrshlo'
+title = 'Card due dates'
+column = 'backlog'
+description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance.\n\nNotifications / events list: because cards can have deadlines, surface overdue + due-soon cards in a dedicated list somewhere in the UI (notification panel, events feed, sidebar widget — form TBD). Lets the user see at a glance what slipped or is about to slip without scanning the whole board. Each entry links back to the card."
+created_at = 2026-05-23T09:09:28Z
+updated_at = 2026-08-09T14:16:49Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'medium'
+epic = 'nzmotf'
+
+[[cards]]
+id = 'f20wbo'
+title = 'Card dependencies'
+column = 'backlog'
+description = "Allow a card to declare dependencies on other cards (blocked-by / blocks). CLI: ezida edit <id> --depends-on <id>,<id> (and --no-depends-on to clear). Viewer: show linked cards in the detail modal with their status, and a small badge on the card when it has unmet dependencies (deps not in 'done'). Goal: surface blocking relationships so the board reflects what is actually actionable now."
+created_at = 2026-05-23T09:09:28Z
+updated_at = 2026-08-09T14:16:52Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'low'
+epic = 'nzmotf'
+
+[[cards]]
 id = 'r0kn99'
 title = 'Windows support'
 column = 'backlog'
@@ -49,6 +71,72 @@ created_at = 2026-05-29T08:41:50Z
 updated_at = 2026-05-29T08:41:50Z
 tags = []
 priority = 'low'
+
+[[cards]]
+id = 'dvnpih'
+title = 'Card epics'
+column = 'done'
+description = "One card may point at another with `epic = <id>`: the parent is the epic, the pointing cards are its children. Nesting is exactly one level, and the relation is documentary — it never blocks a move or a delete.\n\nDelivered in five changes, from the file format up to the viewer. Specs live in openspec/specs/card-epics/, board-config/, viewer-server/ and viewer-ui/."
+created_at = 2026-08-09T14:11:19Z
+updated_at = 2026-08-09T14:11:31Z
+tags = ['schema', 'viewer']
+priority = 'medium'
+color = '#10b981'
+
+[[cards]]
+id = 'msf47i'
+title = 'Epic schema, palette, validation and CLI'
+column = 'done'
+description = "The `epic` and `color` fields, the 8-colour palette ordered by chromatic distance so two epics created in a row stay distinguishable at 18px, the validation rules, the CLI flags and the migration.\n\nShipped in 5fdd328."
+created_at = 2026-08-09T14:11:31Z
+updated_at = 2026-08-09T14:11:31Z
+tags = ['schema', 'cli']
+priority = 'medium'
+epic = 'dvnpih'
+
+[[cards]]
+id = '0vyyjq'
+title = 'Render epics in the viewer'
+column = 'done'
+description = "Wire plus a read-only board: the epic chip on a child, the children list and progress bar on a parent, the terminal-column mark in the list header.\n\nThe wire stays normalised — GET /api/board returns every card, so it carries raw `epic` and `color` ids and no epic_title, children or progress. The client resolves relations once per load in toUiBoard's index. Deliberate divergence from the handoff artifact, which asked for a denormalised payload.\n\nShipped in bd15c5e."
+created_at = 2026-08-09T14:11:31Z
+updated_at = 2026-08-09T14:11:31Z
+tags = ['viewer']
+priority = 'medium'
+epic = 'dvnpih'
+
+[[cards]]
+id = 'xeaa34'
+title = 'Focus an epic from the filter'
+column = 'done'
+description = "Scope the board to one epic from the filter popover. Clicking a card's epic chip toggles that scope.\n\nA focused epic stays visible: the clause is `card.epic === id || card.id === id`. Without the second half, focusing an epic makes it vanish along with its own progress bar and counter.\n\n`No epic` means \"unlinked\", not \"has no epic field\" — a parent carries no epic field either, so the naive definition would list it as unlinked. The reserved key is the empty string.\n\nShipped in bd15c5e."
+created_at = 2026-08-09T14:11:44Z
+updated_at = 2026-08-09T14:11:44Z
+tags = ['viewer', 'ux']
+priority = 'low'
+epic = 'dvnpih'
+
+[[cards]]
+id = 'y7sslg'
+title = 'Edit the epic link and color from the modal'
+column = 'done'
+description = "EpicPicker combobox, attach/detach from either side, the 8-colour swatch, and an error area in the modal.\n\nEvery relation write is a PATCH on the child: its `epic` field is the only storage of the relation, so attaching from the parent, from the child, reassigning and detaching are all the same call. The parent is never written by the client.\n\nTwo server holes closed: InvalidEpicError and InvalidColorError fell through to a 500, and CheckEpicTarget was asymmetric — it refused attaching a card to a child but not giving an epic to a card that already had children.\n\nShipped in 0812155."
+created_at = 2026-08-09T14:11:44Z
+updated_at = 2026-08-09T14:11:44Z
+tags = ['viewer', 'ux']
+priority = 'medium'
+epic = 'dvnpih'
+
+[[cards]]
+id = 'fvran4'
+title = 'Toggle a terminal column from the viewer'
+column = 'done'
+description = "Marking a column terminal was the last CLI-only piece of board taxonomy, even though epic progress is counted off it.\n\nTwo paths: a staged check beside the inline rename that commits in the same PATCH, and a Terminal column entry in the ⋯ menu. The check acts on mousedown with preventDefault — a click blurs the input first, and blur is what commits the rename.\n\nShipped in 271552b."
+created_at = 2026-08-09T14:11:44Z
+updated_at = 2026-08-09T14:11:44Z
+tags = ['viewer']
+priority = 'low'
+epic = 'dvnpih'
 
 [[cards]]
 id = '5fdy8j'
@@ -210,34 +298,12 @@ priority = 'medium'
 color = '#8b5cf6'
 
 [[cards]]
-id = 'f20wbo'
-title = 'Card dependencies'
-column = 'todo'
-description = "Allow a card to declare dependencies on other cards (blocked-by / blocks). CLI: ezida edit <id> --depends-on <id>,<id> (and --no-depends-on to clear). Viewer: show linked cards in the detail modal with their status, and a small badge on the card when it has unmet dependencies (deps not in 'done'). Goal: surface blocking relationships so the board reflects what is actually actionable now."
-created_at = 2026-05-23T09:09:28Z
-updated_at = 2026-08-08T15:00:25Z
-tags = ['cli', 'viewer', 'schema']
-priority = 'medium'
-epic = 'nzmotf'
-
-[[cards]]
-id = 'wrshlo'
-title = 'Card due dates'
-column = 'todo'
-description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance.\n\nNotifications / events list: because cards can have deadlines, surface overdue + due-soon cards in a dedicated list somewhere in the UI (notification panel, events feed, sidebar widget — form TBD). Lets the user see at a glance what slipped or is about to slip without scanning the whole board. Each entry links back to the card."
-created_at = 2026-05-23T09:09:28Z
-updated_at = 2026-08-08T15:00:38Z
-tags = ['cli', 'viewer', 'schema']
-priority = 'medium'
-epic = 'nzmotf'
-
-[[cards]]
 id = 'o3d4aa'
 title = 'Archive cards'
 column = 'todo'
 description = "Archive cards out of the active board into separate storage (e.g. kanban.archive.toml or .kanban/archive/ folder — TBD). CLI: 'ezida archive <id>'. Viewer: archive action on card. Archived cards excluded from board/list by default; surface via 'ezida archive list' or viewer toggle."
 created_at = 2026-05-21T22:09:11Z
-updated_at = 2026-08-08T15:00:51Z
+updated_at = 2026-08-09T14:16:46Z
 tags = ['cli', 'viewer', 'schema']
-priority = 'low'
+priority = 'medium'
 epic = 'nzmotf'

@@ -307,3 +307,13 @@ updated_at = 2026-08-09T14:16:46Z
 tags = ['cli', 'viewer', 'schema']
 priority = 'medium'
 epic = 'nzmotf'
+
+[[cards]]
+id = 'nvwk16'
+title = 'Move a card to the top of its new column (CLI)'
+column = 'todo'
+description = "`ezida move <id> <column>` appends the card to the bottom of the target column. On a long column — `done` has 21 cards — you have to scroll all the way down to see what you just moved. The thing you most want to see is the hardest to find.\n\nWanted: a CLI move places the card at the **top** of the target column.\n\nScope: `ezida move` and `ezida edit --column`, which share the same placement. Both call `board.MoveCard` with an explicit position, so the change is in the callers, not in the helper.\n\nThe viewer is NOT affected: it sends the drop position from the drag, and dropping is already positional.\n\nThis is not a bug — it is a written requirement, so implementing it means an OpenSpec change with deltas on:\n  - card-writing:125  `move` re-places at the end\n  - board-config:29   `edit --column` re-places at the end\n\nOpen question, deliberately left out: `ezida add` also appends (card-writing:12). Same irritation, but a new card at the top is a different argument from a moved card at the top — decide separately."
+created_at = 2026-08-09T14:34:46Z
+updated_at = 2026-08-09T14:44:19Z
+tags = ['cli', 'ux']
+priority = 'medium'

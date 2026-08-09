@@ -759,6 +759,51 @@ input, textarea { font: inherit; color: inherit; }
 }
 .list-done-mark svg { width: 12px; height: 12px; }
 
+/* The rename input and its terminal check share the row the title span
+   occupied, so opening the editor does not reflow the header. */
+.editable-with-accessory {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* Unchecked reads as an outline the check can land in, so the control
+   is visible as a control before it is switched on.
+
+   The border is --text-muted rather than a border token, measured not
+   guessed: --border gives 1.6:1 against the list surface and
+   --border-strong 2.2:1, both under the 3:1 WCAG asks of a control
+   boundary. --text-muted measures 7.9:1 light / 5.0:1 dark. Border
+   tokens are sized for panel edges; this is an actionable box. */
+.terminal-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--text-muted);
+  border-radius: 5px;
+  background: var(--surface);
+  color: transparent;
+  cursor: pointer;
+}
+.terminal-check:hover { color: var(--text-faint); }
+.terminal-check.on { color: var(--text); }
+.terminal-check svg { width: 12px; height: 12px; }
+
+.menu-toggle .menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: transparent;
+}
+.menu-toggle .menu-check.on { color: var(--text); }
+.menu-toggle .menu-check svg { width: 12px; height: 12px; }
+
 .card-delete {
   position: absolute;
   top: 6px;

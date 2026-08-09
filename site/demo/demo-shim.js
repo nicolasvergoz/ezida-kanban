@@ -34,6 +34,7 @@
       // Defensive: app.js expects arrays, not null.
       if (!Array.isArray(state.cards)) state.cards = [];
       if (!Array.isArray(state.columns)) state.columns = [];
+      if (!Array.isArray(state.done_columns)) state.done_columns = [];
       if (!Array.isArray(state.priorities)) state.priorities = [];
       if (state.priority_colors === null || typeof state.priority_colors !== 'object' || Array.isArray(state.priority_colors)) {
         state.priority_colors = {};
@@ -50,6 +51,7 @@
         schema_version: 1,
         project_name: 'Ezida (demo)',
         columns: ['todo', 'ongoing', 'done'],
+        done_columns: [],
         priorities: ['low', 'medium', 'high'],
         priority_colors: { low: '#22c55e', medium: '#f59e0b', high: '#ef4444' },
         cards_per_column: { todo: 0, ongoing: 0, done: 0 },
@@ -65,6 +67,16 @@
     state.columns.forEach(function (c) { counts[c] = 0; });
     state.cards.forEach(function (c) { counts[c.column] = (counts[c.column] || 0) + 1; });
     state.cards_per_column = counts;
+  }
+
+  // setDoneColumn keeps done_columns in [board].columns order, the way
+  // BoardConfig.DoneColumns() does, so the demo and the server agree on
+  // more than membership.
+  function setDoneColumn(name, done) {
+    var set = {};
+    state.done_columns.forEach(function (c) { set[c] = true; });
+    if (done) set[name] = true; else delete set[name];
+    state.done_columns = state.columns.filter(function (c) { return set[c]; });
   }
 
   function nowISO() { return new Date().toISOString(); }
@@ -287,22 +299,40 @@
       return emptyOK();
     }
 
-    // PATCH /api/columns/<old> → rename column (cascades to cards).
+    // PATCH /api/columns/<old> → rename the column (cascading to
+    // cards) and/or set its terminal marker. Both keys optional, at
+    // least one required — same contract as the real handler, so the
+    // header controls are not dead on the demo page.
     var colPatchMatch = path.match(/^\/api\/columns\/([^/]+)$/);
     if (method === 'PATCH' && colPatchMatch) {
       var oldName = decodeURIComponent(colPatchMatch[1]);
-      var rawNew = body && typeof body.name === 'string' ? body.name.trim() : '';
-      if (!rawNew) return errorResponse('INVALID_BODY', 'name required', 400);
+      var hasName = body && typeof body.name === 'string';
+      var hasDone = body && typeof body.done === 'boolean';
+      if (!hasName && !hasDone) return errorResponse('INVALID_BODY', 'name or done required', 400);
+      var rawNew = hasName ? body.name.trim() : '';
+      if (hasName && !rawNew) return errorResponse('INVALID_BODY', 'name must be non-empty', 400);
       var oldIdx = state.columns.indexOf(oldName);
       if (oldIdx < 0) return errorResponse('COLUMN_NOT_FOUND', 'no column ' + oldName, 404);
-      if (rawNew !== oldName && state.columns.includes(rawNew)) {
+      if (hasName && rawNew !== oldName && state.columns.includes(rawNew)) {
         return errorResponse('COLUMN_EXISTS', 'column already exists', 409);
       }
-      state.columns[oldIdx] = rawNew;
-      state.cards.forEach(function (c) { if (c.column === oldName) c.column = rawNew; });
+      var target = oldName;
+      if (hasName) {
+        // The marker belongs to the column, not to its name, so it
+        // rides across. setDoneColumn rebuilds from state.columns, so
+        // the old name drops out on its own.
+        var wasDone = state.done_columns.includes(oldName);
+        state.columns[oldIdx] = rawNew;
+        state.cards.forEach(function (c) { if (c.column === oldName) c.column = rawNew; });
+        setDoneColumn(rawNew, wasDone);
+        target = rawNew;
+      }
+      // After the rename, and against the new name: the carry-across
+      // above would otherwise overwrite what the client just asked for.
+      if (hasDone) setDoneColumn(target, body.done);
       recomputeCounts();
       fireBoardChanged();
-      return jsonResponse({ name: rawNew });
+      return jsonResponse({ name: target });
     }
 
     // DELETE /api/columns/<col> → remove column (refused if non-empty).
@@ -314,6 +344,7 @@
       var has = state.cards.some(function (c) { return c.column === rmName; });
       if (has) return errorResponse('COLUMN_HAS_CARDS', 'column still has cards', 409);
       state.columns.splice(rmIdx, 1);
+      setDoneColumn(rmName, false);
       recomputeCounts();
       fireBoardChanged();
       return emptyOK();

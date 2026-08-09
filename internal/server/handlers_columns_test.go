@@ -588,3 +588,220 @@ func TestHandleColumns_SSEFiresOnSuccess(t *testing.T) {
 		t.Fatalf("expected board-changed event, got: %q", chunk)
 	}
 }
+
+// --- PATCH /api/columns/{name}: the terminal marker -------------------------
+
+// terminalColumnsFixture is a board with one terminal column (`done*`)
+// and two ordinary ones, so a single fixture exercises setting,
+// clearing and carrying the marker.
+const terminalColumnsFixture = `schema_version = 2
+
+[board]
+columns = ["todo", "review", "done*"]
+priorities = ["low", "medium", "high"]
+
+[[cards]]
+id = "aaaaaa"
+title = "First"
+column = "todo"
+description = ""
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = []
+`
+
+// TestHandleColumnPatch_TerminalMarker walks the body shapes the
+// endpoint gained in add-terminal-column-ui. wantColumns is the RAW
+// on-disk list, `*` suffixes included — the marker's placement is the
+// whole point, so asserting the decoded names would prove nothing.
+func TestHandleColumnPatch_TerminalMarker(t *testing.T) {
+	cases := []struct {
+		name        string
+		column      string
+		body        string
+		wantColumns []string
+		wantRenamed bool
+	}{
+		{
+			name:        "mark terminal without renaming",
+			column:      "review",
+			body:        `{"done":true}`,
+			wantColumns: []string{"todo", "review*", "done*"},
+		},
+		{
+			name:        "clear the marker without renaming",
+			column:      "done",
+			body:        `{"done":false}`,
+			wantColumns: []string{"todo", "review", "done"},
+		},
+		{
+			name:        "setting the value already held is a no-op",
+			column:      "done",
+			body:        `{"done":true}`,
+			wantColumns: []string{"todo", "review", "done*"},
+		},
+		{
+			name:        "clearing a marker that was never set is a no-op",
+			column:      "review",
+			body:        `{"done":false}`,
+			wantColumns: []string{"todo", "review", "done*"},
+		},
+		{
+			name:        "rename and mark terminal in one request",
+			column:      "review",
+			body:        `{"name":"shipped","done":true}`,
+			wantColumns: []string{"todo", "shipped*", "done*"},
+			wantRenamed: true,
+		},
+		{
+			// The order-of-operations case: RenameColumn carries the
+			// marker across, so a handler that applied `done` first
+			// would see it re-applied and answer "still terminal".
+			name:        "rename and clear the marker in one request",
+			column:      "done",
+			body:        `{"name":"shipped","done":false}`,
+			wantColumns: []string{"todo", "review", "shipped"},
+			wantRenamed: true,
+		},
+		{
+			name:        "a rename alone preserves the marker",
+			column:      "done",
+			body:        `{"name":"shipped"}`,
+			wantColumns: []string{"todo", "review", "shipped*"},
+			wantRenamed: true,
+		},
+		{
+			name:        "a rename alone leaves a plain column plain",
+			column:      "review",
+			body:        `{"name":"shipped"}`,
+			wantColumns: []string{"todo", "shipped", "done*"},
+			wantRenamed: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writableBoardWithBody(t, terminalColumnsFixture)
+			ts, cleanup := startTestServer(t, path)
+			defer cleanup()
+
+			res := patchJSON(t, ts.URL+"/api/columns/"+tc.column, tc.body)
+			defer res.Body.Close()
+			if res.StatusCode != 200 {
+				t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+			}
+
+			var body map[string]any
+			if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+				t.Fatalf("decode: %v", err)
+			}
+			if _, present := body["renamed"]; present != tc.wantRenamed {
+				t.Errorf("renamed present = %v, want %v", present, tc.wantRenamed)
+			}
+			if _, present := body["done_columns"]; present {
+				t.Error("response carries done_columns; the marker is not echoed here")
+			}
+			for _, name := range body["columns"].([]any) {
+				if strings.HasSuffix(name.(string), "*") {
+					t.Errorf("response column %q carries the on-disk marker", name)
+				}
+			}
+
+			got := readColumnsOnDisk(t, path)
+			if !reflectStringSliceEqual(got, tc.wantColumns) {
+				t.Fatalf("on-disk columns = %v, want %v", got, tc.wantColumns)
+			}
+		})
+	}
+}
+
+// TestHandleColumnPatch_DoneColumnsAfterToggle closes the loop the
+// viewer actually reads: the marker has to come back out of
+// GET /api/board, not merely land on disk.
+func TestHandleColumnPatch_DoneColumnsAfterToggle(t *testing.T) {
+	cases := []struct {
+		name     string
+		column   string
+		body     string
+		wantDone []string
+	}{
+		{"mark terminal", "review", `{"done":true}`, []string{"review", "done"}},
+		{"clear the marker", "done", `{"done":false}`, []string{}},
+		{"rename carries it", "done", `{"name":"shipped"}`, []string{"shipped"}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writableBoardWithBody(t, terminalColumnsFixture)
+			ts, cleanup := startTestServer(t, path)
+			defer cleanup()
+
+			res := patchJSON(t, ts.URL+"/api/columns/"+tc.column, tc.body)
+			res.Body.Close()
+			if res.StatusCode != 200 {
+				t.Fatalf("status = %d", res.StatusCode)
+			}
+
+			boardRes, err := http.Get(ts.URL + "/api/board")
+			if err != nil {
+				t.Fatalf("GET /api/board: %v", err)
+			}
+			defer boardRes.Body.Close()
+			var payload struct {
+				DoneColumns []string `json:"done_columns"`
+			}
+			if err := json.NewDecoder(boardRes.Body).Decode(&payload); err != nil {
+				t.Fatalf("decode board: %v", err)
+			}
+			if !reflectStringSliceEqual(payload.DoneColumns, tc.wantDone) {
+				t.Fatalf("done_columns = %v, want %v", payload.DoneColumns, tc.wantDone)
+			}
+		})
+	}
+}
+
+func TestHandleColumnPatch_EmptyPatchRejected(t *testing.T) {
+	path := writableBoardWithBody(t, terminalColumnsFixture)
+	before, _ := os.ReadFile(path)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := patchJSON(t, ts.URL+"/api/columns/todo", `{}`)
+	defer res.Body.Close()
+	if res.StatusCode != 400 {
+		t.Fatalf("status = %d, want 400", res.StatusCode)
+	}
+	if got := readString(res.Body); !strings.Contains(got, `"INVALID_BODY"`) {
+		t.Fatalf("missing INVALID_BODY: %s", got)
+	}
+	after, _ := os.ReadFile(path)
+	if string(after) != string(before) {
+		t.Fatal("on-disk file changed despite 400 error")
+	}
+}
+
+// TestHandleColumnPatch_UnknownColumnEvenWhenNoop covers the edge the
+// up-front membership check tightened: RenameColumn short-circuits on
+// from == to before looking anything up, so this used to answer 200.
+func TestHandleColumnPatch_UnknownColumnEvenWhenNoop(t *testing.T) {
+	path := writableBoardWithBody(t, terminalColumnsFixture)
+	before, _ := os.ReadFile(path)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	for _, body := range []string{`{"name":"ghost"}`, `{"done":true}`} {
+		res := patchJSON(t, ts.URL+"/api/columns/ghost", body)
+		if res.StatusCode != 400 {
+			t.Fatalf("body %q: status = %d, want 400", body, res.StatusCode)
+		}
+		got := readString(res.Body)
+		res.Body.Close()
+		if !strings.Contains(got, `"COLUMN_NOT_FOUND"`) {
+			t.Fatalf("body %q: missing COLUMN_NOT_FOUND: %s", body, got)
+		}
+		after, _ := os.ReadFile(path)
+		if string(after) != string(before) {
+			t.Fatalf("body %q: on-disk file changed despite 400 error", body)
+		}
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -50,7 +51,7 @@ func (s *serverState) routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/cards/{id}", s.handleDelete)
 	mux.HandleFunc("POST /api/columns", s.handleColumnCreate)
 	mux.HandleFunc("POST /api/columns/move", s.handleColumnMove)
-	mux.HandleFunc("PATCH /api/columns/{name}", s.handleColumnRename)
+	mux.HandleFunc("PATCH /api/columns/{name}", s.handleColumnPatch)
 	mux.HandleFunc("DELETE /api/columns/{name}", s.handleColumnDelete)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
 	mux.HandleFunc("GET /{$}", s.handleIndex)
@@ -328,10 +329,14 @@ type columnCreatePayload struct {
 	Name string `json:"name"`
 }
 
-// columnRenamePayload is the JSON body shape accepted by
-// PATCH /api/columns/{name}.
-type columnRenamePayload struct {
-	Name string `json:"name"`
+// columnPatchPayload is the JSON body shape accepted by
+// PATCH /api/columns/{name}. Both keys are optional; a pointer is what
+// separates "absent, leave it alone" from "present and blank/false".
+// `{"name":""}` therefore stays a rejected rename and `{"done":false}`
+// still clears the terminal marker (add-terminal-column-ui design D1).
+type columnPatchPayload struct {
+	Name *string `json:"name"`
+	Done *bool   `json:"done"`
 }
 
 // columnMovePayload is the JSON body shape accepted by
@@ -377,25 +382,39 @@ func (s *serverState) handleColumnCreate(w http.ResponseWriter, r *http.Request)
 	})
 }
 
-// handleColumnRename implements PATCH /api/columns/{name} (UI-6).
-// Decode → trim → load → RenameColumn → save → 200 with the post-rename
-// column list and the `renamed: {from, to}` echo.
-func (s *serverState) handleColumnRename(w http.ResponseWriter, r *http.Request) {
+// handleColumnPatch implements PATCH /api/columns/{name} (UI-6,
+// extended by add-terminal-column-ui). Decode → refuse an empty patch →
+// load → verify the column exists → rename → apply the terminal marker
+// → save → 200 with the post-patch column list, plus the
+// `renamed: {from, to}` echo when a rename actually happened.
+//
+// The terminal marker is not echoed: the sibling column endpoints do
+// not echo it either, and the page learns the new state from the
+// board-changed refetch.
+func (s *serverState) handleColumnPatch(w http.ResponseWriter, r *http.Request) {
 	from := r.PathValue("name")
 
-	var p columnRenamePayload
+	var p columnPatchPayload
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 		httpError(w, &InvalidBodyError{Reason: err.Error()})
 		return
 	}
-	// Empty/whitespace-only post-trim is rejected as INVALID_BODY by
-	// the board.RenameColumn helper itself (via EmptyColumnNameError).
-	// We pass the raw value through trim so a same-name no-op (without
-	// surrounding whitespace) succeeds before the helper trims.
-	trimmed := strings.TrimSpace(p.Name)
-	if trimmed == "" {
-		httpError(w, &board.EmptyColumnNameError{})
+	if p.Name == nil && p.Done == nil {
+		httpError(w, &InvalidBodyError{Reason: "body carries neither name nor done"})
 		return
+	}
+
+	// Empty/whitespace-only post-trim is rejected as INVALID_BODY via
+	// EmptyColumnNameError. We trim here rather than leaving it to
+	// board.RenameColumn so a same-name no-op (without surrounding
+	// whitespace) succeeds before the helper trims.
+	trimmed := ""
+	if p.Name != nil {
+		trimmed = strings.TrimSpace(*p.Name)
+		if trimmed == "" {
+			httpError(w, &board.EmptyColumnNameError{})
+			return
+		}
 	}
 
 	b, err := board.Load(s.boardPath)
@@ -403,23 +422,47 @@ func (s *serverState) handleColumnRename(w http.ResponseWriter, r *http.Request)
 		httpError(w, err)
 		return
 	}
-	if err := board.RenameColumn(b, from, trimmed); err != nil {
-		httpError(w, err)
+
+	// Existence is checked here rather than left to RenameColumn.
+	// SetDoneColumn does not verify membership, so a done-only patch on
+	// an unknown column would write a flag that EncodeColumns then
+	// drops on save — a 200 that did nothing (design D3). Checking up
+	// front also covers the rename path with the same error.
+	if !slices.Contains(b.Board.Columns, from) {
+		httpError(w, &board.ColumnNotFoundError{Column: from})
 		return
 	}
+
+	target := from
+	renamed := false
+	if p.Name != nil {
+		if err := board.RenameColumn(b, from, trimmed); err != nil {
+			httpError(w, err)
+			return
+		}
+		renamed = trimmed != from
+		target = trimmed
+	}
+	// After the rename, never before, and against the post-rename name:
+	// RenameColumn carries the terminal flag across to the new name, so
+	// setting it first would let that carry-across overwrite the value
+	// the client just asked for (design D2).
+	if p.Done != nil {
+		b.Board.SetDoneColumn(target, *p.Done)
+	}
+
 	if err := board.Save(s.boardPath, b); err != nil {
 		httpError(w, err)
 		return
 	}
 
+	out := map[string]any{"columns": b.Board.Columns}
+	if renamed {
+		out["renamed"] = map[string]any{"from": from, "to": trimmed}
+	}
+
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"columns": b.Board.Columns,
-		"renamed": map[string]any{
-			"from": from,
-			"to":   trimmed,
-		},
-	})
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // handleColumnDelete implements DELETE /api/columns/{name} (UI-6).

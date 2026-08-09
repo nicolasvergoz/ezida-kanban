@@ -428,11 +428,12 @@ function App() {
     fetchBoard();
   };
 
-  const renameList = async (from, to) => {
-    const name = to.trim();
-    if (!name || name === from) return;
-    try { await apiSend("PATCH", `/api/columns/${encodeURIComponent(from)}`, { name }); }
-    catch (e) { alert(`Cannot rename list: ${e.message}`); fetchBoard(); }
+  // patch carries whichever of `name` / `done` the caller changed; the
+  // caller has already decided there is something to send.
+  const patchList = async (from, patch) => {
+    if (!patch || !Object.keys(patch).length) return;
+    try { await apiSend("PATCH", `/api/columns/${encodeURIComponent(from)}`, patch); }
+    catch (e) { alert(`Cannot update list: ${e.message}`); fetchBoard(); }
   };
 
   const removeList = async (name) => {
@@ -517,7 +518,7 @@ function App() {
         priorityColors={board.priorityColors}
         epics={board.epics}
         onAddList={addList}
-        onRenameList={renameList}
+        onPatchList={patchList}
         onRemoveList={removeList}
         onAddCard={addCard}
         onRemoveCard={removeCard}
@@ -733,7 +734,7 @@ function ThemeToggle({ theme }) {
 /* =========================================================
    Board
 ========================================================= */
-function Board({ board, filter, filterActive, priorityColors, epics, onAddList, onRenameList, onRemoveList, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
+function Board({ board, filter, filterActive, priorityColors, epics, onAddList, onPatchList, onRemoveList, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
   const [addingList, setAddingList] = useState(false);
   const dragRef = useRef({ kind: null, cardId: null, fromListId: null, listIdx: null });
   const wrapRef = useRef(null);
@@ -790,7 +791,7 @@ function Board({ board, filter, filterActive, priorityColors, epics, onAddList, 
             priorityColors={priorityColors}
             epics={epics}
             dragRef={dragRef}
-            onRename={(t) => onRenameList(list.id, t)}
+            onPatch={(patch) => onPatchList(list.id, patch)}
             onRemove={() => onRemoveList(list.id)}
             onAddCard={(t) => onAddCard(list.id, t)}
             onRemoveCard={(cid) => onRemoveCard(cid)}
@@ -815,11 +816,30 @@ function Board({ board, filter, filterActive, priorityColors, epics, onAddList, 
 /* =========================================================
    List column
 ========================================================= */
-function ListColumn({ list, index, filter, filterActive, priorityColors, epics, dragRef, onRename, onRemove, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
+function ListColumn({ list, index, filter, filterActive, priorityColors, epics, dragRef, onPatch, onRemove, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
   const [adding, setAdding] = useState(false);
   const [isOver, setIsOver] = useState(false);
   const [draggingSelf, setDraggingSelf] = useState(false);
+  // null while the header is not being renamed; the staged terminal
+  // value once it is.
+  const [stagedDone, setStagedDone] = useState(null);
   const counterRef = useRef(0);
+
+  // One request carries both halves of the edit, so the name can never
+  // land without the marker it was committed with. Only the keys the
+  // user actually moved are sent — a commit must not assert a value
+  // they never touched.
+  const commitHeaderEdit = (name) => {
+    const done = stagedDone;
+    setStagedDone(null);
+    // An empty name leaves the field in an invalid state; there is no
+    // committing half of it, so the staged marker goes with it.
+    if (name === null) return;
+    const patch = {};
+    if (name !== list.id) patch.name = name;
+    if (done !== null && done !== list.done) patch.done = done;
+    if (Object.keys(patch).length) onPatch(patch);
+  };
 
   useEffect(() => {
     const onHover = (e) => setIsOver(e.detail === list.id);
@@ -889,10 +909,20 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, epics, 
         <EditableText
           className="list-title"
           value={list.title}
-          original={list.id}
-          onChange={(t) => onRename(t)}
-          uppercase />
-        {list.done &&
+          uppercase
+          onOpen={() => setStagedDone(list.done)}
+          onCancel={() => setStagedDone(null)}
+          onCommit={commitHeaderEdit}
+          accessory={
+            <TerminalCheck
+              checked={stagedDone === null ? list.done : stagedDone}
+              columnName={list.id}
+              onToggle={() => setStagedDone((v) => !(v === null ? list.done : v))} />
+          } />
+        {/* The resting mark stands down while the editor is open: the
+            staged check reports the same fact, editably, right beside
+            it. Two marks for one fact reads as two settings. */}
+        {list.done && stagedDone === null &&
           <span
             className="list-done-mark"
             title="Cards in this column count as done"
@@ -901,7 +931,10 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, epics, 
             <IconCheck size={12} />
           </span>}
         <span className="list-count" title={`${list.cards.length} cards`}>{list.cards.length}</span>
-        <ListMenu onRemove={onRemove} />
+        <ListMenu
+          done={list.done}
+          onToggleDone={() => onPatch({ done: !list.done })}
+          onRemove={onRemove} />
       </header>
 
       <div className={"cards" + (visibleCards.length === 0 && !adding ? " empty" : "")}>
@@ -934,7 +967,10 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, epics, 
     </section>);
 }
 
-function ListMenu({ onRemove }) {
+/* useClickOutside is correct here: its bubble-phase document listener
+   only fails inside the card modal, which stops mousedown at its own
+   container. This menu is not in the modal. */
+function ListMenu({ done, onToggleDone, onRemove }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useClickOutside(ref, () => setOpen(false), open);
@@ -944,7 +980,18 @@ function ListMenu({ onRemove }) {
         <IconDots />
       </button>
       {open &&
-        <div className="popover" style={{ right: 0, top: "calc(100% + 4px)", minWidth: 180, padding: 6 }}>
+        <div className="popover" style={{ right: 0, top: "calc(100% + 4px)", minWidth: 200, padding: 6 }}>
+          {/* No name to coordinate with, so nothing to stage: this
+              writes `done` alone and never sends a `name` the client
+              may already have stale. */}
+          <button
+            className="add-card menu-toggle"
+            role="menuitemcheckbox"
+            aria-checked={done}
+            onClick={() => { onToggleDone(); setOpen(false); }}>
+            <span className={"menu-check" + (done ? " on" : "")}><IconCheck size={12} /></span>
+            Terminal column
+          </button>
           <button
             className="add-card"
             style={{ color: "oklch(0.55 0.18 25)" }}
@@ -1332,17 +1379,29 @@ function AddListComposer({ onAdd, onCancel }) {
 }
 
 /* =========================================================
-   Editable text — emits trimmed original column name on commit
+   Editable text — reports the end of an inline edit
 ========================================================= */
-function EditableText({ value, original, onChange, className, placeholder, uppercase }) {
+/* EditableText reports the end of an edit; it does not decide whether
+   that edit is worth a request. The list header commits a name and a
+   terminal marker together, and only the caller knows both values —
+   an editor that reverted on an unchanged name would silently drop a
+   staged marker.
+
+   onCommit receives the trimmed, lowercased name, or null when the
+   field was left empty. onCancel fires on Escape. onOpen fires when
+   the input appears, so the caller can seed whatever it stages
+   alongside. `accessory` renders beside the input while editing. */
+function EditableText({ value, onCommit, onCancel, onOpen, accessory, className, placeholder, uppercase }) {
   const ref = useRef(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
 
   useEffect(() => { setDraft(value); }, [value]);
 
+  const open = () => { setEditing(true); if (onOpen) onOpen(); };
+
   if (editing) {
-    return (
+    const input = (
       <input
         ref={ref}
         className={className}
@@ -1350,26 +1409,60 @@ function EditableText({ value, original, onChange, className, placeholder, upper
         onChange={(e) => setDraft(uppercase ? e.target.value.toUpperCase() : e.target.value)}
         onBlur={() => {
           const t = (draft || "").trim();
-          if (t) onChange(t.toLowerCase());
           setEditing(false);
+          onCommit(t ? t.toLowerCase() : null);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
-          if (e.key === "Escape") { setDraft(value); setEditing(false); }
+          if (e.key === "Escape") {
+            setDraft(value);
+            setEditing(false);
+            if (onCancel) onCancel();
+          }
         }}
         autoFocus
         onFocus={(e) => e.currentTarget.select()} />);
+    if (!accessory) return input;
+    return (
+      <span className="editable-with-accessory">
+        {input}
+        {accessory}
+      </span>);
   }
   return (
     <span
       className={className}
-      onClick={() => setEditing(true)}
+      onClick={open}
       tabIndex={0}
       role="textbox"
-      onKeyDown={(e) => { if (e.key === "Enter") setEditing(true); }}
+      onKeyDown={(e) => { if (e.key === "Enter") open(); }}
       style={{ display: "inline-block", cursor: "text", fontWeight: "700" }}>
       {value || placeholder}
     </span>);
+}
+
+/* The terminal-column check that rides along with an inline rename.
+
+   It acts on mousedown and kills the default focus shift, because a
+   click would blur the input first and blur is what commits the
+   rename: the marker would arrive after its own commit, or split the
+   write in two. dragstart is stopped as well — the header this sits in
+   is the column-reorder drag handle. */
+function TerminalCheck({ checked, onToggle, columnName }) {
+  return (
+    <button
+      type="button"
+      className={"terminal-check" + (checked ? " on" : "")}
+      role="checkbox"
+      aria-checked={checked}
+      aria-label={`Terminal column — cards in ${columnName} count as done`}
+      title="Terminal column — its cards count as done for epic progress"
+      draggable={false}
+      onDragStart={(e) => { e.preventDefault(); e.stopPropagation(); }}
+      onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }}
+      onClick={(e) => e.preventDefault()}>
+      <IconCheck size={12} />
+    </button>);
 }
 
 /* =========================================================

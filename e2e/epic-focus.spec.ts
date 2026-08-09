@@ -215,20 +215,17 @@ test.describe("focus does not break the rest of the board", () => {
   });
 
   /**
-   * KNOWN DEFECT, predating the epic work (same code at 5fdd328).
+   * A card title has one gesture and it opens the modal. The inline
+   * composer that `onDoubleClick` used to reach was unreachable with a
+   * mouse — the card's own `onClick` opened the modal before the
+   * second click landed — and the handler, its state and its whole
+   * prop chain were removed rather than untangled: editing a title is
+   * the modal's job.
    *
-   * `CardItem` wires `onDoubleClick` on `.card-title` to the inline
-   * composer, but the card's own `onClick` opens the detail modal —
-   * and a real double-click delivers that click first. The modal is
-   * up before the second click lands, so the inline editor is
-   * unreachable with a mouse. Only a synthesised `dblclick` with no
-   * preceding clicks reaches it.
-   *
-   * This asserts what the viewer actually does, so the day the
-   * handlers are untangled this test fails and says so, rather than
-   * the behaviour changing unnoticed.
+   * Kept as a test because a double-click is still a double-click, and
+   * the second one must not do something surprising.
    */
-  test("double-clicking a title opens the modal, not the inline editor", async ({ page, board }) => {
+  test("double-clicking a title opens the modal and nothing else", async ({ page, board }) => {
     await openBoard(page, board);
     await card(page, "f20wbo").locator(".card-epic-chip").click();
 

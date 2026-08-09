@@ -61,15 +61,21 @@ accepting it.
 
 ### What the browser tests found
 
-Real interaction beats synthesised events. Both of these were live
+Real interaction beats synthesised events. Each of these was live
 before the tests existed:
 
-- **Inline title edit is unreachable with a mouse.** `CardItem` wires
+- **Inline title edit was unreachable with a mouse.** `CardItem` wired
   `onDoubleClick` on `.card-title` to the inline composer, but the
   card's own `onClick` opens the detail modal, and a real double-click
-  delivers that click first. A synthesised `dblclick` reaches the
-  editor; a user never does. Pinned in `e2e/epic-focus.spec.ts` as a
-  known defect, asserting current behaviour so a fix fails loudly.
+  delivers that click first. A synthesised `dblclick` reached the
+  editor; a user never did. Resolved by deletion, not repair — editing
+  a title is the modal's job.
+
+- **`useClickOutside` never fires inside the modal.** It listens on
+  `document` during the bubble phase, and the modal stops `mousedown`
+  at its own container, so no click within the modal reaches it. The
+  epic picker listens during the capture phase instead. The priority
+  and column dropdowns still carry the same latent defect.
 
 ## Conventions worth knowing
 

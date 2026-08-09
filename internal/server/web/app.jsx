@@ -352,12 +352,6 @@ function App() {
     fetchBoard();
   };
 
-  const editCard = async (cardId, text) => {
-    try { await apiSend("PATCH", `/api/cards/${encodeURIComponent(cardId)}`, { title: text }); }
-    catch (e) { console.error(e); }
-    fetchBoard();
-  };
-
   /* onFail, when given, receives the server's sentence so a caller
      with somewhere to show it can. Callers that pass nothing keep the
      previous behaviour exactly: the failure is logged and the refetch
@@ -526,7 +520,6 @@ function App() {
         onRenameList={renameList}
         onRemoveList={removeList}
         onAddCard={addCard}
-        onEditCard={editCard}
         onRemoveCard={removeCard}
         onToggleTag={toggleTag}
         onMoveCard={moveCard}
@@ -740,7 +733,7 @@ function ThemeToggle({ theme }) {
 /* =========================================================
    Board
 ========================================================= */
-function Board({ board, filter, filterActive, priorityColors, epics, onAddList, onRenameList, onRemoveList, onAddCard, onEditCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
+function Board({ board, filter, filterActive, priorityColors, epics, onAddList, onRenameList, onRemoveList, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
   const [addingList, setAddingList] = useState(false);
   const dragRef = useRef({ kind: null, cardId: null, fromListId: null, listIdx: null });
   const wrapRef = useRef(null);
@@ -800,7 +793,6 @@ function Board({ board, filter, filterActive, priorityColors, epics, onAddList, 
             onRename={(t) => onRenameList(list.id, t)}
             onRemove={() => onRemoveList(list.id)}
             onAddCard={(t) => onAddCard(list.id, t)}
-            onEditCard={(cid, t) => onEditCard(cid, t)}
             onRemoveCard={(cid) => onRemoveCard(cid)}
             onToggleTag={(cid, tag) => onToggleTag(cid, tag)}
             onMoveCard={onMoveCard}
@@ -823,7 +815,7 @@ function Board({ board, filter, filterActive, priorityColors, epics, onAddList, 
 /* =========================================================
    List column
 ========================================================= */
-function ListColumn({ list, index, filter, filterActive, priorityColors, epics, dragRef, onRename, onRemove, onAddCard, onEditCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
+function ListColumn({ list, index, filter, filterActive, priorityColors, epics, dragRef, onRename, onRemove, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
   const [adding, setAdding] = useState(false);
   const [isOver, setIsOver] = useState(false);
   const [draggingSelf, setDraggingSelf] = useState(false);
@@ -924,7 +916,6 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, epics, 
             dragRef={dragRef}
             priorityColors={priorityColors}
             epics={epics}
-            onEdit={(t) => onEditCard(card.id, t)}
             onRemove={() => onRemoveCard(card.id)}
             onToggleTag={(tag) => onToggleTag(card.id, tag)}
             onMoveCard={onMoveCard}
@@ -967,8 +958,7 @@ function ListMenu({ onRemove }) {
 /* =========================================================
    Card
 ========================================================= */
-function CardItem({ card, listId, index, dragRef, priorityColors, epics, onEdit, onRemove, onToggleTag, onMoveCard, onOpen, onFocusEpic }) {
-  const [editing, setEditing] = useState(false);
+function CardItem({ card, listId, index, dragRef, priorityColors, epics, onRemove, onToggleTag, onMoveCard, onOpen, onFocusEpic }) {
   const [dragging, setDragging] = useState(false);
   const [dropPos, setDropPos] = useState(null);
 
@@ -1010,14 +1000,6 @@ function CardItem({ card, listId, index, dragRef, priorityColors, epics, onEdit,
     dragRef.current = { kind: null };
   };
 
-  if (editing) {
-    return (
-      <CardComposer
-        initial={card.text}
-        onAdd={(t) => { onEdit(t); setEditing(false); }}
-        onClose={() => setEditing(false)}
-        submitLabel="Save" />);
-  }
 
   const prioColor = card.priority ? (priorityColors[card.priority] || "var(--text-muted)") : null;
   const hasDesc = !!(card.description && card.description.trim());
@@ -1043,9 +1025,6 @@ function CardItem({ card, listId, index, dragRef, priorityColors, epics, onEdit,
       onClick={(e) => {
         if (e.target.closest('.card-tag-chip, .card-tag-add, .card-tag-input, .card-delete, .card-epic-chip')) return;
         onOpen?.();
-      }}
-      onDoubleClick={(e) => {
-        if (e.target.closest('.card-title')) { e.stopPropagation(); setEditing(true); }
       }}>
       <CopyableId className="card-id" value={card.id} />
       <div className="card-title">
@@ -1279,8 +1258,11 @@ function CardTags({ tags, onToggle }) {
 /* =========================================================
    Composers
 ========================================================= */
-function CardComposer({ onAdd, onClose, initial = "", submitLabel = "Add" }) {
-  const [text, setText] = useState(initial);
+/* Only ever composes a new card now: the edit-an-existing-title caller
+   went with the dead double-click, taking `initial` and `submitLabel`
+   with it. */
+function CardComposer({ onAdd, onClose }) {
+  const [text, setText] = useState("");
   const ref = useRef(null);
   useEffect(() => {
     ref.current?.focus();
@@ -1310,7 +1292,7 @@ function CardComposer({ onAdd, onClose, initial = "", submitLabel = "Add" }) {
           }, 100);
         }} />
       <div className="composer-actions">
-        <button className="btn-primary" onMouseDown={(e) => e.preventDefault()} onClick={submit}>{submitLabel}</button>
+        <button className="btn-primary" onMouseDown={(e) => e.preventDefault()} onClick={submit}>Add</button>
         <button className="btn-ghost" onMouseDown={(e) => e.preventDefault()} onClick={onClose}>Cancel</button>
       </div>
     </div>);

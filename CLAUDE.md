@@ -95,3 +95,5 @@ before the tests existed:
 
 Specs and change history live in `openspec/`. The user drives the
 OpenSpec cadence themselves — do not invoke `/opsx:*` on their behalf.
+
+Work lands on `main`. No pull requests — do not offer to open one.

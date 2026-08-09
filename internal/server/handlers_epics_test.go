@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -272,4 +273,178 @@ func jsonTags(t reflect.Type) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// --- PATCH /api/cards/{id}: epic and color ---------------------------------
+
+// patchCardRaw issues a PATCH and returns the status, the response
+// body's `card` as a generic map (nil when the response carries no
+// card), and the raw body for message assertions. Generic maps are
+// what make omitempty observable: a cleared field is an *absent* key,
+// not a zero value.
+func patchCardRaw(t *testing.T, url, body string) (int, map[string]any, string) {
+	t.Helper()
+	res := patchJSON(t, url, body)
+	defer res.Body.Close()
+	raw, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatalf("read body: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		t.Fatalf("decode %s: %v", raw, err)
+	}
+	card, _ := payload["card"].(map[string]any)
+	return res.StatusCode, card, string(raw)
+}
+
+// errorEnvelope extracts code, message and details from a refusal.
+func errorEnvelope(t *testing.T, body string) (code, message string, details map[string]any) {
+	t.Helper()
+	var payload struct {
+		Error struct {
+			Code    string         `json:"code"`
+			Message string         `json:"message"`
+			Details map[string]any `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(body), &payload); err != nil {
+		t.Fatalf("decode error envelope %s: %v", body, err)
+	}
+	return payload.Error.Code, payload.Error.Message, payload.Error.Details
+}
+
+// Attaching a card to a colorless target colors that target in the
+// same write: acquiring a child is what makes a card an epic, and an
+// epic with no color has nothing to lend its children.
+func TestHandle_Patch_AttachToEpicColorsTheTarget(t *testing.T) {
+	path := writeBoardFixture(t, epicsBoardFixture)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	status, card, body := patchCardRaw(t, ts.URL+"/api/cards/q7t6z2", `{"epic":"a3f2k9"}`)
+	if status != 200 {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+	if got := card["epic"]; got != "a3f2k9" {
+		t.Errorf("response epic = %v, want a3f2k9", got)
+	}
+	target := findCardOnDisk(t, path, "a3f2k9")
+	if target == nil || target.Color == "" {
+		t.Fatalf("target acquired no color: %+v", target)
+	}
+}
+
+func TestHandle_Patch_DetachClearsTheEpicKey(t *testing.T) {
+	path := writeBoardFixture(t, epicsBoardFixture)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	status, card, body := patchCardRaw(t, ts.URL+"/api/cards/f20wbo", `{"epic":""}`)
+	if status != 200 {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+	if _, present := card["epic"]; present {
+		t.Errorf("detached card still carries an epic key: %s", body)
+	}
+	if disk := findCardOnDisk(t, path, "f20wbo"); disk == nil || disk.Epic != "" {
+		t.Errorf("on-disk epic = %q, want empty", disk.Epic)
+	}
+}
+
+// The four epic refusals must be 400s carrying a code a client can
+// branch on. Before this change every one of them left through
+// httpError's catch-all as 500 IO_ERROR.
+func TestHandle_Patch_EpicRefusals(t *testing.T) {
+	cases := []struct {
+		name   string
+		id     string
+		body   string
+		wants  string
+		target string
+	}{
+		{"unknown target", "a3f2k9", `{"epic":"zzzzzz"}`, "no card on this board carries that id", "zzzzzz"},
+		{"self reference", "a3f2k9", `{"epic":"a3f2k9"}`, "cannot be its own epic", "a3f2k9"},
+		{"target already a child", "a3f2k9", `{"epic":"f20wbo"}`, "already belongs", "f20wbo"},
+		{"card has children", "rl4m9x", `{"epic":"a3f2k9"}`, "children of its own", "a3f2k9"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeBoardFixture(t, epicsBoardFixture)
+			before, _ := os.ReadFile(path)
+			ts, cleanup := startTestServer(t, path)
+			defer cleanup()
+
+			status, _, body := patchCardRaw(t, ts.URL+"/api/cards/"+tc.id, tc.body)
+			if status != 400 {
+				t.Fatalf("status = %d, want 400, body = %s", status, body)
+			}
+			code, message, details := errorEnvelope(t, body)
+			if code != "INVALID_EPIC" {
+				t.Errorf("code = %s, want INVALID_EPIC", code)
+			}
+			if !strings.Contains(message, tc.wants) {
+				t.Errorf("message %q does not explain the refusal (%q)", message, tc.wants)
+			}
+			if details["epic"] != tc.target {
+				t.Errorf("details = %v, want epic %q", details, tc.target)
+			}
+			after, _ := os.ReadFile(path)
+			if string(after) != string(before) {
+				t.Error("a refused PATCH modified kanban.toml")
+			}
+		})
+	}
+}
+
+func TestHandle_Patch_SetAndClearColor(t *testing.T) {
+	path := writeBoardFixture(t, epicsBoardFixture)
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	status, card, body := patchCardRaw(t, ts.URL+"/api/cards/rl4m9x", `{"color":"#10b981"}`)
+	if status != 200 {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+	if got := card["color"]; got != "#10b981" {
+		t.Errorf("response color = %v, want #10b981", got)
+	}
+
+	status, card, body = patchCardRaw(t, ts.URL+"/api/cards/rl4m9x", `{"color":""}`)
+	if status != 200 {
+		t.Fatalf("status = %d, body = %s", status, body)
+	}
+	if _, present := card["color"]; present {
+		t.Errorf("cleared card still carries a color key: %s", body)
+	}
+}
+
+// Palette names are a CLI convenience; only hex reaches the file, so
+// only hex is accepted on the wire.
+func TestHandle_Patch_ColorRefusals(t *testing.T) {
+	for _, value := range []string{"blue", "#12"} {
+		t.Run(value, func(t *testing.T) {
+			path := writeBoardFixture(t, epicsBoardFixture)
+			before, _ := os.ReadFile(path)
+			ts, cleanup := startTestServer(t, path)
+			defer cleanup()
+
+			status, _, body := patchCardRaw(t, ts.URL+"/api/cards/rl4m9x",
+				`{"color":"`+value+`"}`)
+			if status != 400 {
+				t.Fatalf("status = %d, want 400, body = %s", status, body)
+			}
+			code, _, details := errorEnvelope(t, body)
+			if code != "INVALID_COLOR" {
+				t.Errorf("code = %s, want INVALID_COLOR", code)
+			}
+			if details["color"] != value {
+				t.Errorf("details = %v, want color %q", details, value)
+			}
+			after, _ := os.ReadFile(path)
+			if string(after) != string(before) {
+				t.Error("a refused PATCH modified kanban.toml")
+			}
+		})
+	}
 }

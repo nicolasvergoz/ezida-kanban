@@ -265,8 +265,14 @@ drains in-flight requests within 5 seconds.
 - See which columns count as done — a check mark in the column
   header — so the progress numbers are readable.
 - Read the full relation in the card modal: the parent a card belongs
-  to, or the children an epic holds with their columns. Assigning and
-  recoloring an epic is CLI-only for now (`ezida epic`).
+  to, or the children an epic holds with their columns.
+- Attach a card to an epic, reassign it, or detach it — from the
+  modal's Epic section, searching the board's cards by title or id.
+  The same picker adds a child from the epic's own modal, and each
+  child row can be removed from it.
+- Recolor an epic from the eight-color palette, or clear its color.
+  A hand-edited hex outside the palette shows up as a ninth swatch
+  rather than disappearing.
 - Focus one epic: click its chip on any card, or pick it in the
   filter popover's Epic section — the viewer's counterpart to
   `ezida list --epic`. The parent stays visible with its progress

@@ -82,6 +82,46 @@
     return 'demo' + Math.floor(Math.random() * 100); // pragmatic fallback
   }
 
+  // The palette, in the same order as board.EpicPalette.
+  var EPIC_PALETTE = [
+    '#8b5cf6', '#10b981', '#f97316', '#3b82f6',
+    '#ec4899', '#84cc16', '#06b6d4', '#d946ef',
+  ];
+
+  // checkEpicTarget returns the refusal sentence, or '' when childID
+  // may point at epicID. The four rules are board.CheckEpicTarget's,
+  // in the same order.
+  function checkEpicTarget(childID, epicID) {
+    if (!epicID) return '';
+    if (epicID === childID) return 'a card cannot be its own epic';
+    var target = state.cards.find(function (c) { return c.id === epicID; });
+    if (!target) return 'no card on this board carries that id';
+    if (target.epic) {
+      return 'that card already belongs to epic "' + target.epic +
+        '", and epic nesting is limited to one level';
+    }
+    if (state.cards.some(function (c) { return c.epic === childID; })) {
+      return 'the card being edited has children of its own, and epic nesting is limited to one level';
+    }
+    return '';
+  }
+
+  // Acquiring a child is what turns a card into an epic, so it gets a
+  // color in the same write. Least-used wins, ties by palette order.
+  function ensureEpicColor(id) {
+    var parent = state.cards.find(function (c) { return c.id === id; });
+    if (!parent || parent.color) return;
+    var used = {};
+    state.cards.forEach(function (c) {
+      if (c.color) used[c.color] = (used[c.color] || 0) + 1;
+    });
+    var best = EPIC_PALETTE[0];
+    EPIC_PALETTE.forEach(function (hex) {
+      if ((used[hex] || 0) < (used[best] || 0)) best = hex;
+    });
+    parent.color = best;
+  }
+
   function fireBoardChanged() {
     eventTargets.forEach(function (t) {
       try {
@@ -189,6 +229,23 @@
           pc.priority = body.priority;
         }
         if (Array.isArray(body.tags)) pc.tags = body.tags.slice();
+        // Epic and color mirror board.UpdateCard: the same four
+        // refusals, the same codes, and the same automatic color for a
+        // target that acquires its first child. Silently ignoring them
+        // would leave the demo's editing controls looking broken.
+        if (typeof body.epic === 'string') {
+          var epicErr = checkEpicTarget(pid, body.epic);
+          if (epicErr) return errorResponse('INVALID_EPIC', epicErr, 400);
+          pc.epic = body.epic;
+          if (body.epic) ensureEpicColor(body.epic);
+        }
+        if (typeof body.color === 'string') {
+          if (body.color !== '' && !/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(body.color)) {
+            return errorResponse('INVALID_COLOR',
+              'color "' + body.color + '" is neither a palette name nor a hex value', 400);
+          }
+          pc.color = body.color;
+        }
       }
       pc.updated_at = nowISO();
       fireBoardChanged();

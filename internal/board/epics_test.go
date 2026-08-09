@@ -125,6 +125,36 @@ func TestCheckEpicTarget(t *testing.T) {
 	}
 }
 
+// The mirror of the nested-target rule: rl4m9x has children, so
+// giving it a parent would push them to a second level. The refusal
+// must come from CheckEpicTarget, before anything is written — not
+// from the whole-board Validate afterwards.
+func TestCheckEpicTarget_ChildWithChildrenRefused(t *testing.T) {
+	b := epicBoard(t, "done")
+	err := CheckEpicTarget(b, "rl4m9x", "loose1")
+	if err == nil {
+		t.Fatal("a card with children was given an epic")
+	}
+	var ie *InvalidEpicError
+	if !asInvalidEpic(err, &ie) {
+		t.Fatalf("error = %T, want *InvalidEpicError", err)
+	}
+	if ie.ID != "loose1" {
+		t.Errorf("error names %q, want the refused target loose1", ie.ID)
+	}
+	if ie.Reason == "" {
+		t.Error("refusal carried no reason")
+	}
+	// The board is a pure read for this call.
+	if b.Cards[0].Epic != "" {
+		t.Errorf("board mutated: rl4m9x now carries epic %q", b.Cards[0].Epic)
+	}
+	// A childless card is still free to acquire one.
+	if err := CheckEpicTarget(b, "loose1", "rl4m9x"); err != nil {
+		t.Fatalf("childless card refused: %v", err)
+	}
+}
+
 func TestEnsureEpicColor(t *testing.T) {
 	b := epicBoard(t, "done")
 	if !EnsureEpicColor(b, "rl4m9x") {

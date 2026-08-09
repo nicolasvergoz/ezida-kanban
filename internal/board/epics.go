@@ -85,8 +85,15 @@ func ParentOf(b *Board, id string) *Card {
 }
 
 // CheckEpicTarget validates that childID may point at epicID, applying
-// the three pre-mutation rules in the order the CLI reports them:
-// unknown target, self-reference, and target-already-a-child.
+// the four pre-mutation rules in the order the CLI reports them:
+// self-reference, unknown target, target-already-a-child, and
+// child-already-a-parent.
+//
+// The last rule is the mirror of the third: giving an epic a parent of
+// its own pushes its existing children to a second level. Without it
+// the case is caught only afterwards by the whole-board Validate,
+// which reports a board-level inconsistency for what is a single
+// invalid argument.
 //
 // Returns *InvalidEpicError on any violation, leaving the caller free
 // to reject before mutating anything.
@@ -113,6 +120,12 @@ func CheckEpicTarget(b *Board, childID, epicID string) error {
 			Reason: fmt.Sprintf(
 				"that card already belongs to epic %q, and epic nesting is limited to one level",
 				target.Epic),
+		}
+	}
+	if IsEpic(b, childID) {
+		return &InvalidEpicError{
+			ID:     epicID,
+			Reason: "the card being edited has children of its own, and epic nesting is limited to one level",
 		}
 	}
 	return nil

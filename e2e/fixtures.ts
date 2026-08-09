@@ -106,7 +106,13 @@ export const test = base.extend<Fixtures>({
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(String(e)));
     page.on("console", (m) => {
-      if (m.type() === "error") errors.push(m.text());
+      // Chromium logs its own line for every failed request, whoever
+      // made it. A refused mutation is something the viewer displays,
+      // so that line says nothing about the page's own behaviour —
+      // unlike a console.error, which only the app can emit.
+      if (m.type() === "error" && !m.text().startsWith("Failed to load resource:")) {
+        errors.push(m.text());
+      }
     });
 
     await use(page);

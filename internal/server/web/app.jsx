@@ -115,13 +115,35 @@ async function apiSend(method, path, body) {
     body: body == null ? undefined : JSON.stringify(body),
   });
   if (!r.ok) {
-    let detail = "";
-    try { detail = JSON.stringify(await r.json()); } catch (_) {}
-    throw new Error(`${method} ${path} → ${r.status} ${detail}`);
+    /* The server's error envelope is the message a user reads —
+       "no card on this board carries that id" — so it travels on the
+       Error rather than being stringified into it. `expected` marks a
+       refusal the UI is equipped to display: a 4xx that arrived in the
+       documented shape. Anything else is a bug or an outage and still
+       belongs in the console. */
+    let envelope = null;
+    try { envelope = (await r.json()).error || null; } catch (_) {}
+    const err = new Error(
+      envelope && envelope.message
+        ? envelope.message
+        : `${method} ${path} → ${r.status}`);
+    err.status = r.status;
+    err.envelope = envelope;
+    err.expected = r.status >= 400 && r.status < 500 && !!envelope;
+    throw err;
   }
   if (r.status === 204) return null;
   const ct = r.headers.get("content-type") || "";
   return ct.includes("application/json") ? r.json() : null;
+}
+
+/* Hand a failure to whoever asked to display it, and log only what
+   nothing else records. A handled 4xx that also reached console.error
+   is noise — and the browser tests fail any page that logs one, so an
+   asserted refusal would fail on the error it is asserting. */
+function reportFailure(e, onFail) {
+  if (onFail) onFail(e && e.message ? e.message : String(e));
+  if (!(e && e.expected)) console.error(e);
 }
 
 /* =========================================================
@@ -336,35 +358,42 @@ function App() {
     fetchBoard();
   };
 
-  const patchCard = async (cardId, patch) => {
-    // Translate UI keys → server keys.
+  /* onFail, when given, receives the server's sentence so a caller
+     with somewhere to show it can. Callers that pass nothing keep the
+     previous behaviour exactly: the failure is logged and the refetch
+     puts the field back. */
+  const patchCard = async (cardId, patch, onFail) => {
+    // Translate UI keys → server keys. The empty string is the clear
+    // for `epic` and `color`, which is what the server understands.
     const body = {};
     if ("text" in patch) body.title = patch.text;
     if ("description" in patch) body.description = patch.description;
     if ("priority" in patch) body.priority = patch.priority;
     if ("tags" in patch) body.tags = patch.tags;
+    if ("epic" in patch) body.epic = patch.epic;
+    if ("color" in patch) body.color = patch.color;
     try { await apiSend("PATCH", `/api/cards/${encodeURIComponent(cardId)}`, body); }
-    catch (e) { console.error(e); }
+    catch (e) { reportFailure(e, onFail); }
     fetchBoard();
   };
 
-  const removeCard = async (cardId) => {
+  const removeCard = async (cardId, onFail) => {
     try { await apiSend("DELETE", `/api/cards/${encodeURIComponent(cardId)}`); }
-    catch (e) { console.error(e); }
+    catch (e) { reportFailure(e, onFail); }
     fetchBoard();
   };
 
-  const toggleTag = async (cardId, tag) => {
+  const toggleTag = async (cardId, tag, onFail) => {
     if (!board) return;
     const card = board.lists.flatMap((l) => l.cards).find((c) => c.id === cardId);
     if (!card) return;
     const tags = card.tags.includes(tag) ? card.tags.filter((t) => t !== tag) : [...card.tags, tag];
     try { await apiSend("PATCH", `/api/cards/${encodeURIComponent(cardId)}`, { tags }); }
-    catch (e) { console.error(e); }
+    catch (e) { reportFailure(e, onFail); }
     fetchBoard();
   };
 
-  const moveCard = async (fromListId, cardId, toListId, toIndex) => {
+  const moveCard = async (fromListId, cardId, toListId, toIndex, onFail) => {
     // Optimistic local update so the UI is snappy.
     setBoard((b) => {
       if (!b) return b;
@@ -394,7 +423,7 @@ function App() {
       await apiSend("POST", `/api/cards/${encodeURIComponent(cardId)}/move`, {
         column: toListId, position: serverIdx,
       });
-    } catch (e) { console.error(e); fetchBoard(); }
+    } catch (e) { reportFailure(e, onFail); fetchBoard(); }
   };
 
   const addList = async (title) => {
@@ -519,9 +548,10 @@ function App() {
             priorityColors={board.priorityColors}
             epics={board.epics}
             onClose={() => setOpenCardId(null)}
-            onPatch={(patch) => patchCard(card.id, patch)}
-            onMoveColumn={(toListId) => moveCard(list.id, card.id, toListId, board.lists.find((l) => l.id === toListId).cards.length)}
-            onToggleTag={(tag) => toggleTag(card.id, tag)}
+            onPatch={(patch, onFail) => patchCard(card.id, patch, onFail)}
+            onPatchCard={(cardId, patch, onFail) => patchCard(cardId, patch, onFail)}
+            onMoveColumn={(toListId, onFail) => moveCard(list.id, card.id, toListId, board.lists.find((l) => l.id === toListId).cards.length, onFail)}
+            onToggleTag={(tag, onFail) => toggleTag(card.id, tag, onFail)}
             onRemove={() => { removeCard(card.id); setOpenCardId(null); }}
           />
         );
@@ -1086,6 +1116,119 @@ function EpicProgress({ done, total, className }) {
     </div>);
 }
 
+/* The palette, mirrored from board.EpicPalette. Eight constants that
+   change when the Go source changes is a smaller price than a second
+   endpoint or a top-level `palette` array on every board fetch. Order
+   is chromatic distance, not hue — see colors.go. */
+const EPIC_PALETTE = [
+  { name: "violet", hex: "#8b5cf6" },
+  { name: "emerald", hex: "#10b981" },
+  { name: "orange", hex: "#f97316" },
+  { name: "blue", hex: "#3b82f6" },
+  { name: "pink", hex: "#ec4899" },
+  { name: "lime", hex: "#84cc16" },
+  { name: "cyan", hex: "#06b6d4" },
+  { name: "fuchsia", hex: "#d946ef" },
+];
+
+/* Card-search combobox — the first entity picker in Ezida, written to
+   outlive epics: dependencies and linked files need the same control.
+
+   It searches the board the client already holds. GET /api/board
+   returns every card on every fetch, so a request here would be asking
+   the server for an array we are holding.
+
+   The candidate list is filtered by the caller, which knows which side
+   of the relation is being filled: an epic target may have children, a
+   candidate child may not. Filtering is a courtesy — the server stays
+   the authority, and a refusal lands in the modal's error region. */
+function EpicPicker({ candidates, columnTitle, placeholder, onPick, onClose }) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const boxRef = useRef(null);
+  const inputRef = useRef(null);
+
+  /* Not useClickOutside: that hook listens on document during the
+     bubble phase, and the modal stops mousedown at its own container,
+     so a click on any other part of the modal never reaches it. The
+     capture phase runs top-down and arrives before anything can stop
+     it. */
+  useEffect(() => {
+    const handler = (e) => {
+      if (boxRef.current && !boxRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener("mousedown", handler, true);
+    return () => document.removeEventListener("mousedown", handler, true);
+  }, [onClose]);
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const matches = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return candidates;
+    return candidates.filter((c) =>
+      (c.text || "").toLowerCase().includes(q) || c.id.toLowerCase().startsWith(q));
+  }, [candidates, query]);
+
+  // A shrinking result set must never leave the highlight past the end.
+  const at = matches.length ? Math.min(active, matches.length - 1) : 0;
+  const activeOptionId = matches.length ? `epic-option-${matches[at].id}` : undefined;
+
+  const onKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive(matches.length ? Math.min(at + 1, matches.length - 1) : 0);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive(Math.max(at - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (matches[at]) onPick(matches[at].id);
+    } else if (e.key === "Escape") {
+      // The modal closes on Escape from a document-level listener, so
+      // the native event must stop here or abandoning a search closes
+      // the whole modal.
+      e.preventDefault();
+      e.stopPropagation();
+      onClose();
+    }
+  };
+
+  return (
+    <div className="epic-picker" ref={boxRef}>
+      <input
+        ref={inputRef}
+        className="epic-picker-input"
+        type="text"
+        role="combobox"
+        aria-expanded="true"
+        aria-controls="epic-picker-list"
+        aria-autocomplete="list"
+        aria-activedescendant={activeOptionId}
+        placeholder={placeholder}
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setActive(0); }}
+        onKeyDown={onKeyDown} />
+      <ul className="modal-dropdown epic-picker-list" id="epic-picker-list" role="listbox">
+        {matches.length === 0 ?
+          <li className="epic-picker-empty" role="presentation">No card matches</li> :
+          matches.map((c, i) =>
+            <li key={c.id} id={`epic-option-${c.id}`} role="option" aria-selected={i === at}>
+              <button
+                type="button"
+                className={"modal-dropdown-item epic-picker-item" + (i === at ? " active" : "")}
+                onMouseEnter={() => setActive(i)}
+                onClick={() => onPick(c.id)}>
+                <span className="epic-picker-title" title={c.text}>{c.text}</span>
+                <span className="epic-picker-meta">
+                  <span className="epic-picker-id">{c.id}</span>
+                  <span className="epic-picker-col">{columnTitle(c.column)}</span>
+                </span>
+              </button>
+            </li>)}
+      </ul>
+    </div>);
+}
+
 function CardTags({ tags, onToggle }) {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState("");
@@ -1284,7 +1427,7 @@ function formatAbsolute(iso) {
   return d.toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function CardDetailModal({ card, list, allLists, priorities, priorityColors, epics, onClose, onPatch, onMoveColumn, onToggleTag, onRemove }) {
+function CardDetailModal({ card, list, allLists, priorities, priorityColors, epics, onClose, onPatch, onPatchCard, onMoveColumn, onToggleTag, onRemove }) {
   const overlayRef = useRef(null);
   const [descDraft, setDescDraft] = useState(card.description || "");
   const [editingDesc, setEditingDesc] = useState(false);
@@ -1294,6 +1437,11 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
   const [colOpen, setColOpen] = useState(false);
   const [addingTag, setAddingTag] = useState(false);
   const [tagDraft, setTagDraft] = useState("");
+  const [picker, setPicker] = useState(null); // null | "parent" | "child"
+  /* { at, message } — `at` names the section that issued the failed
+     mutation, so the sentence renders where the cause is rather than
+     floating at the top of the modal. */
+  const [error, setError] = useState(null);
   const prioRef = useRef(null);
   const colRef = useRef(null);
   const descRef = useRef(null);
@@ -1305,30 +1453,33 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") {
-        if (editingDesc || editingTitle || addingTag || prioOpen || colOpen) return;
+        if (editingDesc || editingTitle || addingTag || prioOpen || colOpen || picker) return;
         onClose();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [editingDesc, editingTitle, addingTag, prioOpen, colOpen, onClose]);
+  }, [editingDesc, editingTitle, addingTag, prioOpen, colOpen, picker, onClose]);
 
   useEffect(() => { setDescDraft(card.description || ""); }, [card.id]);
+  // A message belongs to the card that produced it, and so does an
+  // open picker.
+  useEffect(() => { setError(null); setPicker(null); }, [card.id]);
   useEffect(() => { setTitleDraft(card.text); }, [card.id, card.text]);
   useEffect(() => { if (editingDesc && descRef.current) { descRef.current.focus(); descRef.current.setSelectionRange(descDraft.length, descDraft.length); } }, [editingDesc]);
   useEffect(() => { if (addingTag) tagInputRef.current?.focus(); }, [addingTag]);
 
-  const commitDesc = () => { onPatch({ description: descDraft }); setEditingDesc(false); };
+  const commitDesc = () => { onPatch({ description: descDraft }, failAt("card")); setEditingDesc(false); };
   const cancelDesc = () => { setDescDraft(card.description || ""); setEditingDesc(false); };
   const commitTitle = () => {
     const t = titleDraft.trim();
-    if (t && t !== card.text) onPatch({ text: t });
+    if (t && t !== card.text) onPatch({ text: t }, failAt("card"));
     else setTitleDraft(card.text);
     setEditingTitle(false);
   };
   const commitTag = () => {
     const t = tagDraft.trim().slice(0, 15);
-    if (t && !(card.tags || []).includes(t)) onToggleTag(t);
+    if (t && !(card.tags || []).includes(t)) onToggleTag(t, failAt("card"));
     setTagDraft("");
     setAddingTag(false);
   };
@@ -1342,8 +1493,45 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
   const idx = epics || EMPTY_EPIC_INDEX;
   const parent = idx.parentOf(card);
   const children = idx.childrenOf(card.id);
-  const progress = children.length > 0 ? idx.progressOf(card.id) : null;
+  const isParent = children.length > 0;
+  const progress = isParent ? idx.progressOf(card.id) : null;
   const columnTitle = (name) => (allLists.find((l) => l.id === name) || {}).title || name;
+  const allCards = useMemo(() => allLists.flatMap((l) => l.cards), [allLists]);
+
+  /* The two candidate sets are not the same exclusions, because the
+     two sides of the relation are not symmetric on the server. An epic
+     target must carry no epic of its own — but may well have children,
+     which is the ordinary case. A candidate child must have no
+     children, and there is no point offering one already attached
+     here. A card belonging to another epic stays listed: reassigning
+     is legal. */
+  const epicCandidates = useMemo(
+    () => allCards.filter((c) => c.id !== card.id && !c.epic),
+    [allCards, card.id]);
+  const childCandidates = useMemo(
+    () => allCards.filter((c) => c.id !== card.id && c.epic !== card.id && !idx.isEpic(c.id)),
+    [allCards, card.id, idx]);
+
+  /* An off-palette hex is shown as a ninth, selected swatch rather
+     than as no selection at all: a hand-edited color is legal, and a
+     UI that cannot represent the current value invites overwriting it
+     by accident. */
+  const swatches = useMemo(() => {
+    if (!card.color || EPIC_PALETTE.some((p) => p.hex === card.color)) return EPIC_PALETTE;
+    return [...EPIC_PALETTE, { name: card.color, hex: card.color }];
+  }, [card.color]);
+
+  /* Clearing before the call is what makes "cleared by the next
+     successful mutation" true: only a failure writes a message back. */
+  const failAt = (at) => { setError(null); return (message) => setError({ at, message }); };
+  const openPicker = (which) => { setError(null); setPicker(which); };
+  // Every relation write is a PATCH on the child, whichever side of
+  // the modal it was issued from.
+  const commitRelation = (childId, epicId, at) => {
+    setPicker(null);
+    onPatchCard(childId, { epic: epicId }, failAt(at));
+  };
+  const commitColor = (hex) => onPatch({ color: hex }, failAt("children"));
 
   return (
     <div
@@ -1435,7 +1623,7 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
                     <li key={l.id}>
                       <button
                         className={"modal-dropdown-item" + (l.id === list.id ? " selected" : "")}
-                        onClick={() => { if (l.id !== list.id) onMoveColumn(l.id); setColOpen(false); }}>
+                        onClick={() => { if (l.id !== list.id) onMoveColumn(l.id, failAt("card")); setColOpen(false); }}>
                         <span className="col-tick" />
                         <span>{l.title}</span>
                         {l.id === list.id && <IconCheck size={12} />}
@@ -1472,38 +1660,124 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
                 </button>}
           </section>
 
-          {/* Relation sections are read-only in this version: no add,
-              remove, reassign, or color control. The next change drops
-              the card picker and the swatches into these containers. */}
-          {parent &&
+          {/* The Epic section renders on every card that could carry
+              one: a card with no relation is precisely the card that
+              needs the attach control, and without it a board with no
+              epics has no path to its first. A card with children is
+              the one exception — one-level nesting forbids giving it a
+              parent, so it gets the Children section instead. */}
+          {!isParent &&
             <section className="modal-section modal-epic">
               <div className="modal-section-head"><label className="modal-label">Epic</label></div>
-              <div className="modal-epic-parent">
-                <EpicChip card={parent} />
-                <span className="modal-epic-id">{parent.id}</span>
-              </div>
+              {parent ?
+                <div className="modal-epic-parent">
+                  <EpicChip card={parent} />
+                  <span className="modal-epic-id">{parent.id}</span>
+                  <div className="modal-epic-parent-actions">
+                    <button
+                      type="button"
+                      className="btn-ghost modal-epic-action"
+                      onClick={() => openPicker("parent")}>
+                      Change
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-ghost modal-epic-action"
+                      onClick={() => commitRelation(card.id, "", "epic")}>
+                      Detach
+                    </button>
+                  </div>
+                </div> :
+                picker !== "parent" &&
+                  <button
+                    type="button"
+                    className="modal-desc-empty modal-epic-empty"
+                    onClick={() => openPicker("parent")}>
+                    No epic. Add this card to one.
+                  </button>}
+              {picker === "parent" &&
+                <EpicPicker
+                  candidates={epicCandidates}
+                  columnTitle={columnTitle}
+                  placeholder="Search a card by title or id…"
+                  onPick={(id) => commitRelation(card.id, id, "epic")}
+                  onClose={() => setPicker(null)} />}
+              {error && error.at === "epic" &&
+                <p className="modal-error" role="alert">{error.message}</p>}
             </section>}
 
           {progress &&
             <section
               className="modal-section modal-epic"
               style={{ "--epic-color": card.color || "var(--text-muted)" }}>
-              <div className="modal-section-head"><label className="modal-label">Children</label></div>
+              <div className="modal-section-head">
+                <label className="modal-label">Children</label>
+                {picker !== "child" &&
+                  <button
+                    type="button"
+                    className="btn-ghost modal-epic-action"
+                    onClick={() => openPicker("child")}>
+                    <IconPlus size={11} /><span>Add</span>
+                  </button>}
+              </div>
               <EpicProgress done={progress.done} total={progress.total} className="modal-epic-progress" />
               <ul className="modal-epic-children">
                 {children.map((c) =>
                   <li key={c.id} className="modal-epic-child">
                     <span className="modal-epic-child-title" title={c.text}>{c.text}</span>
                     <span className="modal-epic-child-col">{columnTitle(c.column)}</span>
+                    {/* Removing a child is a PATCH on the child: the
+                        relation lives in its `epic` field and nowhere
+                        else, so the parent is never written. */}
+                    <button
+                      type="button"
+                      className="modal-epic-child-remove"
+                      title={`Remove ${c.text} from this epic`}
+                      aria-label={`Remove ${c.text} from this epic`}
+                      onClick={() => commitRelation(c.id, "", "children")}>
+                      <IconClose size={11} />
+                    </button>
                   </li>)}
               </ul>
+              {picker === "child" &&
+                <EpicPicker
+                  candidates={childCandidates}
+                  columnTitle={columnTitle}
+                  placeholder="Search a card by title or id…"
+                  onPick={(id) => commitRelation(id, card.id, "children")}
+                  onClose={() => setPicker(null)} />}
+
+              <div className="modal-section-head modal-epic-color-head">
+                <label className="modal-label">Color</label>
+              </div>
+              <div className="modal-epic-swatches">
+                {swatches.map((s) =>
+                  <button
+                    key={s.hex}
+                    type="button"
+                    className={"modal-epic-swatch" + (s.hex === card.color ? " selected" : "")}
+                    style={{ "--swatch": s.hex }}
+                    title={s.name}
+                    aria-label={s.name}
+                    aria-pressed={s.hex === card.color}
+                    onClick={() => commitColor(s.hex)} />)}
+                <button
+                  type="button"
+                  className={"modal-epic-swatch is-clear" + (card.color ? "" : " selected")}
+                  title="No color"
+                  aria-label="No color"
+                  aria-pressed={!card.color}
+                  onClick={() => commitColor("")} />
+              </div>
+              {error && error.at === "children" &&
+                <p className="modal-error" role="alert">{error.message}</p>}
             </section>}
 
           <section className="modal-section">
             <div className="modal-section-head"><label className="modal-label">Tags</label></div>
             <div className="modal-tags">
               {tags.map((t) =>
-                <button key={t} className="modal-tag-chip" onClick={() => onToggleTag(t)} title="Remove this tag">
+                <button key={t} className="modal-tag-chip" onClick={() => onToggleTag(t, failAt("card"))} title="Remove this tag">
                   <span>{t}</span>
                   <IconClose size={10} />
                 </button>)}
@@ -1525,6 +1799,12 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
                 </button>}
             </div>
           </section>
+
+          {/* Failures from the fields that have no section of their own
+              — title, description, priority, column, tags — land here
+              rather than in the console alone. */}
+          {error && error.at === "card" &&
+            <p className="modal-error" role="alert">{error.message}</p>}
         </div>
 
         <footer className="modal-foot">

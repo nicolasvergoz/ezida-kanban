@@ -720,6 +720,8 @@ type testCardSnapshot struct {
 	Description string    `toml:"description"`
 	Tags        []string  `toml:"tags"`
 	Priority    string    `toml:"priority"`
+	Epic        string    `toml:"epic"`
+	Color       string    `toml:"color"`
 	UpdatedAt   time.Time `toml:"updated_at"`
 }
 

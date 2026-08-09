@@ -88,7 +88,7 @@ test.describe("epic rendering", () => {
   });
 });
 
-test.describe("the detail modal reports the relation, read-only", () => {
+test.describe("the detail modal reports the relation", () => {
   test("a child names its parent", async ({ page, board }) => {
     await openBoard(page, board);
     await card(page, "f20wbo").locator(".card-title").click();
@@ -116,22 +116,28 @@ test.describe("the detail modal reports the relation, read-only", () => {
     await expect(page.locator(".modal-epic-parent")).toHaveCount(0);
   });
 
-  test("an unrelated card shows no relation section", async ({ page, board }) => {
+  // An unrelated card is precisely the card that needs the attach
+  // control: without it, a board with no epics has no path to its
+  // first one.
+  test("an unrelated card offers the attach affordance", async ({ page, board }) => {
     await openBoard(page, board);
     await card(page, "a3f2k9").locator(".card-title").click();
 
     await expect(page.locator(".modal-overlay")).toBeVisible();
-    await expect(page.locator(".modal-epic")).toHaveCount(0);
+    await expect(page.locator(".modal-epic-empty")).toBeVisible();
+    await expect(page.locator(".modal-epic-parent")).toHaveCount(0);
+    await expect(page.locator(".modal-epic-children")).toHaveCount(0);
   });
 
-  test("neither section offers a way to change the relation", async ({ page, board }) => {
+  // One-level nesting forbids giving a parent an epic of its own, so
+  // the affordance must not be offered where the server would refuse.
+  test("a parent is never offered an epic of its own", async ({ page, board }) => {
     await openBoard(page, board);
     await card(page, "rl4m9x").locator(".card-title").click();
 
-    // Read-only until the modal change lands: no picker, no swatch, no
-    // add or remove control anywhere in the section.
-    await expect(page.locator(".modal-epic button")).toHaveCount(0);
-    await expect(page.locator(".modal-epic input")).toHaveCount(0);
+    await expect(page.locator(".modal-epic-children")).toBeVisible();
+    await expect(page.locator(".modal-epic-empty")).toHaveCount(0);
+    await expect(page.locator(".modal-epic-parent")).toHaveCount(0);
   });
 });
 

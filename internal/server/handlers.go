@@ -116,8 +116,13 @@ func (s *serverState) handleMove(w http.ResponseWriter, r *http.Request) {
 // the board, apply via board.UpdateCard, persist via board.Save, then
 // return {card: ...} with the post-update card. Error mapping is
 // handled by httpError (MISSING_TITLE / INVALID_PRIORITY /
-// INVALID_TAG → 400; CARD_NOT_FOUND → 404; INVALID_BODY → 400;
-// load/save failures stay 500).
+// INVALID_TAG / INVALID_EPIC / INVALID_COLOR → 400; CARD_NOT_FOUND →
+// 404; INVALID_BODY → 400; load/save failures stay 500).
+//
+// epic and color are accepted here as they are anywhere else: an epic
+// naming an illegal target is INVALID_EPIC, a color that is not a hex
+// value is INVALID_COLOR. Palette names are a CLI convenience and are
+// refused on the wire, since only hex ever reaches the file.
 func (s *serverState) handlePatch(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
@@ -659,6 +664,24 @@ func httpError(w http.ResponseWriter, err error) {
 		writeErrorJSON(w, http.StatusBadRequest,
 			"INVALID_TAG", err.Error(),
 			map[string]any{"tag": ite.Tag})
+		return
+	}
+	// An epic target the board refuses and a malformed color are
+	// invalid arguments, not I/O failures: without these two arms
+	// they leave through the catch-all as 500 IO_ERROR and no client
+	// has a message worth showing.
+	var iee *board.InvalidEpicError
+	if errors.As(err, &iee) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"INVALID_EPIC", err.Error(),
+			map[string]any{"epic": iee.ID})
+		return
+	}
+	var ice *board.InvalidColorError
+	if errors.As(err, &ice) {
+		writeErrorJSON(w, http.StatusBadRequest,
+			"INVALID_COLOR", err.Error(),
+			map[string]any{"color": ice.Value})
 		return
 	}
 	var ene *board.EmptyColumnNameError

@@ -226,6 +226,7 @@ func TestEdit_EpicRefusals(t *testing.T) {
 		{"unknown epic", []string{"a3f2k9", "--epic=zzzzzz"}, "INVALID_EPIC"},
 		{"self reference", []string{"a3f2k9", "--epic=a3f2k9"}, "INVALID_EPIC"},
 		{"nested epic", []string{"a3f2k9", "--epic=f20wbo"}, "INVALID_EPIC"},
+		{"parent given an epic", []string{"rl4m9x", "--epic=a3f2k9"}, "INVALID_EPIC"},
 		{"contradictory epic flags", []string{"f20wbo", "--epic=rl4m9x", "--no-epic"}, "INVALID_EPIC"},
 		{"malformed color", []string{"rl4m9x", "--color=chartreuse"}, "INVALID_COLOR"},
 		{"contradictory color flags", []string{"rl4m9x", "--color=violet", "--no-color"}, "INVALID_COLOR"},
@@ -266,6 +267,28 @@ func TestEdit_NestedEpicRefusalExplainsItself(t *testing.T) {
 	}
 	details, _ := AsDetailed(err).Details().(map[string]any)
 	if details["epic"] != "f20wbo" {
+		t.Errorf("details = %v, want the rejected id", details)
+	}
+}
+
+// The mirror refusal has to name the real obstacle, which is the
+// edited card rather than the target: the target is a perfectly legal
+// epic for anything childless.
+func TestEdit_ParentGivenAnEpicExplainsItself(t *testing.T) {
+	path := copyEpicsFixture(t)
+	cmd := newDummyEditForPath(path, false)
+	_, _, err := executeCobraText(cmd, []string{"rl4m9x", "--epic=a3f2k9"}, false)
+	if err == nil {
+		t.Fatal("expected a refusal")
+	}
+	msg := err.Error()
+	for _, want := range []string{"children of its own", "one level"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("message %q does not mention %q", msg, want)
+		}
+	}
+	details, _ := AsDetailed(err).Details().(map[string]any)
+	if details["epic"] != "a3f2k9" {
 		t.Errorf("details = %v, want the rejected id", details)
 	}
 }

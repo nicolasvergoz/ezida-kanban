@@ -287,6 +287,15 @@ tags = ['viewer', 'ux']
 priority = 'medium'
 
 [[cards]]
+id = '364403'
+title = 'Add a reload/refresh button in the viewer nav bar'
+column = 'todo'
+description = 'Add a reload/refresh button to the viewer topbar so the board can be re-fetched on demand, without a full page reload.'
+created_at = 2026-08-11T05:29:37Z
+updated_at = 2026-08-11T05:29:37Z
+tags = ['viewer', 'ux']
+
+[[cards]]
 id = 'nzmotf'
 title = 'Card model extensions'
 column = 'todo'
@@ -317,3 +326,4 @@ created_at = 2026-08-09T14:34:46Z
 updated_at = 2026-08-09T14:44:19Z
 tags = ['cli', 'ux']
 priority = 'medium'
+

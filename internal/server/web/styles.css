@@ -180,6 +180,12 @@ input, textarea { font: inherit; color: inherit; }
 .iconbtn:hover { background: var(--tb-hover); color: var(--tb-text); }
 .iconbtn.active { background: var(--tb-active); color: var(--tb-text); }
 .iconbtn svg { width: 16px; height: 16px; }
+/* Busy state for the refresh control: the icon spins while the
+   re-fetch is in flight. Token-driven like the rest of this file. */
+.iconbtn.refreshing svg { animation: spin 0.9s linear infinite; }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .iconbtn-label {
   font-size: 13px;
   font-weight: 500;

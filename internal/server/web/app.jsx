@@ -224,6 +224,7 @@ const IconCheck = (p) => <Icon {...p} d={<polyline points="20 6 9 17 4 12" />} /
 /* Four squares — one epic holding its children. Marks both the chip on
    a child card and the title of the parent it points at. */
 const IconEpic = (p) => <Icon {...p} d={<><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" /></>} />;
+const IconRefresh = (p) => <Icon {...p} d={<><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></>} />;
 
 /* =========================================================
    Copyable ID — click to copy, brief "Copied" feedback.
@@ -309,6 +310,8 @@ function App() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [openCardId, setOpenCardId] = useState(null);
   const [sseStatus, setSseStatus] = useState("connecting"); // 'connecting'|'online'|'offline'
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
   const refetchTimer = useRef(null);
 
   const fetchBoard = useCallback(async () => {
@@ -321,6 +324,21 @@ function App() {
       setLoadError(String(e));
     }
   }, []);
+
+  /* The refresh button's in-flight guard. A ref (not the state) keeps
+     the guard atomic against double-clicks within the same tick; the
+     state drives the busy UI. Same load path, errors and re-render as
+     the initial load and the SSE refetch. */
+  const refreshBoard = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setRefreshing(true);
+    try { await fetchBoard(); }
+    finally {
+      refreshingRef.current = false;
+      setRefreshing(false);
+    }
+  }, [fetchBoard]);
 
   // Initial load
   useEffect(() => { fetchBoard(); }, [fetchBoard]);
@@ -509,6 +527,8 @@ function App() {
         epics={board.epics}
         theme={theme}
         sseStatus={sseStatus}
+        onRefresh={refreshBoard}
+        refreshing={refreshing}
       />
 
       <Board
@@ -557,7 +577,7 @@ function App() {
 /* =========================================================
    TopBar
 ========================================================= */
-function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFilterOpen, filteredCount, priorities, priorityColors, epics, theme, sseStatus }) {
+function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFilterOpen, filteredCount, priorities, priorityColors, epics, theme, sseStatus, onRefresh, refreshing }) {
   const popRef = useRef(null);
   useClickOutside(popRef, () => setFilterOpen(false), filterOpen);
 
@@ -670,6 +690,16 @@ function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFi
         <ThemeToggle theme={theme} />
 
         <ServerStatus status={sseStatus} />
+
+        <button
+          className={"iconbtn" + (refreshing ? " refreshing" : "")}
+          onClick={onRefresh}
+          disabled={refreshing}
+          aria-label="Refresh"
+          title="Refresh">
+          <IconRefresh />
+          <span className="iconbtn-label">Refresh</span>
+        </button>
       </div>
     </header>);
 }

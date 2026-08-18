@@ -634,7 +634,7 @@ On success, the handler MUST:
   to `""`), the supplied `Priority` (defaulting to `""`), the
   supplied `Tags` (defaulting to `[]`), and
   `CreatedAt = UpdatedAt = time.Now().UTC().Truncate(time.Second)`.
-- Append it via `board.AppendCardToColumn`.
+- Insert it at the **top** of the target column (position 0).
 - Persist via `board.Save`.
 - Respond with status `201`, `Content-Type: application/json`, and
   body `{"card": {...}}` containing the new card via
@@ -655,7 +655,7 @@ IO_ERROR` via the existing `httpError` catch-all.
   matches `^[0-9a-z]{6}$`, and whose `created_at` equals
   `updated_at`
 - **AND** the on-disk `kanban.toml` MUST contain a `[[cards]]`
-  block with the same `id` appended to the `todo` column
+  block with the same `id` at the top of the `todo` column
 
 #### Scenario: Successful create with all optional fields
 
@@ -721,13 +721,12 @@ IO_ERROR` via the existing `httpError` catch-all.
 - **AND** the body's `error.code` MUST be `INVALID_BODY`
 - **AND** the on-disk `kanban.toml` MUST be byte-unchanged
 
-#### Scenario: Created card is appended to the end of its column
+#### Scenario: Created card is placed at the top of its column
 
 - **WHEN** `POST /api/cards` succeeds and the target column
   already contains 3 cards
 - **THEN** the on-disk ordering of cards within that column MUST
-  place the new card last (4th in column-relative order), matching
-  `board.AppendCardToColumn` semantics
+  place the new card first (1st in column-relative order)
 
 #### Scenario: Created card carries equal `created_at` and `updated_at`
 

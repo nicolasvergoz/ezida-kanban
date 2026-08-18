@@ -11,12 +11,23 @@ low = '#22c55e'
 medium = '#f59e0b'
 
 [[cards]]
+id = 'nzmotf'
+title = 'Card model extensions'
+column = 'backlog'
+description = 'Umbrella for the card-schema features that extend what a card can hold.'
+created_at = 2026-08-08T14:48:46Z
+updated_at = 2026-08-18T18:51:16Z
+tags = ['cli', 'viewer', 'schema']
+priority = 'medium'
+color = '#f97316'
+
+[[cards]]
 id = 'wrshlo'
 title = 'Card due dates'
 column = 'backlog'
 description = "Add an optional due date field to cards. CLI: ezida edit <id> --due 2026-06-01 (and --no-due to clear). Viewer: show the date on the card and in the detail modal; visually highlight overdue (past today, not in 'done') and due-soon (within N days). Filter/sort by due date. Goal: make time-bound work visible at a glance.\n\nNotifications / events list: because cards can have deadlines, surface overdue + due-soon cards in a dedicated list somewhere in the UI (notification panel, events feed, sidebar widget — form TBD). Lets the user see at a glance what slipped or is about to slip without scanning the whole board. Each entry links back to the card."
 created_at = 2026-05-23T09:09:28Z
-updated_at = 2026-08-09T14:16:49Z
+updated_at = 2026-08-18T18:51:04Z
 tags = ['cli', 'viewer', 'schema']
 priority = 'medium'
 epic = 'nzmotf'
@@ -71,6 +82,16 @@ created_at = 2026-05-29T08:41:50Z
 updated_at = 2026-05-29T08:41:50Z
 tags = []
 priority = 'low'
+
+[[cards]]
+id = 'nvwk16'
+title = 'Move a card to the top of its new column (CLI)'
+column = 'done'
+description = "`ezida move <id> <column>`, `ezida edit --column`, and `ezida add` all append the card to the bottom of the target column. On a long column — `done` has 21 cards — you have to scroll all the way down to see what you just added or moved.\n\nWanted: card lands at the **top** of the target column, for all three CLI entry points, plus the viewer's column-body drop.\n\nScope:\n- `ezida move` — move.go:41, calls `board.AppendCardToColumn` directly → insert at position 0.\n- `ezida edit --column` — edit.go:195, same call → position 0, regardless of which other flags are combined with `--column` in the same invocation.\n- `ezida add` — add.go:120, same call → new cards also land at position 0.\n- Viewer column-body drop — `List.onDrop` (app.jsx:879) hardcodes `list.cards.length` when dropping onto the column itself (blank space, not onto a card) → change to 0. Card-to-card drop (`CardItem.onDrop`) stays untouched — it's already positional (above/below by cursor Y).\n\n`board.MoveCard` is not in this path for these CLI callers — they call `board.AppendCardToColumn` directly. That's where the actual change lands; callers just stop asking for the bottom.\n\nOne OpenSpec change covers CLI + viewer together. Deltas expected on:\n  - card-writing:125  `move` re-places at the end → top\n  - card-writing:12   `add` appends at the end → top\n  - board-config:29   `edit --column` re-places at the end → top\n  - viewer column-drop: `List.onDrop` re-places at the end → top, when dropping on the column body"
+created_at = 2026-08-09T14:34:46Z
+updated_at = 2026-08-18T18:52:32Z
+tags = ['cli', 'ux']
+priority = 'high'
 
 [[cards]]
 id = 'dvnpih'
@@ -292,19 +313,19 @@ title = 'Add a reload/refresh button in the viewer nav bar'
 column = 'todo'
 description = 'Add a reload/refresh button to the viewer topbar so the board can be re-fetched on demand, without a full page reload.'
 created_at = 2026-08-11T05:29:37Z
-updated_at = 2026-08-11T05:29:37Z
+updated_at = 2026-08-18T18:50:09Z
 tags = ['viewer', 'ux']
+priority = 'high'
 
 [[cards]]
-id = 'nzmotf'
-title = 'Card model extensions'
+id = '0jwp4x'
+title = 'Add version number in status overlay'
 column = 'todo'
-description = 'Umbrella for the card-schema features that extend what a card can hold.'
-created_at = 2026-08-08T14:48:46Z
-updated_at = 2026-08-08T15:00:45Z
-tags = ['cli', 'viewer', 'schema']
-priority = 'medium'
-color = '#8b5cf6'
+description = ''
+created_at = 2026-08-18T18:49:09Z
+updated_at = 2026-08-18T18:49:29Z
+tags = ['ui']
+priority = 'low'
 
 [[cards]]
 id = 'o3d4aa'
@@ -312,18 +333,17 @@ title = 'Archive cards'
 column = 'todo'
 description = "Archive cards out of the active board into separate storage (e.g. kanban.archive.toml or .kanban/archive/ folder — TBD). CLI: 'ezida archive <id>'. Viewer: archive action on card. Archived cards excluded from board/list by default; surface via 'ezida archive list' or viewer toggle."
 created_at = 2026-05-21T22:09:11Z
-updated_at = 2026-08-09T14:16:46Z
+updated_at = 2026-08-17T19:36:18Z
 tags = ['cli', 'viewer', 'schema']
 priority = 'medium'
-epic = 'nzmotf'
 
 [[cards]]
-id = 'nvwk16'
-title = 'Move a card to the top of its new column (CLI)'
+id = 'df6v41'
+title = "Click on epic's children list item should open children card"
 column = 'todo'
-description = "`ezida move <id> <column>` appends the card to the bottom of the target column. On a long column — `done` has 21 cards — you have to scroll all the way down to see what you just moved. The thing you most want to see is the hardest to find.\n\nWanted: a CLI move places the card at the **top** of the target column.\n\nScope: `ezida move` and `ezida edit --column`, which share the same placement. Both call `board.MoveCard` with an explicit position, so the change is in the callers, not in the helper.\n\nThe viewer is NOT affected: it sends the drop position from the drag, and dropping is already positional.\n\nThis is not a bug — it is a written requirement, so implementing it means an OpenSpec change with deltas on:\n  - card-writing:125  `move` re-places at the end\n  - board-config:29   `edit --column` re-places at the end\n\nOpen question, deliberately left out: `ezida add` also appends (card-writing:12). Same irritation, but a new card at the top is a different argument from a moved card at the top — decide separately."
-created_at = 2026-08-09T14:34:46Z
-updated_at = 2026-08-09T14:44:19Z
-tags = ['cli', 'ux']
+description = ''
+created_at = 2026-08-17T19:34:50Z
+updated_at = 2026-08-17T19:35:17Z
+tags = ['ux']
 priority = 'medium'
-
+epic = 'dvnpih'

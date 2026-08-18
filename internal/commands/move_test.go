@@ -69,16 +69,27 @@ func TestMove_HappyPath(t *testing.T) {
 		// additionally want it refreshed).
 		t.Errorf("updated_at not refreshed: %v vs created %v", moved.UpdatedAt, origCard.CreatedAt)
 	}
+	// The moved card must land ahead of every card that was already in
+	// "ongoing" (top-of-column placement, not bottom-append).
+	movedIdx := indexCardByID(postBoard.Cards, origCard.ID)
+	for _, c := range postBoard.Cards {
+		if c.Column == "ongoing" && c.ID != origCard.ID {
+			if otherIdx := indexCardByID(postBoard.Cards, c.ID); otherIdx < movedIdx {
+				t.Errorf("moved card %s is not ahead of pre-existing ongoing card %s", origCard.ID, c.ID)
+			}
+		}
+	}
 }
 
 func TestMove_SameColumn(t *testing.T) {
 	path := copyFixture(t)
 	preBoard, _ := board.Load(path)
+	// Pick the LAST "todo" card, not the first, so a successful
+	// top-placement re-order is actually observable.
 	var orig board.Card
 	for _, c := range preBoard.Cards {
 		if c.Column == "todo" {
 			orig = c
-			break
 		}
 	}
 	cmd := newDummyMoveForPath(path, false)
@@ -98,6 +109,16 @@ func TestMove_SameColumn(t *testing.T) {
 	}
 	if moved.Column != "todo" {
 		t.Errorf("column changed: %s", moved.Column)
+	}
+	// Re-placed at the top: ahead of every other "todo" card, including
+	// the one that used to be first.
+	movedIdx := indexCardByID(postBoard.Cards, orig.ID)
+	for _, c := range postBoard.Cards {
+		if c.Column == "todo" && c.ID != orig.ID {
+			if otherIdx := indexCardByID(postBoard.Cards, c.ID); otherIdx < movedIdx {
+				t.Errorf("moved card %s is not at the top of todo (behind %s)", orig.ID, c.ID)
+			}
+		}
 	}
 }
 

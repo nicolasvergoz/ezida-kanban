@@ -283,13 +283,13 @@ func TestHandle_Create_MalformedBody(t *testing.T) {
 	}
 }
 
-func TestHandle_Create_AppendsToEndOfColumn(t *testing.T) {
+func TestHandle_Create_PlacesAtTopOfColumn(t *testing.T) {
 	path := writableBoard(t)
 	ts, cleanup := startTestServer(t, path)
 	defer cleanup()
 
-	// Seed has aaaaaa, bbbbbb in todo (2 cards). Add a 3rd, then the
-	// create should make a 4th card with column-relative position 3.
+	// Seed has aaaaaa, bbbbbb in todo (2 cards). Each create should
+	// land ahead of everything already in the column.
 	res1 := postJSON(t, ts.URL+"/api/cards", `{"column":"todo","title":"three"}`)
 	res1.Body.Close()
 	if res1.StatusCode != 201 {
@@ -315,8 +315,8 @@ func TestHandle_Create_AppendsToEndOfColumn(t *testing.T) {
 	if len(todoOrder) != 4 {
 		t.Fatalf("todo has %d cards, want 4", len(todoOrder))
 	}
-	if todoOrder[len(todoOrder)-1] != "four" {
-		t.Fatalf("last todo card = %q, want %q", todoOrder[len(todoOrder)-1], "four")
+	if todoOrder[0] != "four" {
+		t.Fatalf("first todo card = %q, want %q", todoOrder[0], "four")
 	}
 }
 

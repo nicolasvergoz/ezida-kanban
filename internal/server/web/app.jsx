@@ -876,7 +876,7 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, epics, 
     setIsOver(false);
     if (dragRef.current.kind === "card") {
       const { cardId, fromListId } = dragRef.current;
-      onMoveCard(fromListId, cardId, list.id, list.cards.length);
+      onMoveCard(fromListId, cardId, list.id, 0);
       dragRef.current = { kind: null };
     } else if (dragRef.current.kind === "list") {
       onMoveList(dragRef.current.listIdx, index);

@@ -186,7 +186,7 @@ type createCardPayload struct {
 //     → 400 INVALID_PRIORITY.
 //  6. board.NewUniqueID against existing IDs (ErrIDExhausted → 500
 //     IO_ERROR via httpError catch-all).
-//  7. Build the Card, AppendCardToColumn, Save.
+//  7. Build the Card, PrependCardToColumn, Save.
 //  8. 201 with {"card": cardToResponse(card)}.
 func (s *serverState) handleCreate(w http.ResponseWriter, r *http.Request) {
 	var p createCardPayload
@@ -279,7 +279,7 @@ func (s *serverState) handleCreate(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt:   now,
 	}
 
-	board.AppendCardToColumn(b, card)
+	board.PrependCardToColumn(b, card)
 	if err := board.Save(s.boardPath, b); err != nil {
 		httpError(w, err)
 		return

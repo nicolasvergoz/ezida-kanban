@@ -140,39 +140,24 @@ func TestAdd_TagError(t *testing.T) {
 	}
 }
 
-func TestAdd_AppendsToColumnBottom(t *testing.T) {
+func TestAdd_PlacesAtColumnTop(t *testing.T) {
 	path := copyFixture(t)
-	preBoard, _ := board.Load(path)
-	// Record indices of existing todo cards.
-	preTodoCount := 0
-	for _, c := range preBoard.Cards {
-		if c.Column == "todo" {
-			preTodoCount++
-		}
-	}
 	cmd := newDummyAddForPath(path, false)
-	stdout, _, err := executeCobraText(cmd, []string{"Last todo", "--column=todo"}, false)
+	stdout, _, err := executeCobraText(cmd, []string{"New todo", "--column=todo"}, false)
 	if err != nil {
 		t.Fatalf("add: %v", err)
 	}
 	id := strings.TrimSpace(stdout)
 	postBoard, _ := board.Load(path)
-	// Find the index of the new card and the index of the last pre-existing todo card.
-	var newIdx, lastPreTodoIdx int = -1, -1
-	for i, c := range postBoard.Cards {
-		if c.ID == id {
-			newIdx = i
-		} else if c.Column == "todo" {
-			if i > lastPreTodoIdx {
-				lastPreTodoIdx = i
-			}
-		}
-	}
+	// The new card must be ahead of every pre-existing "todo" card.
+	newIdx := indexCardByID(postBoard.Cards, id)
 	if newIdx == -1 {
 		t.Fatalf("new card not found in post board")
 	}
-	if newIdx != lastPreTodoIdx+1 {
-		t.Errorf("new card at index %d, want %d (after last pre-existing todo)", newIdx, lastPreTodoIdx+1)
+	for i, c := range postBoard.Cards {
+		if c.Column == "todo" && c.ID != id && i < newIdx {
+			t.Errorf("pre-existing todo card %s at index %d is ahead of the new card at %d", c.ID, i, newIdx)
+		}
 	}
 }
 

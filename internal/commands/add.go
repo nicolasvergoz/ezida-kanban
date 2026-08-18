@@ -117,7 +117,7 @@ func runAdd(cmd *cobra.Command, path, title string, f addFlags, asJSON bool) err
 			CreatedAt:   now,
 			UpdatedAt:   now,
 		}
-		board.AppendCardToColumn(b, c)
+		board.PrependCardToColumn(b, c)
 		// The parent becomes an epic the moment it acquires this
 		// child, so it gets a color in the same write.
 		if f.epic != "" && board.EnsureEpicColor(b, f.epic) {

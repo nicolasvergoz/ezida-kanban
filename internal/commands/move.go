@@ -38,7 +38,7 @@ func runMove(cmd *cobra.Command, path, id, column string, asJSON bool) error {
 		b.Cards = slices.Delete(b.Cards, idx, idx+1)
 		c.Column = column
 		c.UpdatedAt = nowFunc().UTC().Truncate(time.Second)
-		board.AppendCardToColumn(b, c)
+		board.PrependCardToColumn(b, c)
 		return c, nil
 	})
 	if err != nil {

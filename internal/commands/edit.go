@@ -104,7 +104,7 @@ func NewEditCmd(jsonOut *bool) *cobra.Command {
 	cmd.Flags().StringVar(&state.description, "description", "", "new description (pass \"\" to clear)")
 	cmd.Flags().StringVar(&state.priority, "priority", "", "new priority (pass \"\" to clear)")
 	cmd.Flags().StringVar(&state.tags, "tags", "", "comma-separated replacement tag list")
-	cmd.Flags().StringVar(&state.column, "column", "", "move the card to this column (re-orders to bottom)")
+	cmd.Flags().StringVar(&state.column, "column", "", "move the card to this column (re-orders to top)")
 	cmd.Flags().StringVar(&state.epic, "epic", "", "id of the card this one belongs to")
 	cmd.Flags().BoolVar(&state.noEpic, "no-epic", false, "detach the card from its epic")
 	cmd.Flags().StringVar(&state.color, "color", "",
@@ -192,7 +192,7 @@ func runEdit(cmd *cobra.Command, path, id string, f editFlags, asJSON bool) erro
 			}
 			c.Column = *f.column
 			b.Cards = slices.Delete(b.Cards, idx, idx+1)
-			board.AppendCardToColumn(b, c)
+			board.PrependCardToColumn(b, c)
 		} else {
 			b.Cards[idx] = c
 		}

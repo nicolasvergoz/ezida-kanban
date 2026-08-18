@@ -348,6 +348,11 @@ issue `POST /api/cards/{id}/move` with `{ column, position }`
 derived from the drop target column's name and the insertion index
 relative to the column's current card list.
 
+Dropping directly onto the column body — blank space below the last
+card, or an empty column, as opposed to dropping onto another card —
+MUST resolve to position `0` (the top of the column), not the
+column's current card count.
+
 #### Scenario: Drag card to another column
 
 - **WHEN** the user drags a card from `todo` and drops it on `done`
@@ -373,6 +378,23 @@ relative to the column's current card list.
 
 - **WHEN** the cursor is in the lower half
 - **THEN** the 2px accent line appears below the hovered card
+
+#### Scenario: Drop on the column body places the card at the top
+
+- **WHEN** the user drags a card from `todo` and drops it on the
+  `done` column's blank space below its last card (not on another
+  card)
+- **THEN** a `POST /api/cards/<id>/move` request MUST fire with
+  body `{"column":"done","position":0}`
+- **AND** the card visually appears at the top of the `done` column
+  before the request resolves
+
+#### Scenario: Drop on an empty column places the card at the top
+
+- **WHEN** the user drags a card and drops it on a column with no
+  existing cards
+- **THEN** a `POST /api/cards/<id>/move` request MUST fire with
+  body `{"column":"<target>","position":0}`
 
 ### Requirement: Drop failure resets the UI from the server
 

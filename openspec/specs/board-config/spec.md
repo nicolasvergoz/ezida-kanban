@@ -26,8 +26,10 @@ Behavior of each flag:
 - `--tags <csv>`: REPLACES the full tag list. Same parsing rules as
   `add` (`INVALID_TAG` on empty entries).
 - `--column <name>`: changes the card's column. MUST match a value in
-  `[board].columns`. The card MUST be re-placed at the end of the new
-  column's existing cards (same logic as `move`).
+  `[board].columns`. The card MUST be re-placed at the **top** of the
+  new column's existing cards (position 0, same logic as `move`),
+  regardless of which other flags are combined with `--column` in the
+  same invocation.
 - `--epic <id>`: sets the card's parent epic. The id MUST match an
   existing card, MUST NOT equal the card's own id, and MUST NOT name a
   card that itself carries an `epic`; any violation exits `1` with
@@ -74,12 +76,20 @@ MUST also be refreshed.
 - **THEN** the resulting card has no `priority` field in the saved TOML
 - **AND** in JSON output the `card.priority` field is omitted
 
-#### Scenario: Edit changes column re-orders the card
+#### Scenario: Edit changes column places the card at the top
 
 - **WHEN** `ezida edit a3f2k9 --column=ongoing` is invoked on a card
   currently in `todo`, when the board contains cards in the file order
   `[a3f2k9(todo), X(ongoing), Y(ongoing)]`
-- **THEN** the resulting file order is `[X(ongoing), Y(ongoing), a3f2k9(ongoing)]`
+- **THEN** the resulting file order is `[a3f2k9(ongoing), X(ongoing), Y(ongoing)]`
+
+#### Scenario: Edit changes column and other fields together, still places at the top
+
+- **WHEN** `ezida edit a3f2k9 --column=ongoing --priority=high` is
+  invoked on a card currently in `todo`, when the board contains cards
+  in the file order `[a3f2k9(todo), X(ongoing), Y(ongoing)]`
+- **THEN** the resulting file order is `[a3f2k9(ongoing), X(ongoing), Y(ongoing)]`
+- **AND** `a3f2k9`'s `priority` equals `"high"`
 
 #### Scenario: Edit JSON mode echoes the full card
 

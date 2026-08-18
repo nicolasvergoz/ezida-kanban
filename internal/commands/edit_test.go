@@ -168,15 +168,13 @@ func TestEdit_ClearPriority(t *testing.T) {
 func TestEdit_ChangeColumnReOrders(t *testing.T) {
 	path := copyFixture(t)
 	cmd := newDummyEditForPath(path, false)
-	// a3f2k9 is in todo. Move it to ongoing — should end up at the end
-	// of the ongoing block.
+	// a3f2k9 is in todo. Move it to ongoing — should end up at the top
+	// of the ongoing block, ahead of every pre-existing ongoing card.
 	_, _, err := executeCobraText(cmd, []string{"a3f2k9", "--column=ongoing"}, false)
 	if err != nil {
 		t.Fatalf("edit: %v", err)
 	}
 	b, _ := board.Load(path)
-	// Find the index of a3f2k9 and confirm every preceding card with column=ongoing is before it
-	// AND no card with column=ongoing exists after it.
 	var idx int = -1
 	for i, c := range b.Cards {
 		if c.ID == "a3f2k9" {
@@ -189,9 +187,41 @@ func TestEdit_ChangeColumnReOrders(t *testing.T) {
 	if b.Cards[idx].Column != "ongoing" {
 		t.Errorf("column: %q", b.Cards[idx].Column)
 	}
-	for i := idx + 1; i < len(b.Cards); i++ {
+	for i := 0; i < idx; i++ {
 		if b.Cards[i].Column == "ongoing" {
-			t.Errorf("ongoing card after the moved one at index %d", i)
+			t.Errorf("ongoing card before the moved one at index %d, want it at the top", i)
+		}
+	}
+}
+
+func TestEdit_ChangeColumnWithOtherFlagsStillReOrdersToTop(t *testing.T) {
+	path := copyFixture(t)
+	cmd := newDummyEditForPath(path, false)
+	// Combine --column with --priority in the same invocation: both
+	// must apply, and top-placement must still happen.
+	_, _, err := executeCobraText(cmd, []string{"a3f2k9", "--column=ongoing", "--priority=high"}, false)
+	if err != nil {
+		t.Fatalf("edit: %v", err)
+	}
+	b, _ := board.Load(path)
+	var idx int = -1
+	for i, c := range b.Cards {
+		if c.ID == "a3f2k9" {
+			idx = i
+		}
+	}
+	if idx == -1 {
+		t.Fatal("card not found")
+	}
+	if b.Cards[idx].Column != "ongoing" {
+		t.Errorf("column: %q", b.Cards[idx].Column)
+	}
+	if b.Cards[idx].Priority != "high" {
+		t.Errorf("priority: %q", b.Cards[idx].Priority)
+	}
+	for i := 0; i < idx; i++ {
+		if b.Cards[i].Column == "ongoing" {
+			t.Errorf("ongoing card before the moved one at index %d, want it at the top", i)
 		}
 	}
 }

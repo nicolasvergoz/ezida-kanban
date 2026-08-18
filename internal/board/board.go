@@ -256,22 +256,15 @@ func withColumnsComment(data []byte) []byte {
 	return data
 }
 
-// AppendCardToColumn inserts c into b.Cards immediately after the last card
-// whose Column matches c.Column. If no card in c.Column exists yet, the new
-// card is appended to the end of b.Cards.
+// PrependCardToColumn inserts c at the top of the cards whose Column
+// matches c.Column — position 0, ahead of every existing card in
+// that column.
 //
-// This codifies the "append to bottom of column" behavior (ADR §D12) so every
-// write phase inherits a single implementation. As of V2 (drag/reorder)
-// the helper delegates to InsertCardAt with position = number of cards
-// already in c.Column; the observable behavior is unchanged.
-func AppendCardToColumn(b *Board, c Card) {
-	count := 0
-	for _, existing := range b.Cards {
-		if existing.Column == c.Column {
-			count++
-		}
-	}
-	InsertCardAt(b, c, c.Column, count)
+// This codifies the "place at top of column" behavior so every write
+// phase inherits a single implementation. The helper delegates to
+// InsertCardAt with position = 0.
+func PrependCardToColumn(b *Board, c Card) {
+	InsertCardAt(b, c, c.Column, 0)
 }
 
 // InsertCardAt inserts c into b.Cards so that, after the call, the
@@ -311,7 +304,7 @@ func InsertCardAt(b *Board, c Card, column string, position int) {
 		insertAt = len(b.Cards)
 	case position == len(colIdx):
 		// Past the last existing same-column card → insert immediately
-		// after it (preserves AppendCardToColumn semantics).
+		// after it.
 		insertAt = colIdx[len(colIdx)-1] + 1
 	default:
 		insertAt = colIdx[position]

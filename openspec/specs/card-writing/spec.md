@@ -9,8 +9,8 @@ CLI surface for mutating commands: `ezida add`, `ezida move`, `ezida rm`. Includ
 ### Requirement: `ezida add` creates a new card
 
 `ezida add "<title>" --column=<name>` SHALL create a new `[[cards]]`
-entry, place it at the end of the target column's existing cards, and
-write the file atomically. Required flags:
+entry, place it at the **top** of the target column's existing cards
+(position 0), and write the file atomically. Required flags:
 
 - `--column=<name>`: MUST match a value in `[board].columns`.
 
@@ -80,12 +80,12 @@ current UTC time at second precision and MUST be identical at creation.
 - **THEN** the process exits with code `1`
 - **AND** the error code (JSON mode) is `MISSING_TITLE`
 
-#### Scenario: Add appends at the bottom of the column
+#### Scenario: Add places the card at the top of the column
 
-- **WHEN** `ezida add "New"  --column=todo` is invoked against a board
+- **WHEN** `ezida add "New" --column=todo` is invoked against a board
   whose `[[cards]]` order is `A(todo), B(done), C(todo)`
 - **THEN** the resulting card order in the file is
-  `A(todo), B(done), C(todo), New(todo)`
+  `New(todo), A(todo), B(done), C(todo)`
 
 #### Scenario: Add with malformed tag list
 
@@ -122,8 +122,8 @@ current UTC time at second precision and MUST be identical at creation.
 
 `ezida move <id> <column>` SHALL update the card's `column` field, set
 its `updated_at` to the current UTC time at second precision, and
-re-place the card at the end of the new column's existing cards in
-`b.Cards`.
+re-place the card at the **top** of the new column's existing cards
+(position 0) in `b.Cards`.
 
 #### Scenario: Move to an existing column
 
@@ -132,18 +132,18 @@ re-place the card at the end of the new column's existing cards in
 - **THEN** the card's `column` equals `"ongoing"`
 - **AND** the card's `updated_at` is strictly greater than its
   `created_at`
-- **AND** the card appears in `b.Cards` at a position after the last
-  pre-existing `ongoing` card
+- **AND** the card appears in `b.Cards` before every pre-existing
+  `ongoing` card
 
-#### Scenario: Move to the same column is a no-op write
+#### Scenario: Move to the same column re-places at the top
 
 - **WHEN** `ezida move a3f2k9 todo` is invoked on a card already in
-  `todo`
+  `todo`, not currently at the top of `todo`
 - **THEN** the process exits with code `0`
 - **AND** the card's `updated_at` is refreshed (to honor "any
   modification refreshes `updated_at`" — invoking the command counts as
   a modification request)
-- **AND** the card's position within the column is unchanged
+- **AND** the card is now the first `todo` card in `b.Cards`
 
 #### Scenario: Move to an unknown column
 

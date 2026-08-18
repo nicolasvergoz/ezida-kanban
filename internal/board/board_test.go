@@ -336,9 +336,9 @@ func TestRoundTrip_PreservesCardOrder(t *testing.T) {
 	}
 }
 
-// --- AppendCardToColumn tests ---------------------------------------------
+// --- PrependCardToColumn tests ---------------------------------------------
 
-func TestAppendCardToColumn_AfterExistingSameColumn(t *testing.T) {
+func TestPrependCardToColumn_BeforeExistingSameColumn(t *testing.T) {
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	b := &Board{
 		Cards: []Card{
@@ -348,18 +348,18 @@ func TestAppendCardToColumn_AfterExistingSameColumn(t *testing.T) {
 		},
 	}
 	d := Card{ID: "dddddd", Column: "todo", CreatedAt: now, UpdatedAt: now, Title: "D"}
-	AppendCardToColumn(b, d)
-	want := []string{"aaaaaa", "bbbbbb", "cccccc", "dddddd"}
+	PrependCardToColumn(b, d)
+	want := []string{"dddddd", "aaaaaa", "bbbbbb", "cccccc"}
 	got := make([]string, len(b.Cards))
 	for i, c := range b.Cards {
 		got[i] = c.ID
 	}
 	if !reflectStringSliceEqual(got, want) {
-		t.Fatalf("AppendCardToColumn order: got %v, want %v", got, want)
+		t.Fatalf("PrependCardToColumn order: got %v, want %v", got, want)
 	}
 }
 
-func TestAppendCardToColumn_FirstInColumnAppendsToEnd(t *testing.T) {
+func TestPrependCardToColumn_FirstInColumnAppendsToEnd(t *testing.T) {
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	b := &Board{
 		Cards: []Card{
@@ -367,14 +367,14 @@ func TestAppendCardToColumn_FirstInColumnAppendsToEnd(t *testing.T) {
 		},
 	}
 	bcard := Card{ID: "bbbbbb", Column: "done", CreatedAt: now, UpdatedAt: now, Title: "B"}
-	AppendCardToColumn(b, bcard)
+	PrependCardToColumn(b, bcard)
 	want := []string{"aaaaaa", "bbbbbb"}
 	got := make([]string, len(b.Cards))
 	for i, c := range b.Cards {
 		got[i] = c.ID
 	}
 	if !reflectStringSliceEqual(got, want) {
-		t.Fatalf("AppendCardToColumn first-in-column: got %v, want %v", got, want)
+		t.Fatalf("PrependCardToColumn first-in-column: got %v, want %v", got, want)
 	}
 }
 
@@ -631,26 +631,26 @@ func TestMoveCard_NoopRefreshesTimestamp(t *testing.T) {
 	}
 }
 
-// TestAppendCardToColumn_StillMatchesPriorBehavior pins the V2
-// refactor that re-routed AppendCardToColumn through InsertCardAt: a
-// fresh sequence of appends MUST produce the same final slice the
-// V1 implementation produced for the same inputs.
-func TestAppendCardToColumn_StillMatchesPriorBehavior(t *testing.T) {
+// TestPrependCardToColumn_MixedSequence pins PrependCardToColumn's
+// behavior across a mixed sequence of columns: a fresh sequence of
+// prepends MUST produce a stable, expected final slice.
+func TestPrependCardToColumn_MixedSequence(t *testing.T) {
 	now := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
 	mk := func(id, col string) Card {
 		return Card{ID: id, Title: id, Column: col, CreatedAt: now, UpdatedAt: now}
 	}
 	b := &Board{}
 	// Sequence chosen to exercise both "first card in column"
-	// (empty-column → append to end) and "next card in column" (insert
-	// after the last same-column card) branches in mixed order.
-	AppendCardToColumn(b, mk("aaaaaa", "todo")) // empty → end
-	AppendCardToColumn(b, mk("bbbbbb", "done")) // empty done → end
-	AppendCardToColumn(b, mk("cccccc", "todo")) // after aaaaaa
-	AppendCardToColumn(b, mk("dddddd", "todo")) // after cccccc
-	AppendCardToColumn(b, mk("eeeeee", "done")) // after bbbbbb
+	// (empty-column → append to end of the flat slice) and "next card
+	// in column" (insert before every existing same-column card)
+	// branches in mixed order.
+	PrependCardToColumn(b, mk("aaaaaa", "todo")) // empty → end
+	PrependCardToColumn(b, mk("bbbbbb", "done")) // empty done → end
+	PrependCardToColumn(b, mk("cccccc", "todo")) // before aaaaaa
+	PrependCardToColumn(b, mk("dddddd", "todo")) // before cccccc
+	PrependCardToColumn(b, mk("eeeeee", "done")) // before bbbbbb
 
-	want := []string{"aaaaaa", "cccccc", "dddddd", "bbbbbb", "eeeeee"}
+	want := []string{"dddddd", "cccccc", "aaaaaa", "eeeeee", "bbbbbb"}
 	if got := cardIDs(b.Cards); !reflectStringSliceEqual(got, want) {
 		t.Fatalf("got %v, want %v", got, want)
 	}

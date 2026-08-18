@@ -308,16 +308,6 @@ tags = ['viewer', 'ux']
 priority = 'medium'
 
 [[cards]]
-id = '364403'
-title = 'Add a reload/refresh button in the viewer nav bar'
-column = 'todo'
-description = 'Add a reload/refresh button to the viewer topbar so the board can be re-fetched on demand, without a full page reload.'
-created_at = 2026-08-11T05:29:37Z
-updated_at = 2026-08-18T18:50:09Z
-tags = ['viewer', 'ux']
-priority = 'high'
-
-[[cards]]
 id = '0jwp4x'
 title = 'Add version number in status overlay'
 column = 'todo'
@@ -339,11 +329,21 @@ priority = 'medium'
 
 [[cards]]
 id = 'df6v41'
-title = "Click on epic's children list item should open children card"
+title = 'On epic details, click children in the list should open the selected children detail'
 column = 'todo'
 description = ''
 created_at = 2026-08-17T19:34:50Z
-updated_at = 2026-08-17T19:35:17Z
+updated_at = 2026-08-18T20:47:51Z
 tags = ['ux']
 priority = 'medium'
 epic = 'dvnpih'
+
+[[cards]]
+id = '364403'
+title = 'Add a reload/refresh button in the viewer nav bar'
+column = 'ongoing'
+description = 'Add a reload/refresh button to the viewer topbar so the board can be re-fetched on demand, without a full page reload.'
+created_at = 2026-08-11T05:29:37Z
+updated_at = 2026-08-18T20:46:14Z
+tags = ['viewer', 'ux']
+priority = 'high'

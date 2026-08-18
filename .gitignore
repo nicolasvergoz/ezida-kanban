@@ -31,9 +31,8 @@ coverage.html
 *.log
 
 # Claude Code: personal workflow tooling (opsx commands + openspec skills)
-.claude/commands/opsx/
-.claude/skills/openspec-*/
-.claude/settings.local.json
+.claude/
+.opencode/
 
 # Agent context refs (not for public repo)
 refs/

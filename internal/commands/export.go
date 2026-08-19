@@ -7,6 +7,7 @@ import (
 
 	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 	"github.com/nicolasvergoz/ezida-kanban/internal/output"
+	"github.com/nicolasvergoz/ezida-kanban/internal/server"
 )
 
 // NewExportCmd builds the `ezida export` command. The command emits a
@@ -74,6 +75,7 @@ func runExport(cmd *cobra.Command, path string, asJSON bool) error {
 		CardsPerColumn: counts,
 		Cards:          cards,
 		ProjectName:    resolveProjectName(path),
+		Version:        server.Version,
 	}
 	buf, err := output.Export(env)
 	if err != nil {

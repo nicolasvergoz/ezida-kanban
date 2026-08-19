@@ -79,6 +79,7 @@ func startTestServer(t *testing.T, boardPath string) (*httptest.Server, func()) 
 	s := &serverState{
 		boardPath:   boardPath,
 		projectName: resolveProjectName(boardPath),
+		version:     Version,
 		broker:      NewBroker(),
 	}
 	mux := http.NewServeMux()
@@ -95,6 +96,7 @@ func startTestServerWithBroker(t *testing.T, boardPath string) (*httptest.Server
 	s := &serverState{
 		boardPath:   boardPath,
 		projectName: resolveProjectName(boardPath),
+		version:     Version,
 		broker:      b,
 	}
 	mux := http.NewServeMux()
@@ -348,6 +350,8 @@ func TestHandle_Board_Valid(t *testing.T) {
 		Columns        []string       `json:"columns"`
 		Priorities     []string       `json:"priorities"`
 		CardsPerColumn map[string]int `json:"cards_per_column"`
+		ProjectName    string         `json:"project_name"`
+		Version        string         `json:"version"`
 		Cards          []struct {
 			ID          string `json:"id"`
 			Title       string `json:"title"`
@@ -366,6 +370,15 @@ func TestHandle_Board_Valid(t *testing.T) {
 	}
 	if payload.CardsPerColumn["todo"] != 2 || payload.CardsPerColumn["done"] != 1 {
 		t.Fatalf("cards_per_column = %v", payload.CardsPerColumn)
+	}
+	// The envelope carries the build constants alongside the board:
+	// project_name (parent-dir name) and version (build constant,
+	// "dev" for a test/local build). Spec scenario "Valid board".
+	if payload.ProjectName == "" {
+		t.Fatalf("missing project_name field")
+	}
+	if payload.Version != Version {
+		t.Fatalf("version = %q, want %q", payload.Version, Version)
 	}
 	if len(payload.Cards) != 3 {
 		t.Fatalf("len(cards) = %d, want 3", len(payload.Cards))
@@ -1220,6 +1233,83 @@ func TestHandle_Board_ProjectName_Stable(t *testing.T) {
 	if first != "stable-project" {
 		t.Fatalf("project_name = %q, want %q", first, "stable-project")
 	}
+}
+
+// TestHandle_Board_VersionReflectsBuildConstant confirms /api/board
+// surfaces the build-time server.Version constant. The test overrides
+// the package variable before starting the server (and restores it
+// after), so it exercises the real boot-time capture path rather than
+// asserting on the default.
+func TestHandle_Board_VersionReflectsBuildConstant(t *testing.T) {
+	original := Version
+	Version = "v0.4.0-beta"
+	t.Cleanup(func() { Version = original })
+
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	if got := fetchVersion(t, ts.URL); got != "v0.4.0-beta" {
+		t.Fatalf("version = %q, want %q", got, "v0.4.0-beta")
+	}
+}
+
+// TestHandle_Board_VersionRendersDev confirms a local build (no ldflags
+// override) renders the literal "dev" rather than an empty string.
+func TestHandle_Board_VersionRendersDev(t *testing.T) {
+	ts, cleanup := startTestServer(t, fixturePath(t, "valid_kanban.toml"))
+	defer cleanup()
+
+	if got := fetchVersion(t, ts.URL); got != "dev" {
+		t.Fatalf("version = %q, want %q", got, "dev")
+	}
+}
+
+// TestHandle_Board_Version_Stable confirms version is captured once at
+// boot and does not re-evaluate when the board file is rewritten —
+// it is a build constant, not a board value (design D3).
+func TestHandle_Board_Version_Stable(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "kanban.toml")
+	src, err := os.ReadFile(fixturePath(t, "valid_kanban.toml"))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	if err := os.WriteFile(path, src, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	first := fetchVersion(t, ts.URL)
+	// Rewrite the board file between requests — version must not
+	// re-evaluate.
+	if err := os.WriteFile(path, src, 0o644); err != nil {
+		t.Fatalf("rewrite: %v", err)
+	}
+	second := fetchVersion(t, ts.URL)
+	if first != second {
+		t.Fatalf("version drifted: first=%q second=%q", first, second)
+	}
+	if first != "dev" {
+		t.Fatalf("version = %q, want %q", first, "dev")
+	}
+}
+
+func fetchVersion(t *testing.T, baseURL string) string {
+	t.Helper()
+	res, err := http.Get(baseURL + "/api/board")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer res.Body.Close()
+	var payload struct {
+		Version string `json:"version"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	return payload.Version
 }
 
 func fetchProjectName(t *testing.T, baseURL string) string {

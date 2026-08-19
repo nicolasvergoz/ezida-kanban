@@ -63,14 +63,34 @@ and the archived history.
 
 ## Releasing
 
-The official first-release procedure:
+The version is not edited by hand anywhere. The release workflow
+injects it at build time via ldflags, on a single line:
 
-1. Bump the version in `CHANGELOG.md` if/when added (none yet for v0.1.0).
-2. From a clean `main` checkout, push the tag: `git tag v0.1.0 && git push origin v0.1.0`.
+```
+-ldflags "-X main.version=${TAG} -X github.com/nicolasvergoz/ezida-kanban/internal/server.Version=${TAG} -s -w"
+```
+
+`main.version` drives `ezida --version`. `server.Version` is the same
+string, captured once at boot and surfaced three places:
+
+- `GET /api/board` → top-level `version` field
+- `ezida export --json` → top-level `version` field (so a static
+  snapshot records the binary that produced it)
+- the viewer's `ServerStatus` overlay → `Version` row, next to
+  `Status` and `Storage`
+
+Local builds and the CI/Pages workflows inject nothing, so both
+variables default to `"dev"` — the honest label for a non-release
+build.
+
+The procedure:
+
+1. From a clean `main` checkout, push the tag: `git tag v0.1.0 && git push origin v0.1.0`.
    The release workflow refuses tags not reachable from `main`.
-3. Watch the workflow: `gh run list --workflow=release.yml --limit 1`
+2. Watch the workflow: `gh run list --workflow=release.yml --limit 1`
    to find the run id, then `gh run watch <run-id>`. It must produce
    four tarballs, `checksums.txt`, and `install.sh` (six assets).
-4. Smoke-test the install on a fresh machine:
+3. Smoke-test the install on a fresh machine:
    `curl -sSL https://github.com/nicolasvergoz/ezida-kanban/releases/latest/download/install.sh | sh`
-   and confirm `~/.local/bin/ezida --version` prints `v0.1.0`.
+   and confirm `~/.local/bin/ezida --version` prints `v0.1.0` and the
+   viewer's `ServerStatus` overlay shows `Version: v0.1.0`.

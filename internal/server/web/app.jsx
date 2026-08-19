@@ -41,6 +41,7 @@ function toUiBoard(server) {
   }
   return {
     title: server.project_name || "",
+    version: server.version || "",
     lists: (server.columns || []).map((name) => ({
       id: name,
       title: String(name).toUpperCase(),
@@ -516,6 +517,7 @@ function App() {
 
       <TopBar
         title={board.title}
+        version={board.version}
         filter={filter}
         onFilterChange={setFilter}
         filterActive={filterActive}
@@ -577,7 +579,7 @@ function App() {
 /* =========================================================
    TopBar
 ========================================================= */
-function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFilterOpen, filteredCount, priorities, priorityColors, epics, theme, sseStatus, onRefresh, refreshing }) {
+function TopBar({ title, version, filter, onFilterChange, filterActive, filterOpen, setFilterOpen, filteredCount, priorities, priorityColors, epics, theme, sseStatus, onRefresh, refreshing }) {
   const popRef = useRef(null);
   useClickOutside(popRef, () => setFilterOpen(false), filterOpen);
 
@@ -689,7 +691,7 @@ function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFi
 
         <ThemeToggle theme={theme} />
 
-        <ServerStatus status={sseStatus} />
+        <ServerStatus status={sseStatus} version={version} />
 
         <button
           className={"iconbtn" + (refreshing ? " refreshing" : "")}
@@ -704,15 +706,23 @@ function TopBar({ title, filter, onFilterChange, filterActive, filterOpen, setFi
     </header>);
 }
 
-function ServerStatus({ status }) {
+function ServerStatus({ status, version }) {
   const [open, setOpen] = useState(false);
   const popRef = useRef(null);
   useClickOutside(popRef, () => setOpen(false), open);
 
+  // Escape closes the overlay, matching every other popover on the page.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const statusMeta = {
     connecting: { label: "Connecting…", color: "oklch(0.72 0.13 85)" },
     online:     { label: "Online",      color: "oklch(0.68 0.16 145)" },
-    offline:    { label: "Offline",     color: "oklch(0.6 0.2 25)"    },
+    offline:    { label: "Offline",     color: "oklch(0.6 0.2 25)" },
   }[status] || { label: status, color: "var(--text-muted)" };
 
   return (
@@ -736,6 +746,10 @@ function ServerStatus({ status }) {
           <div className="server-row">
             <span className="server-row-label">Storage</span>
             <span className="server-row-value mono">kanban.toml</span>
+          </div>
+          <div className="server-row">
+            <span className="server-row-label">Version</span>
+            <span className="server-row-value mono">{version || "dev"}</span>
           </div>
         </div>}
     </div>);

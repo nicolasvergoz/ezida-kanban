@@ -78,7 +78,7 @@ jobs:
           mkdir -p "dist/${GOOS}-${GOARCH}"
           go build \
             -trimpath \
-            -ldflags "-X main.version=${TAG} -s -w" \
+            -ldflags "-X main.version=${TAG} -X github.com/nicolasvergoz/ezida-kanban/internal/server.Version=${TAG} -s -w" \
             -o "dist/${GOOS}-${GOARCH}/ezida" \
             ./cmd/ezida
           cp LICENSE "dist/${GOOS}-${GOARCH}/LICENSE"

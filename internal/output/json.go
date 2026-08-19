@@ -184,6 +184,9 @@ type ExportEnvelope struct {
 	CardsPerColumn map[string]int    `json:"cards_per_column"`
 	Cards          []ExportCard      `json:"cards"`
 	ProjectName    string            `json:"project_name"`
+	// Version is the build-time server.Version constant, so a static
+	// snapshot records the binary that produced it (design D4).
+	Version string `json:"version"`
 }
 
 // ErrorEnvelope is the JSON shape for any command's error output

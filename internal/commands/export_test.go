@@ -9,11 +9,14 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/nicolasvergoz/ezida-kanban/internal/server"
 )
 
 // TestExport_FullEnvelope confirms `ezida export --json` emits every
 // key of the boardResponse shape (schema_version, project_name,
-// columns, priorities, cards_per_column, cards) with the same types.
+// version, columns, priorities, cards_per_column, cards) with the
+// same types.
 func TestExport_FullEnvelope(t *testing.T) {
 	path := copyFixture(t)
 	cmd := &cobra.Command{Use: "export"}
@@ -27,13 +30,18 @@ func TestExport_FullEnvelope(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatalf("unmarshal: %v\n%s", err, stdout.String())
 	}
-	for _, key := range []string{"schema_version", "project_name", "columns", "priorities", "cards_per_column", "cards"} {
+	for _, key := range []string{"schema_version", "project_name", "version", "columns", "priorities", "cards_per_column", "cards"} {
 		if _, ok := got[key]; !ok {
 			t.Errorf("missing key %q in envelope: %s", key, stdout.String())
 		}
 	}
 	if got["schema_version"].(float64) != 2 {
 		t.Errorf("schema_version = %v, want 2", got["schema_version"])
+	}
+	// version is the build constant, always present (renders "dev"
+	// for a local build — design D4).
+	if got["version"] == nil {
+		t.Errorf("missing version field in envelope: %s", stdout.String())
 	}
 	cards := got["cards"].([]any)
 	if len(cards) != 11 {
@@ -111,5 +119,35 @@ func TestExport_MissingFile(t *testing.T) {
 	}
 	if !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("got %v, want fs.ErrNotExist-wrapped error", err)
+	}
+}
+
+// TestExport_VersionMatchesServerVersion asserts the envelope carries
+// a top-level `version` field equal to the build-time server.Version
+// constant, so a static snapshot records the binary that produced it
+// (design D4).
+func TestExport_VersionMatchesServerVersion(t *testing.T) {
+	original := server.Version
+	server.Version = "v0.4.0-beta"
+	t.Cleanup(func() { server.Version = original })
+
+	path := copyFixture(t)
+	cmd := &cobra.Command{Use: "export"}
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	if err := runExport(cmd, path, true); err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, stdout.String())
+	}
+	v, ok := got["version"].(string)
+	if !ok {
+		t.Fatalf("version is not a string: %T (%v)", got["version"], got["version"])
+	}
+	if v != "v0.4.0-beta" {
+		t.Errorf("version = %q, want %q", v, "v0.4.0-beta")
 	}
 }

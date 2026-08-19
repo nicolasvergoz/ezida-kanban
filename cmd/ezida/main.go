@@ -7,6 +7,7 @@ import (
 
 	"github.com/nicolasvergoz/ezida-kanban/internal/commands"
 	"github.com/nicolasvergoz/ezida-kanban/internal/output"
+	"github.com/nicolasvergoz/ezida-kanban/internal/server"
 )
 
 // version is overridable at build time via:
@@ -57,6 +58,10 @@ func main() {
 	// Pre-parse persistent flags to resolve color before any command runs.
 	_ = rootCmd.ParseFlags(os.Args[1:])
 	output.ConfigureColor(noColor)
+	// Surface the build version on the viewer server seam. The release
+	// workflow injects both this and main.version from the same
+	// -ldflags line; local builds leave both at "dev".
+	server.Version = version
 	if err := rootCmd.Execute(); err != nil {
 		output.Fail(err, jsonOut)
 	}

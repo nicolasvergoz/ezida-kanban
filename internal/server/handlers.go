@@ -572,6 +572,10 @@ type boardResponse struct {
 	// directory of the board path, with "Ezida" fallback). Computed
 	// once at server start; immutable for the process lifetime.
 	ProjectName string `json:"project_name"`
+	// Version is the build-time server.Version constant, captured once
+	// at boot. Immutable for the process lifetime; it is a build
+	// constant, not a board value (design D3).
+	Version string `json:"version"`
 }
 
 // cardResponse is the per-card JSON shape returned inside
@@ -649,6 +653,7 @@ func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
 		CardsPerColumn: counts,
 		Cards:          cards,
 		ProjectName:    s.projectName,
+		Version:        s.version,
 	}
 
 	w.Header().Set("Content-Type", "application/json")

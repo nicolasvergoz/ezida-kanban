@@ -49,6 +49,13 @@ type commandRunner interface {
 	Open(url string) error
 }
 
+// Version is the build-time version string, injected via ldflags the
+// same way as main.version in cmd/ezida/main.go. Defaults to "dev"
+// for local builds and tests; the release workflow overrides it on
+// the same -ldflags line that injects main.version. It is read once
+// at boot by runWithContext and never re-evaluated (design D3).
+var Version = "dev"
+
 // runnerForOpen is the package-level seam for browser-launch
 // behavior. Tests overwrite it to record calls; production code
 // leaves it pointing at execCommandRunner{}.
@@ -110,6 +117,7 @@ func runWithContext(ctx context.Context, opts Options) error {
 	s := &serverState{
 		boardPath:   boardPath,
 		projectName: resolveProjectName(boardPath),
+		version:     Version,
 		broker:      broker,
 	}
 
@@ -215,7 +223,12 @@ type serverState struct {
 	// Immutable for the lifetime of the process — fsnotify events do
 	// not re-evaluate it (ADR 0003 §D4).
 	projectName string
-	broker      *Broker
+	// version is the build-time server.Version constant, copied into
+	// the state once at boot and surfaced via /api/board.version and
+	// the ServerStatus overlay. Immutable for the lifetime of the
+	// process — it is a build constant, not a board value (design D3).
+	version string
+	broker  *Broker
 }
 
 // resolveProjectName returns the parent-directory name of the resolved

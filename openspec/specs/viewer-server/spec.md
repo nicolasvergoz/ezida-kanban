@@ -120,9 +120,9 @@ in-flight requests with a 5 s timeout, then exit with code `0`.
 `GET /api/board` SHALL load `kanban.toml` from the current working
 directory at request time and respond with a JSON object containing
 `schema_version`, `columns`, `done_columns`, `priorities`,
-`priority_colors`, `cards_per_column`, `cards`, and `project_name`. The
-`cards` array MUST include the full `description` field for every card.
-Response `Content-Type` MUST be `application/json`.
+`priority_colors`, `cards_per_column`, `cards`, `project_name`, and
+`version`. The `cards` array MUST include the full `description` field
+for every card. Response `Content-Type` MUST be `application/json`.
 
 Each card object MAY carry `epic` (the six-character id of another card
 on the board) and `color` (a CSS hex string). Both fields use
@@ -151,6 +151,12 @@ basename is empty, equal to `"."`, or equal to the platform path
 separator. The value MUST NOT change for the lifetime of the
 process (it is not re-evaluated when the board file changes).
 
+The top-level `version` field is a string set at server start from the
+build-time `server.Version` constant. It MUST always be present, even
+for local builds (it renders `"dev"`). The value MUST NOT change for
+the lifetime of the process and MUST NOT be re-evaluated on each
+request — it is a build constant, not derived from the board file.
+
 The top-level `priority_colors` field is a JSON object mapping
 priority name → hex color string. The server SHALL resolve it on
 each request as follows:
@@ -178,6 +184,7 @@ values MUST always win over defaults.
 - **AND** each card in `cards` has a `description` field (may be
   empty string)
 - **AND** the body contains a top-level string field `project_name`
+- **AND** the body contains a top-level string field `version`
 - **AND** the body contains a top-level object field `priority_colors`
   (possibly empty)
 - **AND** the body contains a top-level array field `done_columns`
@@ -201,6 +208,24 @@ values MUST always win over defaults.
 - **WHEN** `GET /api/board` is called twice against the same
   running server with a board file rewritten in between
 - **THEN** both responses contain the same `project_name` value
+
+#### Scenario: Version reflects the build constant
+
+- **WHEN** `GET /api/board` is called against a server whose binary
+  was built with `server.Version=v0.4.0-beta`
+- **THEN** the response body's `version` equals `"v0.4.0-beta"`
+
+#### Scenario: Version renders "dev" for a local build
+
+- **WHEN** `GET /api/board` is called against a server whose binary
+  was built without an ldflags override
+- **THEN** the response body's `version` equals `"dev"`
+
+#### Scenario: Version is stable across requests even when the board changes
+
+- **WHEN** `GET /api/board` is called twice against the same running
+  server with the board file rewritten in between
+- **THEN** both responses contain the same `version` value
 
 #### Scenario: Board file missing
 

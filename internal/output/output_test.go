@@ -389,7 +389,7 @@ func TestOutputFail_DetailedErrors_TextAndJSON(t *testing.T) {
 			name:      "column in use",
 			err:       commands.NewColumnInUseError("todo", []commands.AffectedCard{{ID: "a3f2k9", Title: "Refactor auth"}, {ID: "b7m1p4", Title: "Update README"}}),
 			wantCode:  "COLUMN_IN_USE",
-			wantTexts: []string{`Error: column "todo"`, "  a3f2k9  Refactor auth", "Move or remove these cards first."},
+			wantTexts: []string{`Error: column "todo"`, "  a3f2k9  Refactor auth", "Move or remove these cards first, or archive them with `ezida archive column todo`."},
 		},
 		{
 			name:      "priority in use",

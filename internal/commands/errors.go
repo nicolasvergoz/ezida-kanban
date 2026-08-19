@@ -122,6 +122,79 @@ func (e *InvalidFilterError) Details() map[string]any {
 	return map[string]any{"flag": e.Flag, "value": e.Value}
 }
 
+// CardNotArchivedError is returned by `archive get` and `unarchive`
+// when the requested id is not present in the archive.
+type CardNotArchivedError struct {
+	ID string
+}
+
+func (e *CardNotArchivedError) Error() string {
+	return fmt.Sprintf("no archived card with id %q", e.ID)
+}
+
+func (e *CardNotArchivedError) ErrorCode() string { return "CARD_NOT_ARCHIVED" }
+func (e *CardNotArchivedError) ExitCode() int     { return 1 }
+func (e *CardNotArchivedError) Details() map[string]any {
+	return map[string]any{"id": e.ID}
+}
+
+// IDCollisionError is returned by `unarchive` when restoring a card
+// would duplicate an id already present on the live board.
+type IDCollisionError struct {
+	ID string
+}
+
+func (e *IDCollisionError) Error() string {
+	return fmt.Sprintf("id %q already exists on the board", e.ID)
+}
+
+func (e *IDCollisionError) ErrorCode() string { return "ID_COLLISION" }
+func (e *IDCollisionError) ExitCode() int     { return 1 }
+func (e *IDCollisionError) Details() map[string]any {
+	return map[string]any{"id": e.ID}
+}
+
+// MutuallyExclusiveFlagsError is returned by `list` when two flags that
+// cannot be combined were both supplied (--include-archived and
+// --archived-only).
+type MutuallyExclusiveFlagsError struct {
+	Flags []string
+}
+
+func (e *MutuallyExclusiveFlagsError) Error() string {
+	return fmt.Sprintf("flags %s cannot be combined", strings.Join(e.Flags, " and "))
+}
+
+func (e *MutuallyExclusiveFlagsError) ErrorCode() string { return "MUTUALLY_EXCLUSIVE_FLAGS" }
+func (e *MutuallyExclusiveFlagsError) ExitCode() int     { return 1 }
+func (e *MutuallyExclusiveFlagsError) Details() map[string]any {
+	return map[string]any{"flags": e.Flags}
+}
+
+// asBoardError translates the board package's own typed errors — which
+// do not implement CodedError — into the commands package's typed
+// equivalents, so the CLI error envelope carries the right code. Errors
+// it does not recognize are returned unchanged.
+func asBoardError(err error) error {
+	var cnf *board.CardNotFoundError
+	if errors.As(err, &cnf) {
+		return &CardNotFoundError{ID: cnf.ID}
+	}
+	var colnf *board.ColumnNotFoundError
+	if errors.As(err, &colnf) {
+		return &ColumnNotFoundError{Name: colnf.Column}
+	}
+	var cna *board.CardNotArchivedError
+	if errors.As(err, &cna) {
+		return &CardNotArchivedError{ID: cna.ID}
+	}
+	var idc *board.IDCollisionError
+	if errors.As(err, &idc) {
+		return &IDCollisionError{ID: idc.ID}
+	}
+	return err
+}
+
 // AlreadyInitializedError is returned by `init` when a kanban.toml
 // already exists at the target path and --force was not passed.
 type AlreadyInitializedError struct {
@@ -237,7 +310,7 @@ func (e *ColumnInUseError) Error() string {
 	for _, c := range e.Cards {
 		fmt.Fprintf(&sb, "  %s  %s\n", c.ID, c.Title)
 	}
-	sb.WriteString("Move or remove these cards first.")
+	fmt.Fprintf(&sb, "Move or remove these cards first, or archive them with `ezida archive column %s`.", e.Name)
 	return sb.String()
 }
 

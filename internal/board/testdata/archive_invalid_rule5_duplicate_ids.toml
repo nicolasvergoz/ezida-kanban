@@ -1,0 +1,21 @@
+schema_version = 2
+
+[[cards]]
+id = "aaaaaa"
+title = "First"
+column = "done"
+description = ""
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = []
+archived_at = 2026-08-19T10:00:00Z
+
+[[cards]]
+id = "aaaaaa"
+title = "Duplicate"
+column = "done"
+description = ""
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = []
+archived_at = 2026-08-19T10:00:00Z

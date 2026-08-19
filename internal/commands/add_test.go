@@ -2,11 +2,13 @@ package commands
 
 import (
 	"bytes"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -75,6 +77,44 @@ func TestAdd_HappyPath(t *testing.T) {
 	}
 	if !found.CreatedAt.Equal(found.UpdatedAt) {
 		t.Errorf("created != updated: %v vs %v", found.CreatedAt, found.UpdatedAt)
+	}
+}
+
+func TestAdd_DoesNotCollideWithArchivedID(t *testing.T) {
+	path := copyFixture(t)
+	archivePath := board.ArchivePathFor(path)
+
+	at := time.Now().UTC()
+	seed := &board.Archive{
+		SchemaVersion: board.SupportedSchemaVersion,
+		Cards: []board.ArchivedCard{{
+			Card: board.Card{
+				ID: "dddddd", Title: "old", Column: "todo",
+				CreatedAt: at, UpdatedAt: at,
+			},
+			ArchivedAt: at,
+		}},
+	}
+	if err := board.SaveArchive(archivePath, seed); err != nil {
+		t.Fatalf("seed archive: %v", err)
+	}
+
+	// Force crypto/rand to produce "dddddd" on the first draw — which
+	// must be rejected because it collides with the archive — and
+	// "eeeeee" on the second.
+	orig := cryptorand.Reader
+	t.Cleanup(func() { cryptorand.Reader = orig })
+	seq := append(bytes.Repeat([]byte{13}, 6), bytes.Repeat([]byte{14}, 6)...)
+	cryptorand.Reader = bytes.NewReader(seq)
+
+	cmd := newDummyAddForPath(path, false)
+	stdout, _, err := executeCobraText(cmd, []string{"New task", "--column=todo"}, false)
+	if err != nil {
+		t.Fatalf("add: %v", err)
+	}
+	id := strings.TrimSpace(stdout)
+	if id != "eeeeee" {
+		t.Fatalf("got id %q, want eeeeee — the archived id 'dddddd' should have been rejected", id)
 	}
 }
 

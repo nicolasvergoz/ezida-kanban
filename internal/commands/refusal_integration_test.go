@@ -72,7 +72,7 @@ func TestRefusalPayload_TextRendering(t *testing.T) {
 		`Error: column "todo"`,
 		"  a3f2k9  Refactor auth",
 		"  b7m1p4  Update README",
-		"Move or remove these cards first.",
+		"Move or remove these cards first, or archive them with `ezida archive column todo`.",
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in:\n%s", want, got)

@@ -22,6 +22,9 @@ func TestErrors_TypedErrorsImplementCodedError(t *testing.T) {
 		{"invalid color", &InvalidColorError{Value: "chartreuse"}, "INVALID_COLOR"},
 		{"invalid column name", &InvalidColumnNameError{Name: "done*"}, "INVALID_COLUMN_NAME"},
 		{"migration not needed", &MigrationNotNeededError{Version: 2}, "MIGRATION_NOT_NEEDED"},
+		{"card not archived", &CardNotArchivedError{ID: "zzzzzz"}, "CARD_NOT_ARCHIVED"},
+		{"id collision", &IDCollisionError{ID: "aaaaaa"}, "ID_COLLISION"},
+		{"mutually exclusive flags", &MutuallyExclusiveFlagsError{Flags: []string{"--include-archived", "--archived-only"}}, "MUTUALLY_EXCLUSIVE_FLAGS"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -57,6 +60,18 @@ func TestErrors_TypedErrorsImplementCodedError(t *testing.T) {
 	if !errors.As(&InteractiveRequiredError{Hint: "x"}, &ire) {
 		t.Errorf("errors.As(*InteractiveRequiredError) failed")
 	}
+	var cna *CardNotArchivedError
+	if !errors.As(&CardNotArchivedError{ID: "x"}, &cna) {
+		t.Errorf("errors.As(*CardNotArchivedError) failed")
+	}
+	var idc *IDCollisionError
+	if !errors.As(&IDCollisionError{ID: "x"}, &idc) {
+		t.Errorf("errors.As(*IDCollisionError) failed")
+	}
+	var mex *MutuallyExclusiveFlagsError
+	if !errors.As(&MutuallyExclusiveFlagsError{Flags: []string{"a", "b"}}, &mex) {
+		t.Errorf("errors.As(*MutuallyExclusiveFlagsError) failed")
+	}
 }
 
 // TestErrors_NewP4Errors_HaveExpectedTextRendering covers task 1.1.
@@ -77,7 +92,7 @@ func TestErrors_NewP4Errors_HaveExpectedTextRendering(t *testing.T) {
 				`column "todo" still referenced by 2 cards:`,
 				"  a3f2k9  Refactor auth",
 				"  b7m1p4  Update README",
-				"Move or remove these cards first.",
+				"Move or remove these cards first, or archive them with `ezida archive column todo`.",
 			},
 		},
 		{

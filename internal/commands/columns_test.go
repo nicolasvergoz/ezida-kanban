@@ -208,13 +208,54 @@ func TestColumnsRm_InUse_TextOutput(t *testing.T) {
 	}
 	// Verify the text rendering includes the indented card lines.
 	text := ce.Error()
-	if !strings.Contains(text, "Move or remove these cards first.") {
+	if !strings.Contains(text, "Move or remove these cards first, or archive them with `ezida archive column todo`.") {
 		t.Errorf("missing trailing sentence: %s", text)
 	}
 	for _, c := range ce.Cards {
 		want := "  " + c.ID + "  " + c.Title
 		if !strings.Contains(text, want) {
 			t.Errorf("missing line %q in:\n%s", want, text)
+		}
+	}
+}
+
+func TestColumnInUse_SuggestsArchiveColumn(t *testing.T) {
+	path := copyFixture(t)
+	_, _, err := runColumnsCmd(t, path, false, "rm", "todo")
+	var ce *ColumnInUseError
+	if !errors.As(err, &ce) {
+		t.Fatalf("got %T, want *ColumnInUseError", err)
+	}
+	if !strings.Contains(ce.Error(), "ezida archive column todo") {
+		t.Errorf("refusal does not suggest ezida archive column: %s", ce.Error())
+	}
+}
+
+func TestColumnsRm_SucceedsAfterArchivingTheColumn(t *testing.T) {
+	path := copyFixture(t)
+	archivePath := board.ArchivePathFor(path)
+
+	if _, _, err := runColumnsCmd(t, path, false, "rm", "todo"); err == nil {
+		t.Fatal("expected COLUMN_IN_USE before archiving")
+	}
+
+	rio := rmIO{in: strings.NewReader(""), err: &bytes.Buffer{}, interactive: false}
+	colCmd, f := newDummyArchiveColumnForPath(path, archivePath, false, rio)
+	f.yes = true
+	if _, _, err := executeCobraText(colCmd, []string{"todo", "--yes"}, false); err != nil {
+		t.Fatalf("archive column: %v", err)
+	}
+
+	if _, _, err := runColumnsCmd(t, path, false, "rm", "todo"); err != nil {
+		t.Fatalf("columns rm todo after archiving: %v", err)
+	}
+	b, err := board.Load(path)
+	if err != nil {
+		t.Fatalf("board.Load: %v", err)
+	}
+	for _, c := range b.Board.Columns {
+		if c == "todo" {
+			t.Fatal("column 'todo' still present after removal")
 		}
 	}
 }

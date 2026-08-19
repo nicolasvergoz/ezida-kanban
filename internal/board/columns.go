@@ -146,7 +146,9 @@ type ColumnHasCardsError struct {
 }
 
 func (e *ColumnHasCardsError) Error() string {
-	return fmt.Sprintf("board: column %q still has %d card(s); move them first", e.Name, len(e.Cards))
+	return fmt.Sprintf(
+		"board: column %q still has %d card(s); move them first, or archive them with `ezida archive column %s`",
+		e.Name, len(e.Cards), e.Name)
 }
 
 // AddColumn appends a new column to b.Board.Columns. The name is

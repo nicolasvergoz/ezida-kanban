@@ -304,10 +304,14 @@ The text-mode error MUST be:
 Error: column "todo" still referenced by N cards:
   <id1>  <title1>
   <id2>  <title2>
-Move or remove these cards first.
+Move or remove these cards first, or archive them with `ezida archive column todo`.
 ```
 The JSON-mode error MUST include
 `"details":{"column":"<name>","cards":[{"id":"...","title":"..."}]}`.
+
+The remedy naming `ezida archive column <name>` MUST also appear in the
+message carried by the board-layer refusal, so that consumers other than the
+CLI surface the same guidance.
 
 If removing the column would leave `[board].columns` empty, the
 command MUST refuse with `LAST_COLUMN`.
@@ -329,6 +333,7 @@ command MUST refuse with `LAST_COLUMN`.
   pairs
 - **AND** the text-mode message lists both cards as
   `  <id>  <title>` (two-space indent per line)
+- **AND** the text-mode message names `ezida archive column todo` as a remedy
 - **AND** `kanban.toml` is byte-unchanged
 
 #### Scenario: Refuse to remove the last column
@@ -343,6 +348,13 @@ command MUST refuse with `LAST_COLUMN`.
 - **WHEN** `ezida columns rm ghost` is invoked
 - **THEN** the process exits with code `1`
 - **AND** the error code is `COLUMN_NOT_FOUND`
+
+#### Scenario: Archiving the column clears the refusal
+
+- **WHEN** `ezida archive column todo` is invoked and then
+  `ezida columns rm todo`
+- **THEN** the second command exits with code `0`
+- **AND** `[board].columns` no longer contains `todo`
 
 ### Requirement: `ezida priorities add|rename|rm` mirrors columns
 

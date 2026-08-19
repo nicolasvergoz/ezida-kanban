@@ -73,6 +73,11 @@ func runAdd(cmd *cobra.Command, path, title string, f addFlags, asJSON bool) err
 		return err
 	}
 
+	archive, err := loadArchive(board.ArchivePathFor(path))
+	if err != nil {
+		return err
+	}
+
 	card, err := mutateAndSave(path, func(b *board.Board) (board.Card, error) {
 		if !slices.Contains(b.Board.Columns, f.column) {
 			return board.Card{}, &ColumnNotFoundError{Name: f.column}
@@ -96,11 +101,7 @@ func runAdd(cmd *cobra.Command, path, title string, f addFlags, asJSON bool) err
 			}
 			color = resolved
 		}
-		existing := make([]string, 0, len(b.Cards))
-		for _, c := range b.Cards {
-			existing = append(existing, c.ID)
-		}
-		id, err := board.NewUniqueID(existing)
+		id, err := board.NewUniqueID(board.ExistingIDs(b, archive))
 		if err != nil {
 			return board.Card{}, err
 		}

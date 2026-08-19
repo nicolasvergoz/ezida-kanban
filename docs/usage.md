@@ -82,13 +82,25 @@ Print every card. Filters are AND-combined.
 | `--tag=<tag>`         | Keep only cards with this tag.                           |
 | `--priority=<p>`      | Keep only cards with this priority.                      |
 | `--epic=<id>`         | Keep the named card and every card belonging to it.      |
+| `--include-archived`  | Append archived cards after the live results.            |
+| `--archived-only`     | Return archived cards instead of live ones.              |
 
 An `--epic` id matching no card is rejected with `INVALID_FILTER`. The
 parent is always included, so scoping to an epic never hides the epic.
 
+`--include-archived` and `--archived-only` cannot be combined
+(`MUTUALLY_EXCLUSIVE_FLAGS`). Neither flag touches the archive file at
+all when omitted, so plain `ezida list` behaves exactly as it did before
+archiving existed. With `--include-archived`, live cards are listed
+first in board order, then archived cards in archive order — never
+interleaved by date. Text mode appends an `ARCHIVED` column (the archive
+date, or `-`) only when one of the two flags is given.
+
 ```sh
 ezida list --column=todo --tag=security
 ezida list --epic=rl4m9x
+ezida list --include-archived
+ezida list --archived-only --column=done
 ```
 
 ### `ezida get`
@@ -171,6 +183,58 @@ consequence, not an edit to the card.
 
 ```sh
 ezida rm a3f2k9 --yes
+```
+
+### `ezida archive`
+
+Move a card out of `kanban.toml` into a sibling `kanban.archive.toml`,
+keeping every field it had and adding `archived_at`. Archiving an epic
+takes its children with it; archiving a lone child of a live epic is
+allowed and leaves the parent untouched.
+
+```sh
+ezida archive <id>                     # archive one card (and its children, if it's an epic)
+ezida archive column <name>            # archive every card in a column; the column itself stays
+ezida archive list                     # list archived cards (same filters as `list`)
+ezida archive get <id>                 # show one archived card
+```
+
+| Flag (on `archive column`) | Description                                        |
+|-----------------------------|-----------------------------------------------------|
+| `--yes`                     | Skip the confirmation prompt shown when the cascade would also take cards from other columns. Required with `--json`. |
+
+`kanban.archive.toml` is created by the first archive operation and
+**removed** when the archive empties out — a board that never archives
+looks exactly like one built before this feature existed. Archiving a
+column leaves the column itself in `[board].columns`, which is what
+turns `ezida columns rm`'s `COLUMN_IN_USE` refusal into a solvable
+problem.
+
+```sh
+ezida archive a3f2k9
+ezida archive column done --yes
+ezida archive list --column=done
+```
+
+### `ezida unarchive`
+
+Restore an archived card — and any archived children of it — back onto
+the board.
+
+| Flag       | Description                                                    |
+|------------|-----------------------------------------------------------------|
+| `--column` | Restore into this column instead of the one the card was archived from. |
+
+Each restored card returns to its stored column when that column still
+exists; otherwise it lands in the board's first column and the command
+reports that it was relocated. A card whose epic parent is neither on
+the board nor part of the same restore has its `epic` cleared, mirroring
+`rm`'s orphaning behaviour. Restoring an id that already exists on the
+board is refused with `ID_COLLISION`.
+
+```sh
+ezida unarchive a3f2k9
+ezida unarchive a3f2k9 --column=todo
 ```
 
 ### `ezida columns`
@@ -426,7 +490,34 @@ The `description` field is omitted from `list` output (token-efficient
 }
 ```
 
-`epic` and `color` are omitted when unset.
+`epic` and `color` are omitted when unset. With `--include-archived` or
+`--archived-only`, each archived card additionally carries
+`"archived_at": "2026-08-19T10:00:00Z"`. The key is **omitted entirely**
+— never `null`, never a zero timestamp — on every live card, which is
+what keeps plain `ezida list --json` output unchanged for anyone not
+using archiving.
+
+### `ezida archive get --json`
+
+Same envelope as `ezida get --json`, plus `archived_at`. An archived
+card is not resolved against the live board's epic graph — restore it
+first to see `epic`/`children`/`progress` — so those keys are always
+absent here.
+
+```json
+{
+  "card": {
+    "id": "a3f2k9",
+    "title": "Refactor auth",
+    "column": "todo",
+    "tags": ["security"],
+    "description": "Move from session-based to JWT.\n",
+    "created_at": "2026-05-20T14:30:00Z",
+    "updated_at": "2026-05-20T14:30:00Z",
+    "archived_at": "2026-08-19T10:00:00Z"
+  }
+}
+```
 
 ### `ezida get --json`
 
@@ -531,3 +622,18 @@ untouched.
   writer wins. The atomic `tmp + rename` strategy keeps the file
   consistent on disk, but two simultaneous `ezida add` invocations
   may drop one of the cards.
+- **Archiving is not atomic across `kanban.toml` and
+  `kanban.archive.toml`.** Each file is written atomically on its own,
+  but there is no transaction spanning both. A crash between the two
+  writes can leave a card present in **both** files — never in neither
+  — and the next read silently heals it: the live board always wins,
+  and the duplicate is dropped from the archive results.
+- **A card whose id is literally `column` shadows the `archive column`
+  subcommand.** Card ids are always exactly six characters of
+  `[0-9a-z]`, and `column` is the only one of `archive`'s subcommand
+  names (`column`, `list`, `get`) that is also six characters — so it is
+  the only one a real id can ever collide with. When it happens, cobra
+  resolves `ezida archive column` to the subcommand before
+  `ezida archive <id>` ever sees it; the odds are 1 in 36⁶ (≈1 in
+  2.2 billion), and the viewer's archive action offers a way through
+  regardless.

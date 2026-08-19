@@ -56,8 +56,12 @@ ezida list --title-contains=auth     # filter by title substring
 ezida list --tag=security            # filter by tag
 ezida list --priority=high           # filter by priority
 ezida list --epic=<id>               # the epic itself plus its children
+ezida list --include-archived        # live cards, then archived cards appended
+ezida list --archived-only           # only archived cards
 ezida get <id>                       # full details for one card
 ezida colors                         # epic palette and which card holds each color
+ezida archive list                   # archived cards only (same filters as `list`)
+ezida archive get <id>               # full details for one archived card
 ```
 
 `ezida get` on a child reports its parent; on a parent it reports the
@@ -70,6 +74,9 @@ ezida edit <id> [--title="..."] [--description="..."] [--priority=...] [--tags=.
 ezida edit <id> --epic=<id> | --no-epic | --color=<name|hex> | --no-color
 ezida move <id> <column>
 ezida rm <id>
+ezida archive <id>                   # move a card into kanban.archive.toml
+ezida archive column <name>          # archive every card in a column; the column stays
+ezida unarchive <id>                 # restore an archived card back onto the board
 ```
 
 ## Epics
@@ -97,6 +104,32 @@ epic holds which color.
 Progress (`done/total`) counts a child as done when its column is
 **terminal** — see below. A board with no terminal column reports `0/N`
 for every epic, which is a truthful reading, not an error.
+
+## Archiving
+
+Finished cards pile up in `kanban.toml` forever unless someone moves
+them out. `ezida rm` destroys the record; `ezida archive <id>` instead
+moves the card into a sibling `kanban.archive.toml`, keeping every
+field plus an `archived_at` timestamp. Prefer archiving over deleting
+for cards that are simply done — the record survives and stays
+findable with `ezida archive list` / `ezida archive get`.
+
+**Archiving an epic takes its children with it** — the whole group
+moves to the archive together in one operation, and restoring the
+epic with `ezida unarchive` brings them all back. Archiving a lone
+child of a live epic is fine too; the parent is untouched and the
+archived card just keeps a reference that no longer resolves.
+
+`ezida archive column <name>` archives every card in a column without
+removing the column itself — the same command that unblocks
+`ezida columns rm` when it refuses with `COLUMN_IN_USE` because cards
+still reference it. If the cascade would also pull cards out of other
+columns, the command asks for confirmation first; pass `--yes` to skip
+the prompt (required with `--json`).
+
+`kanban.archive.toml` only exists once something has been archived,
+and disappears again once the last archived card is restored — a board
+that never archives looks exactly like one that predates this feature.
 
 ### Viewer (browser UI)
 ```bash

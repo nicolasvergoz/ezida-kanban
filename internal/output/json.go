@@ -64,16 +64,23 @@ type MigrateEnvelope struct {
 // ListCard is the per-card shape inside `ezida list --json`. The
 // `description` field is intentionally absent (ADR §D7, spec
 // "Description omitted in list JSON").
+//
+// ArchivedAt is a pointer, not a value: omitempty does not suppress a
+// zero time.Time (it is a struct), so a value field would emit
+// "archived_at":"0001-01-01T00:00:00Z" on every live card. A nil
+// pointer omits the key entirely, which is what keeps `ezida list`
+// output unchanged for anyone not using archiving.
 type ListCard struct {
-	ID        string    `json:"id"`
-	Title     string    `json:"title"`
-	Column    string    `json:"column"`
-	Priority  string    `json:"priority,omitempty"`
-	Tags      []string  `json:"tags"`
-	Epic      string    `json:"epic,omitempty"`
-	Color     string    `json:"color,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID         string     `json:"id"`
+	Title      string     `json:"title"`
+	Column     string     `json:"column"`
+	Priority   string     `json:"priority,omitempty"`
+	Tags       []string   `json:"tags"`
+	Epic       string     `json:"epic,omitempty"`
+	Color      string     `json:"color,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
+	ArchivedAt *time.Time `json:"archived_at,omitempty"`
 }
 
 // ListEnvelope is the JSON shape for `ezida list --json`.
@@ -120,6 +127,10 @@ type GetCard struct {
 	Progress    *Progress  `json:"progress,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+	// ArchivedAt is a pointer for the same reason as ListCard's: a
+	// zero time.Time survives omitempty and would otherwise leak onto
+	// every live card returned by `ezida get`.
+	ArchivedAt *time.Time `json:"archived_at,omitempty"`
 }
 
 // GetEnvelope is the JSON shape for `ezida get --json`.

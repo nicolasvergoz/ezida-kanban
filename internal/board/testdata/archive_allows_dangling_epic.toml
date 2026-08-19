@@ -1,0 +1,12 @@
+schema_version = 2
+
+[[cards]]
+id = "aaaaaa"
+title = "Lone archived child"
+column = "done"
+description = ""
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = []
+epic = "zzzzzz"
+archived_at = 2026-08-19T10:00:00Z

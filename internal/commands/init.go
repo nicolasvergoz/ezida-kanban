@@ -18,6 +18,11 @@ import (
 // on. Hard-coded for v1 (design "Cobra root and command registration").
 const BoardPath = "kanban.toml"
 
+// ArchivePath is the relative path of the archive sibling the CLI
+// operates on. It must always equal board.ArchivePathFor(BoardPath) —
+// TestArchivePath_MatchesDerivation pins the two together.
+const ArchivePath = "kanban.archive.toml"
+
 // SkillPath is the relative path of the embedded skill file written by
 // `ezida init`. Hard-coded for v1 — matches the Claude Code skill
 // discovery convention (.claude/skills/<name>/SKILL.md).

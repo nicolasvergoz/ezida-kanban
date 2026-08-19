@@ -53,6 +53,12 @@ func runCmd(t *testing.T, build func(jsonOut *bool) *cobra.Command, asJSON bool,
 	return stdout.String(), stderr.String(), err
 }
 
+func TestArchivePath_MatchesDerivation(t *testing.T) {
+	if got := board.ArchivePathFor(BoardPath); got != ArchivePath {
+		t.Fatalf("board.ArchivePathFor(BoardPath) = %q, want ArchivePath %q", got, ArchivePath)
+	}
+}
+
 // --- init (tasks 3.2 / 3.3 / 3.4) ---
 
 func TestInit_FreshDefaults_Text(t *testing.T) {

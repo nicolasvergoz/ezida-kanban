@@ -2,7 +2,9 @@ package server
 
 import (
 	"bufio"
+	"bytes"
 	"context"
+	cryptorand "crypto/rand"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -12,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 )
 
 // deleteJSON is the DELETE counterpart of postJSON/patchJSON.
@@ -78,6 +82,54 @@ func TestHandle_Create_Success_TitleOnly(t *testing.T) {
 	}
 	if disk.Column != "todo" {
 		t.Fatalf("on-disk column = %q, want todo", disk.Column)
+	}
+}
+
+func TestHandle_Create_DoesNotCollideWithArchivedID(t *testing.T) {
+	path := writableBoard(t)
+	archivePath := board.ArchivePathFor(path)
+
+	at := time.Now().UTC()
+	seed := &board.Archive{
+		SchemaVersion: board.SupportedSchemaVersion,
+		Cards: []board.ArchivedCard{{
+			Card: board.Card{
+				ID: "dddddd", Title: "old", Column: "todo",
+				CreatedAt: at, UpdatedAt: at,
+			},
+			ArchivedAt: at,
+		}},
+	}
+	if err := board.SaveArchive(archivePath, seed); err != nil {
+		t.Fatalf("seed archive: %v", err)
+	}
+
+	// Force crypto/rand to produce "dddddd" on the first draw — which
+	// must be rejected because it collides with the archive — and
+	// "eeeeee" on the second.
+	orig := cryptorand.Reader
+	t.Cleanup(func() { cryptorand.Reader = orig })
+	seq := append(bytes.Repeat([]byte{13}, 6), bytes.Repeat([]byte{14}, 6)...)
+	cryptorand.Reader = bytes.NewReader(seq)
+
+	ts, cleanup := startTestServer(t, path)
+	defer cleanup()
+
+	res := postJSON(t, ts.URL+"/api/cards", `{"column":"todo","title":"New"}`)
+	defer res.Body.Close()
+	if res.StatusCode != 201 {
+		t.Fatalf("status = %d, body = %s", res.StatusCode, readString(res.Body))
+	}
+	var body struct {
+		Card struct {
+			ID string `json:"id"`
+		} `json:"card"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if body.Card.ID != "eeeeee" {
+		t.Fatalf("got id %q, want eeeeee — the archived id 'dddddd' should have been rejected", body.Card.ID)
 	}
 }
 

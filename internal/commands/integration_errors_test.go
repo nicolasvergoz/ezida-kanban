@@ -82,6 +82,24 @@ func TestIntegration_ErrorCodesSurface(t *testing.T) {
 			args:     []string{"a3f2k9"},
 			wantCode: "INTERACTIVE_REQUIRED",
 		},
+		{
+			name:     "archive unknown id",
+			build:    commands.NewArchiveCmd,
+			args:     []string{"zzzzzz"},
+			wantCode: "CARD_NOT_FOUND",
+		},
+		{
+			name:     "unarchive unknown id",
+			build:    commands.NewUnarchiveCmd,
+			args:     []string{"zzzzzz"},
+			wantCode: "CARD_NOT_ARCHIVED",
+		},
+		{
+			name:     "list mutually exclusive archive flags",
+			build:    commands.NewListCmd,
+			args:     []string{"--include-archived", "--archived-only"},
+			wantCode: "MUTUALLY_EXCLUSIVE_FLAGS",
+		},
 	}
 
 	for _, tc := range cases {

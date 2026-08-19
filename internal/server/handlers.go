@@ -253,11 +253,12 @@ func (s *serverState) handleCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	existingIDs := make([]string, 0, len(b.Cards))
-	for _, c := range b.Cards {
-		existingIDs = append(existingIDs, c.ID)
+	archive, _, err := board.LoadArchive(board.ArchivePathFor(s.boardPath))
+	if err != nil {
+		httpError(w, err)
+		return
 	}
-	id, err := board.NewUniqueID(existingIDs)
+	id, err := board.NewUniqueID(board.ExistingIDs(b, archive))
 	if err != nil {
 		httpError(w, err)
 		return

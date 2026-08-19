@@ -1,0 +1,22 @@
+schema_version = 2
+
+[[cards]]
+id = "aaaaaa"
+title = "Design schema"
+column = "done"
+description = "Lay out the kanban.toml schema."
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-02T10:00:00Z
+tags = ["design", "v1"]
+priority = "high"
+archived_at = 2026-08-19T10:00:00Z
+
+[[cards]]
+id = "bbbbbb"
+title = "Implement Load"
+column = "ongoing"
+description = ""
+created_at = 2026-05-03T09:00:00Z
+updated_at = 2026-05-03T09:00:00Z
+tags = []
+archived_at = 2026-08-19T10:00:00Z

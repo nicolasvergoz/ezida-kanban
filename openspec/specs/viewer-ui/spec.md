@@ -2414,9 +2414,11 @@ A card whose `epic` names a card that is not present in the payload MUST render 
 
 A card referenced by the `epic` field of at least one other card SHALL render three additional signals: the four-square epic glyph immediately before its title, a border tinted from its own `color`, and a progress bar with a `done/total` counter.
 
-`total` is the count of cards whose `epic` equals this card's id. `done` is the subset of those whose `column` appears in the board's `done_columns`. Both MUST be computed in the client from the `/api/board` payload; neither is read from the wire.
+`total` is the count of cards whose `epic` equals this card's id, counting both live cards and archived ones. `done` is the subset of those that sit in a done column: for a live child, its `column`; for an archived child, the `column` the archive recorded for it. In both cases the column is checked against the board's current `done_columns`. Both values MUST be computed in the client from the `/api/board` payload — which already carries `archived_cards` and `done_columns` — and neither is read from the wire.
 
-All three signals MUST be conditional on the card actually having children. A card carrying a `color` but referenced by nobody MUST render exactly as it does today.
+Archived children MUST count, so that archiving finished work never makes an epic report less progress than it did before. A card referenced only by archived children is still an epic and MUST render all three signals.
+
+All three signals MUST be conditional on the card actually having children, live or archived. A card carrying a `color` but referenced by nobody MUST render exactly as it does today.
 
 The counter MUST use the monospace face with tabular numerals so counters align down a column.
 
@@ -2448,6 +2450,26 @@ The counter MUST use the monospace face with tabular numerals so counters align 
 
 - **WHEN** an epic's children are hidden by an active filter but the parent is visible
 - **THEN** the counter MUST still reflect the full board, not the filtered subset
+
+#### Scenario: Archiving a completed child does not lower the counter
+
+- **WHEN** an epic has three children, all in a done column, and two of them are archived
+- **THEN** the counter MUST read `3/3`
+
+#### Scenario: An archived child from a non-done column counts only toward total
+
+- **WHEN** an epic has one live child in a done column and one child archived from a column not listed in `done_columns`
+- **THEN** the counter MUST read `1/2`
+
+#### Scenario: A card referenced only by archived children is still an epic
+
+- **WHEN** every card referencing card `rl4m9x` as its epic has been archived
+- **THEN** card `rl4m9x` MUST still render the glyph, the tinted border, and the progress bar
+
+#### Scenario: A board with no archive renders identically
+
+- **WHEN** the `/api/board` payload carries no `archived_cards` key
+- **THEN** every epic counter MUST read exactly as it did before archived children were counted
 
 ### Requirement: Terminal columns are marked in the list header
 

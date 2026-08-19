@@ -121,6 +121,10 @@ func runGet(cmd *cobra.Command, path, id string, asJSON bool) error {
 	if err != nil {
 		return err
 	}
+	archive, err := loadArchive(board.ArchivePathFor(path))
+	if err != nil {
+		return err
+	}
 	var found *board.Card
 	for i := range b.Cards {
 		if b.Cards[i].ID == id {
@@ -137,6 +141,7 @@ func runGet(cmd *cobra.Command, path, id string, asJSON bool) error {
 	// two blocks below fills in.
 	parent := board.ParentOf(b, found.ID)
 	children := board.ChildrenOf(b, found.ID)
+	archivedChildren := board.ArchivedChildrenOf(archive, found.ID)
 
 	out := cmd.OutOrStdout()
 	if asJSON {
@@ -158,12 +163,15 @@ func runGet(cmd *cobra.Command, path, id string, asJSON bool) error {
 		if parent != nil {
 			card.Epic = &output.EpicRef{ID: parent.ID, Title: parent.Title}
 		}
-		if len(children) > 0 {
-			refs := make([]output.ChildRef, 0, len(children))
+		if len(children)+len(archivedChildren) > 0 {
+			refs := make([]output.ChildRef, 0, len(children)+len(archivedChildren))
 			for _, c := range children {
 				refs = append(refs, output.ChildRef{ID: c.ID, Title: c.Title, Column: c.Column})
 			}
-			done, total := board.EpicProgress(b, found.ID)
+			for _, c := range archivedChildren {
+				refs = append(refs, output.ChildRef{ID: c.ID, Title: c.Title, Column: c.Column, Archived: true})
+			}
+			done, total := board.EpicProgress(b, archive, found.ID)
 			card.Children = refs
 			card.Progress = &output.Progress{Done: done, Total: total}
 		}
@@ -204,8 +212,8 @@ func runGet(cmd *cobra.Command, path, id string, asJSON bool) error {
 		}
 		kvs = append(kvs, output.KV{Key: "Color", Value: color})
 	}
-	if len(children) > 0 {
-		done, total := board.EpicProgress(b, found.ID)
+	if len(children)+len(archivedChildren) > 0 {
+		done, total := board.EpicProgress(b, archive, found.ID)
 		kvs = append(kvs, output.KV{
 			Key:   "Progress",
 			Value: fmt.Sprintf("%d/%d", done, total),
@@ -216,7 +224,7 @@ func runGet(cmd *cobra.Command, path, id string, asJSON bool) error {
 		output.KV{Key: "Updated", Value: found.UpdatedAt.UTC().Format("2006-01-02T15:04:05Z")},
 	)
 	_, _ = out.Write([]byte(output.KeyValue(kvs)))
-	if len(children) > 0 {
+	if len(children)+len(archivedChildren) > 0 {
 		_, _ = out.Write([]byte("\nChildren:\n"))
 		for _, c := range children {
 			marker := " "
@@ -224,6 +232,13 @@ func runGet(cmd *cobra.Command, path, id string, asJSON bool) error {
 				marker = doneMarker
 			}
 			fmt.Fprintf(out, "  %s %s  %-10s %s\n", marker, c.ID, c.Column, c.Title)
+		}
+		for _, c := range archivedChildren {
+			marker := " "
+			if b.Board.IsDoneColumn(c.Column) {
+				marker = doneMarker
+			}
+			fmt.Fprintf(out, "  %s %s  %-10s %s (archived)\n", marker, c.ID, c.Column, c.Title)
 		}
 	}
 	if found.Description != "" {

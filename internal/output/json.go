@@ -98,11 +98,16 @@ type EpicRef struct {
 	Title string `json:"title"`
 }
 
-// ChildRef is one child of an epic, in board file order.
+// ChildRef is one child of an epic, in board file order (live children)
+// followed by archive file order (archived children).
+//
+// Archived is omitempty because a bool's zero value is false: a live
+// child's entry stays byte-identical to before this field existed.
 type ChildRef struct {
-	ID     string `json:"id"`
-	Title  string `json:"title"`
-	Column string `json:"column"`
+	ID       string `json:"id"`
+	Title    string `json:"title"`
+	Column   string `json:"column"`
+	Archived bool   `json:"archived,omitempty"`
 }
 
 // Progress is an epic's derived done/total pair. It is computed at read

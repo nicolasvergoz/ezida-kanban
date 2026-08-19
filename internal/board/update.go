@@ -75,7 +75,7 @@ func (e *InvalidTagError) Error() string {
 //     → *InvalidColorError
 //
 // On any error, the board is left unmutated.
-func UpdateCard(b *Board, id string, p CardPatch) error {
+func UpdateCard(b *Board, a *Archive, id string, p CardPatch) error {
 	idx := -1
 	for i, c := range b.Cards {
 		if c.ID == id {
@@ -116,7 +116,7 @@ func UpdateCard(b *Board, id string, p CardPatch) error {
 		}
 	}
 	if p.Epic != nil && *p.Epic != "" {
-		if err := CheckEpicTarget(b, id, *p.Epic); err != nil {
+		if err := CheckEpicTarget(b, a, id, *p.Epic); err != nil {
 			return err
 		}
 	}

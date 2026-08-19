@@ -376,8 +376,18 @@ consequences:
   anywhere; either can be edited or deleted independently.
 - **Deleting a parent detaches its children** instead of refusing, and
   names the cards it detached.
+- **Archived children still count.** Archiving a done child does not
+  shrink its epic's progress: `done` and `total` are computed over live
+  *and* archived children alike, so filing away finished work never
+  makes an epic look less complete. An archived child counts toward
+  `done` when the column it was archived from is a terminal column
+  **right now** — the same rule a live card follows, applied to the
+  column the archive recorded. `ezida get` and the viewer both list
+  archived children alongside live ones, marked as archived, so `total`
+  always matches what is actually shown.
 - **Derived values are never stored.** `children`, `done` and `total`
-  are computed at read time, so a hand edit cannot falsify them.
+  are computed at read time — now over a wider set that includes the
+  archive — so a hand edit cannot falsify them.
 
 ### Colors
 
@@ -547,15 +557,20 @@ absent here.
 ```
 
 A card that *is* an epic carries `color`, `children` and `progress`
-instead of `epic`:
+instead of `epic`. `children` lists live children first, then archived
+ones — each archived entry carries `"archived": true`; the key is
+omitted entirely on a live entry:
 
 ```json
 {
   "card": {
     "id": "rl4m9x",
     "color": "#8b5cf6",
-    "children": [{"id": "f20wbo", "title": "Card dependencies", "column": "backlog"}],
-    "progress": {"done": 1, "total": 3}
+    "children": [
+      {"id": "f20wbo", "title": "Card dependencies", "column": "backlog"},
+      {"id": "wrshlo", "title": "Card due dates", "column": "done", "archived": true}
+    ],
+    "progress": {"done": 2, "total": 2}
   }
 }
 ```
@@ -637,6 +652,18 @@ untouched.
   writes can leave a card present in **both** files — never in neither
   — and the next read silently heals it: the live board always wins,
   and the duplicate is dropped from the archive results.
+- **Removing or un-marking an archived child's column stops it counting
+  toward `done`.** An epic's progress resolves an archived child's
+  done-ness against the board's terminal columns *at read time*, from
+  the column the archive recorded — not a fact frozen at archive time.
+  Reachable through the workflow archiving was built to enable:
+  `ezida archive column done` followed by `ezida columns rm done`
+  deletes the very column those archived cards recorded, so they
+  silently stop counting toward `done` while still counting toward
+  `total`. An epic can therefore drop from, say, `4/4` to `0/4` by way
+  of a column deletion with no card moving. This is consistent with
+  what happens to a live card when a terminal marker is cleared; the
+  remedy is to re-create or re-mark the column.
 - **A card whose id is literally `column` shadows the `archive column`
   subcommand.** Card ids are always exactly six characters of
   `[0-9a-z]`, and `column` is the only one of `archive`'s subcommand

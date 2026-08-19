@@ -10,7 +10,7 @@ test.describe("the Archive section, paired with an existing archive", () => {
 
     await expect(archiveStrip(page)).toHaveCount(1);
     await expect(archiveStrip(page)).toHaveClass(/collapsed/);
-    await expect(archiveStrip(page).locator(".list-archive-count")).toHaveText("4");
+    await expect(archiveStrip(page).locator(".list-archive-count")).toHaveText("5");
   });
 
   test("expands on click to list exactly the archived ids", async ({ page, board }) => {
@@ -20,7 +20,7 @@ test.describe("the Archive section, paired with an existing archive", () => {
     await expect(archiveStrip(page)).not.toHaveClass(/collapsed/);
 
     const ids = await archivedCardIds(page);
-    expect(new Set(ids)).toEqual(new Set(["b7m1p4", "vw01k2", "q7t6z2", "t07htj"]));
+    expect(new Set(ids)).toEqual(new Set(["b7m1p4", "vw01k2", "q7t6z2", "t07htj", "m4n5o6"]));
   });
 
   test("collapses again on a second click", async ({ page, board }) => {
@@ -89,6 +89,27 @@ test.describe("the Archive section, paired with an existing archive", () => {
     // while [data-archive="true"] matches exactly the virtual section.
     await expect(page.locator('[data-column="archive"]')).toHaveCount(0);
     await expect(page.locator('[data-archive="true"]')).toHaveCount(1);
+  });
+});
+
+test.describe("a live epic whose child is archived", () => {
+  test("still renders its glyph, tint and bar, and its counter includes the archived child", async ({
+    page,
+    board,
+  }) => {
+    await openBoard(page, board);
+    const parent = card(page, "rl4m9x");
+
+    await expect(parent).toHaveClass(/is-epic/);
+    await expect(parent.locator(".card-title .card-epic-glyph")).toBeVisible();
+    await expect(parent).toHaveCSS("--epic-color", "#8b5cf6");
+
+    // f20wbo (live, "ongoing") + m4n5o6 (archived, terminal "done") —
+    // the archived child counts toward both done and total exactly
+    // like a live one would, without ever expanding the Archive strip.
+    await expect(parent.locator(".epic-count")).toHaveText("1/2");
+    await expect(parent.locator(".epic-bar")).toHaveAttribute("aria-valuenow", "1");
+    await expect(parent.locator(".epic-bar")).toHaveAttribute("aria-valuemax", "2");
   });
 });
 

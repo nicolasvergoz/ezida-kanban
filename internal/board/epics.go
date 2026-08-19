@@ -34,12 +34,38 @@ func ChildrenOf(b *Board, id string) []Card {
 	return out
 }
 
-// EpicProgress counts the children of id, and how many of them sit in a
-// terminal column. A board with no terminal column truthfully reports
-// done = 0; that is a reading of the board's configuration, not an
-// error worth warning about.
-func EpicProgress(b *Board, id string) (done, total int) {
+// ArchivedChildrenOf returns every archived card whose Epic equals id,
+// in archive file order. A nil archive yields nothing — every caller
+// can pass the result of loadArchive without a nil check of its own.
+func ArchivedChildrenOf(a *Archive, id string) []ArchivedCard {
+	if id == "" || a == nil {
+		return nil
+	}
+	var out []ArchivedCard
+	for _, c := range a.Cards {
+		if c.Epic == id {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// EpicProgress counts the children of id — live and archived — and how
+// many of them sit in a terminal column. An archived child is judged
+// by the column the archive recorded for it, checked against the
+// board's terminal columns at read time: the same rule a live card
+// follows. A board with no terminal column truthfully reports done =
+// 0; that is a reading of the board's configuration, not an error
+// worth warning about. A nil archive reproduces the live-only
+// behaviour this function had before archiving existed.
+func EpicProgress(b *Board, a *Archive, id string) (done, total int) {
 	for _, c := range ChildrenOf(b, id) {
+		total++
+		if b.Board.IsDoneColumn(c.Column) {
+			done++
+		}
+	}
+	for _, c := range ArchivedChildrenOf(a, id) {
 		total++
 		if b.Board.IsDoneColumn(c.Column) {
 			done++
@@ -49,8 +75,9 @@ func EpicProgress(b *Board, id string) (done, total int) {
 }
 
 // IsEpic reports whether id is referenced as the epic of at least one
-// card. A card carrying a color but no children is not an epic.
-func IsEpic(b *Board, id string) bool {
+// card, live or archived. A card carrying a color but no children is
+// not an epic. A nil archive reduces this to the live-only check.
+func IsEpic(b *Board, a *Archive, id string) bool {
 	if id == "" {
 		return false
 	}
@@ -59,7 +86,7 @@ func IsEpic(b *Board, id string) bool {
 			return true
 		}
 	}
-	return false
+	return len(ArchivedChildrenOf(a, id)) > 0
 }
 
 // ParentOf returns the card named by the Epic field of the card with
@@ -97,7 +124,7 @@ func ParentOf(b *Board, id string) *Card {
 //
 // Returns *InvalidEpicError on any violation, leaving the caller free
 // to reject before mutating anything.
-func CheckEpicTarget(b *Board, childID, epicID string) error {
+func CheckEpicTarget(b *Board, a *Archive, childID, epicID string) error {
 	if epicID == "" {
 		return nil
 	}
@@ -122,7 +149,7 @@ func CheckEpicTarget(b *Board, childID, epicID string) error {
 				target.Epic),
 		}
 	}
-	if IsEpic(b, childID) {
+	if IsEpic(b, a, childID) {
 		return &InvalidEpicError{
 			ID:     epicID,
 			Reason: "the card being edited has children of its own, and epic nesting is limited to one level",

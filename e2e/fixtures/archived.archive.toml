@@ -1,4 +1,4 @@
-# Paired with archived.toml. Three cases:
+# Paired with archived.toml. Four cases:
 #  - b7m1p4: a standalone archived card, stored column ("done") still
 #    exists on the live board.
 #  - vw01k2 + q7t6z2: an archived epic and its archived child, restored
@@ -6,6 +6,11 @@
 #    contract, the parent id specifically.
 #  - t07htj: stored column ("review") does NOT exist in archived.toml's
 #    [board].columns — exercises the relocated-restore path.
+#  - m4n5o6: an archived child of rl4m9x, the LIVE epic in
+#    archived.toml. Its stored column ("done") is terminal, so it must
+#    count toward rl4m9x's `done` alongside the live child f20wbo —
+#    the live-parent-counts-an-archived-child case none of the other
+#    three fixtures exercise.
 schema_version = 2
 
 [[cards]]
@@ -48,4 +53,15 @@ description = ''
 created_at = 2026-05-03T09:00:00Z
 updated_at = 2026-05-03T09:00:00Z
 tags = []
+archived_at = 2026-08-01T10:00:00Z
+
+[[cards]]
+id = 'm4n5o6'
+title = 'Archived child of the live epic'
+column = 'done'
+description = ''
+created_at = 2026-05-04T09:00:00Z
+updated_at = 2026-05-04T09:00:00Z
+tags = []
+epic = 'rl4m9x'
 archived_at = 2026-08-01T10:00:00Z

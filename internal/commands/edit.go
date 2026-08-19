@@ -133,6 +133,11 @@ func runEdit(cmd *cobra.Command, path, id string, f editFlags, asJSON bool) erro
 		}
 	}
 
+	archive, err := loadArchive(board.ArchivePathFor(path))
+	if err != nil {
+		return err
+	}
+
 	// Set when the edit also wrote a color onto the parent, so text
 	// mode can report the second card the command touched.
 	var coloredParent string
@@ -167,7 +172,7 @@ func runEdit(cmd *cobra.Command, path, id string, f editFlags, asJSON bool) erro
 			c.Tags = tags
 		}
 		if f.epic != nil && *f.epic != "" {
-			if eerr := board.CheckEpicTarget(b, id, *f.epic); eerr != nil {
+			if eerr := board.CheckEpicTarget(b, archive, id, *f.epic); eerr != nil {
 				return board.Card{}, asEpicError(eerr)
 			}
 			c.Epic = *f.epic

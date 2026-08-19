@@ -293,6 +293,52 @@ func TestEdit_ParentGivenAnEpicExplainsItself(t *testing.T) {
 	}
 }
 
+// The nesting guard follows an epic even when all of its children are
+// archived: rl4m9x has no live children left, but its three archived
+// ones still make it an epic, so giving it a parent must be refused
+// exactly as it would be with live children (design.md "The nesting
+// guard follows, because it asks the same question").
+func TestEdit_RefusesEpicWhenChildrenAreArchived(t *testing.T) {
+	path := copyEpicsFixture(t)
+	b := loadBoard(t, path)
+	archived := make([]board.ArchivedCard, 0, 3)
+	kept := b.Cards[:0:0]
+	for _, c := range b.Cards {
+		if c.Epic == "rl4m9x" {
+			archived = append(archived, board.ArchivedCard{Card: c, ArchivedAt: c.UpdatedAt})
+			continue
+		}
+		kept = append(kept, c)
+	}
+	if len(archived) != 3 {
+		t.Fatalf("archived %d children of rl4m9x, want 3", len(archived))
+	}
+	b.Cards = kept
+	if err := board.Save(path, b); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	archivePath := board.ArchivePathFor(path)
+	if err := board.SaveArchive(archivePath, &board.Archive{
+		SchemaVersion: board.SupportedSchemaVersion,
+		Cards:         archived,
+	}); err != nil {
+		t.Fatalf("seed archive: %v", err)
+	}
+
+	before := readFile(t, path)
+	cmd := newDummyEditForPath(path, false)
+	_, _, err := executeCobraText(cmd, []string{"rl4m9x", "--epic=a3f2k9"}, false)
+	if err == nil {
+		t.Fatal("expected a refusal: rl4m9x still has archived children")
+	}
+	if got := AsDetailed(err).Code(); got != "INVALID_EPIC" {
+		t.Errorf("code = %s, want INVALID_EPIC", got)
+	}
+	if readFile(t, path) != before {
+		t.Error("kanban.toml was modified by a refused command")
+	}
+}
+
 func TestEdit_NothingToEditMentionsTheNewFlags(t *testing.T) {
 	msg := (&NothingToEditError{}).Error()
 	for _, flag := range []string{"--epic", "--no-epic", "--color", "--no-color"} {
@@ -558,6 +604,170 @@ func TestGet_ParentReportsChildrenAndProgress(t *testing.T) {
 	}
 	if _, present := card["epic"]; present {
 		t.Error("a parent reported an epic")
+	}
+}
+
+// archiveChild moves the named child off the live board and into the
+// archive, preserving its column exactly as EpicProgress/get expect to
+// find it. Returns the resulting archive so callers can extend it.
+func archiveChild(t *testing.T, path, id string) *board.Archive {
+	t.Helper()
+	b := loadBoard(t, path)
+	idx := indexCardByID(b.Cards, id)
+	if idx < 0 {
+		t.Fatalf("card %s not found", id)
+	}
+	c := b.Cards[idx]
+	b.Cards = append(b.Cards[:idx], b.Cards[idx+1:]...)
+	if err := board.Save(path, b); err != nil {
+		t.Fatalf("seed board: %v", err)
+	}
+	archivePath := board.ArchivePathFor(path)
+	a, _, err := board.LoadArchive(archivePath)
+	if err != nil {
+		t.Fatalf("load archive: %v", err)
+	}
+	a.SchemaVersion = board.SupportedSchemaVersion
+	a.Cards = append(a.Cards, board.ArchivedCard{Card: c, ArchivedAt: c.UpdatedAt})
+	if err := board.SaveArchive(archivePath, a); err != nil {
+		t.Fatalf("seed archive: %v", err)
+	}
+	return a
+}
+
+// wrshlo sits in the terminal column "done"; archiving it must not
+// change rl4m9x's progress, and it must appear in children marked
+// archived, after the two live children in file order.
+func TestGet_ListsAndCountsArchivedChildren(t *testing.T) {
+	path := copyEpicsFixture(t)
+	archiveChild(t, path, "wrshlo")
+
+	card := runGetJSON(t, path, "rl4m9x")
+	children, ok := card["children"].([]any)
+	if !ok || len(children) != 3 {
+		t.Fatalf("children = %v, want three entries", card["children"])
+	}
+	want := []string{"f20wbo", "q7t6z2", "wrshlo"}
+	for i, raw := range children {
+		child := raw.(map[string]any)
+		if child["id"] != want[i] {
+			t.Fatalf("children order = %v, want live-then-archived %v", children, want)
+		}
+	}
+	progress := card["progress"].(map[string]any)
+	if progress["done"].(float64) != 1 || progress["total"].(float64) != 3 {
+		t.Errorf("progress = %v, want 1/3 — archiving must not change it", progress)
+	}
+}
+
+func TestGet_MarksArchivedChildInJSON(t *testing.T) {
+	path := copyEpicsFixture(t)
+	archiveChild(t, path, "wrshlo")
+
+	card := runGetJSON(t, path, "rl4m9x")
+	children := card["children"].([]any)
+	for _, raw := range children {
+		child := raw.(map[string]any)
+		_, present := child["archived"]
+		switch child["id"] {
+		case "wrshlo":
+			if archived, _ := child["archived"].(bool); !present || !archived {
+				t.Errorf("archived child %v missing archived:true", child)
+			}
+		default:
+			if present {
+				t.Errorf("live child %v carries an archived key", child)
+			}
+		}
+	}
+}
+
+func TestGet_MarksArchivedChildInText(t *testing.T) {
+	path := copyEpicsFixture(t)
+	archiveChild(t, path, "wrshlo")
+
+	cmd := &cobra.Command{
+		Use: "get", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runGet(cmd, path, args[0], false)
+		},
+	}
+	stdout, _, err := executeCobraText(cmd, []string{"rl4m9x"}, false)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	lines := strings.Split(stdout, "\n")
+	var archivedLine, liveLine string
+	for _, l := range lines {
+		if strings.Contains(l, "wrshlo") {
+			archivedLine = l
+		}
+		if strings.Contains(l, "f20wbo") {
+			liveLine = l
+		}
+	}
+	if !strings.Contains(archivedLine, "(archived)") {
+		t.Errorf("archived child line missing suffix: %q", archivedLine)
+	}
+	if strings.Contains(liveLine, "(archived)") {
+		t.Errorf("live child line carries the archived suffix: %q", liveLine)
+	}
+}
+
+// A board with no archive file must produce output that never mentions
+// archiving at all — the same guarantee every other archive-aware
+// surface holds for anyone not using the feature.
+func TestGet_NoArchiveOutputUnchanged(t *testing.T) {
+	path := copyEpicsFixture(t)
+	if _, err := os.Stat(board.ArchivePathFor(path)); !os.IsNotExist(err) {
+		t.Fatalf("test fixture unexpectedly has an archive file")
+	}
+
+	card := runGetJSON(t, path, "rl4m9x")
+	for _, raw := range card["children"].([]any) {
+		child := raw.(map[string]any)
+		if _, present := child["archived"]; present {
+			t.Errorf("child %v carries an archived key with no archive file present", child["id"])
+		}
+	}
+
+	cmd := &cobra.Command{
+		Use: "get", Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runGet(cmd, path, args[0], false)
+		},
+	}
+	stdout, _, err := executeCobraText(cmd, []string{"rl4m9x"}, false)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if strings.Contains(stdout, "archived") {
+		t.Errorf("text output mentions archiving with no archive file present:\n%s", stdout)
+	}
+}
+
+// A card whose only children are archived still reports them: total
+// must always match the visible list rather than silently understate.
+func TestGet_EpicWithOnlyArchivedChildrenStillReportsThem(t *testing.T) {
+	path := copyEpicsFixture(t)
+	archiveChild(t, path, "f20wbo")
+	archiveChild(t, path, "wrshlo")
+	archiveChild(t, path, "q7t6z2")
+
+	card := runGetJSON(t, path, "rl4m9x")
+	children, ok := card["children"].([]any)
+	if !ok || len(children) != 3 {
+		t.Fatalf("children = %v, want three archived entries", card["children"])
+	}
+	for _, raw := range children {
+		child := raw.(map[string]any)
+		if archived, _ := child["archived"].(bool); !archived {
+			t.Errorf("child %v not marked archived", child)
+		}
+	}
+	progress := card["progress"].(map[string]any)
+	if progress["done"].(float64) != 1 || progress["total"].(float64) != 3 {
+		t.Errorf("progress = %v, want 1/3", progress)
 	}
 }
 

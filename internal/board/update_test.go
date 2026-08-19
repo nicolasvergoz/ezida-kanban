@@ -58,7 +58,7 @@ func findCard(t *testing.T, b *Board, id string) Card {
 
 func TestUpdateCard_TitleOnly(t *testing.T) {
 	b := updateTestBoard()
-	if err := UpdateCard(b, "aaaaaa", CardPatch{Title: ptr("New")}); err != nil {
+	if err := UpdateCard(b, nil, "aaaaaa", CardPatch{Title: ptr("New")}); err != nil {
 		t.Fatalf("UpdateCard: %v", err)
 	}
 	c := findCard(t, b, "aaaaaa")
@@ -78,7 +78,7 @@ func TestUpdateCard_TitleOnly(t *testing.T) {
 
 func TestUpdateCard_ClearPriority(t *testing.T) {
 	b := updateTestBoard()
-	if err := UpdateCard(b, "aaaaaa", CardPatch{Priority: ptr("")}); err != nil {
+	if err := UpdateCard(b, nil, "aaaaaa", CardPatch{Priority: ptr("")}); err != nil {
 		t.Fatalf("UpdateCard: %v", err)
 	}
 	c := findCard(t, b, "aaaaaa")
@@ -90,7 +90,7 @@ func TestUpdateCard_ClearPriority(t *testing.T) {
 func TestUpdateCard_ClearTags(t *testing.T) {
 	b := updateTestBoard()
 	empty := []string{}
-	if err := UpdateCard(b, "aaaaaa", CardPatch{Tags: &empty}); err != nil {
+	if err := UpdateCard(b, nil, "aaaaaa", CardPatch{Tags: &empty}); err != nil {
 		t.Fatalf("UpdateCard: %v", err)
 	}
 	c := findCard(t, b, "aaaaaa")
@@ -102,7 +102,7 @@ func TestUpdateCard_ClearTags(t *testing.T) {
 func TestUpdateCard_EmptyTitle(t *testing.T) {
 	b := updateTestBoard()
 	before := findCard(t, b, "aaaaaa")
-	err := UpdateCard(b, "aaaaaa", CardPatch{Title: ptr("   ")})
+	err := UpdateCard(b, nil, "aaaaaa", CardPatch{Title: ptr("   ")})
 	if err == nil {
 		t.Fatalf("UpdateCard returned nil, want *MissingTitleError")
 	}
@@ -119,7 +119,7 @@ func TestUpdateCard_EmptyTitle(t *testing.T) {
 func TestUpdateCard_UnknownPriority(t *testing.T) {
 	b := updateTestBoard()
 	before := findCard(t, b, "aaaaaa")
-	err := UpdateCard(b, "aaaaaa", CardPatch{Priority: ptr("urgent")})
+	err := UpdateCard(b, nil, "aaaaaa", CardPatch{Priority: ptr("urgent")})
 	if err == nil {
 		t.Fatalf("UpdateCard returned nil, want *InvalidPriorityError")
 	}
@@ -141,7 +141,7 @@ func TestUpdateCard_EmptyTagInList(t *testing.T) {
 	b := updateTestBoard()
 	before := findCard(t, b, "aaaaaa")
 	tags := []string{"good", ""}
-	err := UpdateCard(b, "aaaaaa", CardPatch{Tags: &tags})
+	err := UpdateCard(b, nil, "aaaaaa", CardPatch{Tags: &tags})
 	if err == nil {
 		t.Fatalf("UpdateCard returned nil, want *InvalidTagError")
 	}
@@ -158,7 +158,7 @@ func TestUpdateCard_EmptyTagInList(t *testing.T) {
 func TestUpdateCard_UnknownCard(t *testing.T) {
 	b := updateTestBoard()
 	beforeIDs := cardIDs(b.Cards)
-	err := UpdateCard(b, "zzzzzz", CardPatch{Title: ptr("nope")})
+	err := UpdateCard(b, nil, "zzzzzz", CardPatch{Title: ptr("nope")})
 	if err == nil {
 		t.Fatalf("UpdateCard returned nil, want *CardNotFoundError")
 	}
@@ -177,7 +177,7 @@ func TestUpdateCard_UnknownCard(t *testing.T) {
 func TestUpdateCard_RefreshesUpdatedAt(t *testing.T) {
 	b := updateTestBoard()
 	before := findCard(t, b, "aaaaaa")
-	if err := UpdateCard(b, "aaaaaa", CardPatch{Title: ptr("New title")}); err != nil {
+	if err := UpdateCard(b, nil, "aaaaaa", CardPatch{Title: ptr("New title")}); err != nil {
 		t.Fatalf("UpdateCard: %v", err)
 	}
 	after := findCard(t, b, "aaaaaa")

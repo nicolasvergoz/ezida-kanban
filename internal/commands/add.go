@@ -89,7 +89,7 @@ func runAdd(cmd *cobra.Command, path, title string, f addFlags, asJSON bool) err
 		// CheckEpicTarget cannot fire — which is correct, a card
 		// cannot be created under itself.
 		if f.epic != "" {
-			if err := board.CheckEpicTarget(b, "", f.epic); err != nil {
+			if err := board.CheckEpicTarget(b, archive, "", f.epic); err != nil {
 				return board.Card{}, asEpicError(err)
 			}
 		}

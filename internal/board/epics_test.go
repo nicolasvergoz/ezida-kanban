@@ -59,7 +59,7 @@ func TestChildrenOf_PreservesFileOrder(t *testing.T) {
 
 func TestEpicProgress_CountsTerminalColumns(t *testing.T) {
 	b := epicBoard(t, "done")
-	done, total := EpicProgress(b, "rl4m9x")
+	done, total := EpicProgress(b, nil, "rl4m9x")
 	if done != 1 || total != 3 {
 		t.Fatalf("progress = %d/%d, want 1/3", done, total)
 	}
@@ -69,21 +69,150 @@ func TestEpicProgress_CountsTerminalColumns(t *testing.T) {
 // progress; that is a reading of the configuration, not an error.
 func TestEpicProgress_NoTerminalColumnYieldsZero(t *testing.T) {
 	b := epicBoard(t, "")
-	done, total := EpicProgress(b, "rl4m9x")
+	done, total := EpicProgress(b, nil, "rl4m9x")
 	if done != 0 || total != 3 {
 		t.Fatalf("progress = %d/%d, want 0/3", done, total)
 	}
 }
 
+// archivedChild builds an ArchivedCard whose Epic and Column mirror the
+// live cards epicBoard produces, so tests can drop children into the
+// archive without diverging from the live fixture's shape.
+func archivedChild(id, column, epic string) ArchivedCard {
+	now := time.Date(2026, 5, 20, 14, 30, 0, 0, time.UTC)
+	return ArchivedCard{
+		Card: Card{
+			ID: id, Title: "card " + id, Column: column, Tags: []string{},
+			Epic: epic, CreatedAt: now, UpdatedAt: now,
+		},
+		ArchivedAt: now,
+	}
+}
+
+// Archiving a done child must not change its epic's progress: the
+// child moves from live to archived, but its column travels with it,
+// so it still counts toward both done and total.
+func TestEpicProgress_CountsArchivedChildren(t *testing.T) {
+	b := epicBoard(t, "done")
+	// aaaaa1 and bbbbb1 (both "todo") are archived from "done" —
+	// simulating that they were moved to "done" and archived from
+	// there, leaving only ccccc1 live in "done".
+	b.Cards = []Card{
+		b.Cards[0], // rl4m9x, the parent
+		b.Cards[1], // ccccc1, live, done
+		b.Cards[4], // loose1
+	}
+	a := &Archive{
+		SchemaVersion: SupportedSchemaVersion,
+		Cards: []ArchivedCard{
+			archivedChild("aaaaa1", "done", "rl4m9x"),
+			archivedChild("bbbbb1", "done", "rl4m9x"),
+		},
+	}
+	done, total := EpicProgress(b, a, "rl4m9x")
+	if done != 3 || total != 3 {
+		t.Fatalf("progress = %d/%d, want 3/3 — archiving must not change it", done, total)
+	}
+}
+
+// An archived child from a non-terminal column counts toward total but
+// never inflates done — the mirror of a live card in that column.
+func TestEpicProgress_ArchivedFromNonTerminalColumnCountsOnlyTotal(t *testing.T) {
+	b := epicBoard(t, "done")
+	a := &Archive{
+		SchemaVersion: SupportedSchemaVersion,
+		Cards: []ArchivedCard{
+			archivedChild("zzzzz1", "todo", "rl4m9x"),
+		},
+	}
+	done, total := EpicProgress(b, a, "rl4m9x")
+	if done != 1 || total != 4 {
+		t.Fatalf("progress = %d/%d, want 1/4", done, total)
+	}
+}
+
+// A nil archive must reproduce EpicProgress's pre-archiving behaviour
+// exactly — the guarantee every archive-free board relies on.
+func TestEpicProgress_NilArchiveMatchesPreviousBehaviour(t *testing.T) {
+	b := epicBoard(t, "done")
+	done, total := EpicProgress(b, nil, "rl4m9x")
+	if done != 1 || total != 3 {
+		t.Fatalf("progress = %d/%d, want 1/3", done, total)
+	}
+}
+
+// Done-ness is resolved at read time against the board's current
+// terminal columns. If the column an archived child recorded is later
+// un-marked (or removed), that child silently stops counting toward
+// done while it keeps counting toward total — the documented caveat.
+func TestEpicProgress_ArchivedChildStopsCountingWhenColumnDeleted(t *testing.T) {
+	b := epicBoard(t, "done")
+	a := &Archive{
+		SchemaVersion: SupportedSchemaVersion,
+		Cards: []ArchivedCard{
+			archivedChild("aaaaa1", "done", "rl4m9x"),
+		},
+	}
+	b.Cards = []Card{b.Cards[0]} // only the parent remains live
+
+	done, total := EpicProgress(b, a, "rl4m9x")
+	if done != 1 || total != 1 {
+		t.Fatalf("progress before column removal = %d/%d, want 1/1", done, total)
+	}
+
+	// Remove "done" the way `ezida columns rm` does: clear the
+	// terminal flag and drop it from the declared columns.
+	b.Board.SetDoneColumn("done", false)
+	b.Board.Columns = []string{"todo"}
+
+	done, total = EpicProgress(b, a, "rl4m9x")
+	if done != 0 || total != 1 {
+		t.Fatalf("progress after column removal = %d/%d, want 0/1", done, total)
+	}
+}
+
+// ArchivedChildrenOf must return children in archive file order, the
+// same convention ChildrenOf holds for the live board.
+func TestArchivedChildrenOf_ArchiveFileOrder(t *testing.T) {
+	a := &Archive{
+		SchemaVersion: SupportedSchemaVersion,
+		Cards: []ArchivedCard{
+			archivedChild("ccccc1", "done", "rl4m9x"),
+			archivedChild("aaaaa1", "todo", "rl4m9x"),
+			archivedChild("other1", "todo", "elsewhere"),
+			archivedChild("bbbbb1", "todo", "rl4m9x"),
+		},
+	}
+	children := ArchivedChildrenOf(a, "rl4m9x")
+	want := []string{"ccccc1", "aaaaa1", "bbbbb1"}
+	if len(children) != len(want) {
+		t.Fatalf("got %d children, want %d", len(children), len(want))
+	}
+	for i, c := range children {
+		if c.ID != want[i] {
+			t.Fatalf("children = %v, want %v", children, want)
+		}
+	}
+	if got := ArchivedChildrenOf(a, "loose1"); got != nil {
+		t.Errorf("ArchivedChildrenOf(childless) = %v, want nil", got)
+	}
+	if got := ArchivedChildrenOf(a, ""); got != nil {
+		t.Errorf("ArchivedChildrenOf(\"\") = %v, want nil", got)
+	}
+	if got := ArchivedChildrenOf(nil, "rl4m9x"); got != nil {
+		t.Errorf("ArchivedChildrenOf(nil archive) = %v, want nil", got)
+	}
+}
+
 func TestIsEpicAndParentOf(t *testing.T) {
 	b := epicBoard(t, "done")
-	if !IsEpic(b, "rl4m9x") {
+	if !IsEpic(b, nil, "rl4m9x") {
 		t.Error("parent not reported as an epic")
 	}
-	if IsEpic(b, "loose1") {
+	if IsEpic(b, nil, "loose1") {
 		t.Error("childless card reported as an epic")
 	}
-	if IsEpic(b, "") {
+	if IsEpic(b, nil, "") {
 		t.Error("empty id reported as an epic")
 	}
 	parent := ParentOf(b, "aaaaa1")
@@ -95,22 +224,39 @@ func TestIsEpicAndParentOf(t *testing.T) {
 	}
 }
 
+// A card with no live children still counts as an epic when its only
+// children are archived: they are filed away, not gone.
+func TestIsEpic_TrueWithOnlyArchivedChildren(t *testing.T) {
+	b := epicBoard(t, "done")
+	b.Cards = []Card{b.Cards[0], b.Cards[4]} // parent + loose1, no live children
+	a := &Archive{
+		SchemaVersion: SupportedSchemaVersion,
+		Cards:         []ArchivedCard{archivedChild("aaaaa1", "todo", "rl4m9x")},
+	}
+	if !IsEpic(b, a, "rl4m9x") {
+		t.Error("parent with only archived children not reported as an epic")
+	}
+	if IsEpic(b, nil, "rl4m9x") {
+		t.Error("nil archive should not see the archived-only child")
+	}
+}
+
 func TestCheckEpicTarget(t *testing.T) {
 	b := epicBoard(t, "done")
-	if err := CheckEpicTarget(b, "loose1", "rl4m9x"); err != nil {
+	if err := CheckEpicTarget(b, nil, "loose1", "rl4m9x"); err != nil {
 		t.Fatalf("legal target rejected: %v", err)
 	}
-	if err := CheckEpicTarget(b, "loose1", ""); err != nil {
+	if err := CheckEpicTarget(b, nil, "loose1", ""); err != nil {
 		t.Fatalf("empty target rejected: %v", err)
 	}
-	if err := CheckEpicTarget(b, "loose1", "loose1"); err == nil {
+	if err := CheckEpicTarget(b, nil, "loose1", "loose1"); err == nil {
 		t.Error("self-reference accepted")
 	}
-	if err := CheckEpicTarget(b, "loose1", "zzzzzz"); err == nil {
+	if err := CheckEpicTarget(b, nil, "loose1", "zzzzzz"); err == nil {
 		t.Error("unknown target accepted")
 	}
 	// aaaaa1 is itself a child, so it may not become a parent.
-	err := CheckEpicTarget(b, "loose1", "aaaaa1")
+	err := CheckEpicTarget(b, nil, "loose1", "aaaaa1")
 	if err == nil {
 		t.Fatal("nested target accepted")
 	}
@@ -131,7 +277,7 @@ func TestCheckEpicTarget(t *testing.T) {
 // from the whole-board Validate afterwards.
 func TestCheckEpicTarget_ChildWithChildrenRefused(t *testing.T) {
 	b := epicBoard(t, "done")
-	err := CheckEpicTarget(b, "rl4m9x", "loose1")
+	err := CheckEpicTarget(b, nil, "rl4m9x", "loose1")
 	if err == nil {
 		t.Fatal("a card with children was given an epic")
 	}
@@ -150,8 +296,39 @@ func TestCheckEpicTarget_ChildWithChildrenRefused(t *testing.T) {
 		t.Errorf("board mutated: rl4m9x now carries epic %q", b.Cards[0].Epic)
 	}
 	// A childless card is still free to acquire one.
-	if err := CheckEpicTarget(b, "loose1", "rl4m9x"); err != nil {
+	if err := CheckEpicTarget(b, nil, "loose1", "rl4m9x"); err != nil {
 		t.Fatalf("childless card refused: %v", err)
+	}
+}
+
+// Closes the nesting trap the design doc describes: a card whose only
+// child is archived is still an epic, so giving it a parent of its own
+// must be refused just as it would be for a live child.
+func TestCheckEpicTarget_RefusesParentForCardWithOnlyArchivedChildren(t *testing.T) {
+	b := epicBoard(t, "done")
+	b.Cards = []Card{b.Cards[0], b.Cards[4]} // rl4m9x + loose1, no live children
+	a := &Archive{
+		SchemaVersion: SupportedSchemaVersion,
+		Cards:         []ArchivedCard{archivedChild("aaaaa1", "todo", "rl4m9x")},
+	}
+	err := CheckEpicTarget(b, a, "rl4m9x", "loose1")
+	if err == nil {
+		t.Fatal("a card with only archived children was given an epic")
+	}
+	var ie *InvalidEpicError
+	if !asInvalidEpic(err, &ie) {
+		t.Fatalf("error = %T, want *InvalidEpicError", err)
+	}
+}
+
+// A nil archive must reduce CheckEpicTarget to its pre-archiving,
+// live-only reading: a card whose only children are archived is
+// invisible to it, so the nesting refusal above does not fire.
+func TestCheckEpicTarget_NilArchiveMatchesPreviousBehaviour(t *testing.T) {
+	b := epicBoard(t, "done")
+	b.Cards = []Card{b.Cards[0], b.Cards[4]} // rl4m9x + loose1, no live children
+	if err := CheckEpicTarget(b, nil, "rl4m9x", "loose1"); err != nil {
+		t.Fatalf("nil archive should not see archived-only children: %v", err)
 	}
 }
 

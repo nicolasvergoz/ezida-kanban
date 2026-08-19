@@ -66,6 +66,27 @@ test.describe("archiving and restoring a single card", () => {
   });
 });
 
+test.describe("archiving a done child leaves its epic's progress unchanged", () => {
+  test("the counter is unchanged after archiving a done child through the card modal", async ({
+    page,
+    board,
+  }) => {
+    await openBoard(page, board);
+    const parent = card(page, "vw01k2");
+    await expect(parent.locator(".epic-count")).toHaveText("1/1");
+
+    await openCard(page, "wrshlo");
+    await page.getByTitle("Archive card").click();
+
+    await expect(page.locator(".modal-overlay")).toHaveCount(0);
+    await expect(card(page, "wrshlo")).toHaveCount(0);
+    // The child moved from live to archived, but it is still there —
+    // the regression this whole change exists to prevent is the
+    // counter reading 0/0 the moment its only child is filed away.
+    await expect(parent.locator(".epic-count")).toHaveText("1/1");
+  });
+});
+
 test.describe("archiving an epic cascades its children", () => {
   test("confirms before archiving, then both parent and child move together", async ({
     page,

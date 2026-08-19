@@ -3,10 +3,18 @@
 # must not share a stem with one that has archived data already. Used
 # by archive-actions.spec.ts, which needs to start with nothing
 # archived and prove the Archive section is created on first use.
+#
+# vw01k2 + wrshlo (a second epic and its one done child) live entirely
+# in "review", a column no other test in this fixture's spec file ever
+# archives via the column menu or a "todo"-column cascade — so the
+# "archive a done child, counter unchanged" test can archive wrshlo
+# through the card modal without perturbing the rl4m9x/f20wbo cascade
+# math the other tests here depend on.
 schema_version = 2
 
 [board]
-columns = ['todo', 'ongoing', 'done']
+# a '*' suffix marks a terminal column: its cards count as done for epic progress
+columns = ['todo', 'ongoing', 'done', 'review*']
 priorities = ['low', 'medium', 'high']
 
 [[cards]]
@@ -38,3 +46,23 @@ created_at = 2026-05-20T14:30:00Z
 updated_at = 2026-05-20T14:30:00Z
 tags = []
 epic = 'rl4m9x'
+
+[[cards]]
+id = 'vw01k2'
+title = 'Second epic'
+column = 'review'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+color = '#10b981'
+
+[[cards]]
+id = 'wrshlo'
+title = 'Done child of the second epic'
+column = 'review'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+epic = 'vw01k2'

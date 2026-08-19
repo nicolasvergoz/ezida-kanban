@@ -143,7 +143,13 @@ func (s *serverState) handlePatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := board.UpdateCard(b, id, patch); err != nil {
+	archive, _, err := board.LoadArchive(board.ArchivePathFor(s.boardPath))
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.UpdateCard(b, archive, id, patch); err != nil {
 		httpError(w, err)
 		return
 	}

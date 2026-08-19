@@ -2,11 +2,14 @@
 # unrelated live card. No archive sibling is required to boot this
 # board — archive-actions.spec.ts uses this fixture with NO
 # .archive.toml at all, to prove the Archive section is created on
-# first use. archive-render.spec.ts pairs it with archived.archive.toml.
+# first use. archive-render.spec.ts pairs it with archived.archive.toml,
+# whose m4n5o6 is a second, archived child of rl4m9x in the terminal
+# "done" column — the live-parent-counts-an-archived-child case.
 schema_version = 2
 
 [board]
-columns = ['todo', 'ongoing', 'done']
+# a '*' suffix marks a terminal column: its cards count as done for epic progress
+columns = ['todo', 'ongoing', 'done*']
 priorities = ['low', 'medium', 'high']
 
 [[cards]]

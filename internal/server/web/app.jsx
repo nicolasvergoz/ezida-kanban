@@ -58,17 +58,13 @@ function toUiBoard(server) {
     archivedColumn: c.column,
   }));
 
-  // A SEPARATE index, used only to render the epic chip on an
-  // archived card — never for live progress or live chips. It is
-  // built over live + archived cards together, so an archived card
-  // still shows which epic it belonged to: an archived epic with an
-  // archived child (both in this pool), and a lone archived child of
-  // a still-live epic (the parent resolves from allCards) both
-  // display correctly. This is purely informational — the stored
-  // `epic` field survives archiving untouched either way, which is
-  // why it comes back on restore regardless of what the archive
-  // section displays.
-  const archiveEpics = buildEpicIndex([...allCards, ...archivedCards], doneSet);
+  // ONE index, built over live + archived cards together, used for
+  // both the live board's epic chrome and the Archive section. An
+  // archived child counts toward its parent's done/total exactly like
+  // a live one — archiving finished work must not change the count —
+  // so there is no separate live-only index to keep in sync with this
+  // one. A parent whose only children are archived is still an epic.
+  const epics = buildEpicIndex([...allCards, ...archivedCards], doneSet);
 
   return {
     title: server.project_name || "",
@@ -82,12 +78,19 @@ function toUiBoard(server) {
     priorities: server.priorities || [],
     priorityColors: server.priority_colors || {},
     doneColumns,
-    epics: buildEpicIndex(allCards, doneSet),
+    epics,
     // null (not an empty object) so a plain board renders no Archive
     // section at all — the DOM-level half of the omitempty contract.
-    archive: archivedCards.length ? { cards: archivedCards, epics: archiveEpics } : null,
+    archive: archivedCards.length ? { cards: archivedCards, epics } : null,
   };
 }
+
+// columnOf resolves the column a card should be judged done-or-not by:
+// a live card's own column, or an archived card's archivedColumn (the
+// column it was archived from). Archived UI cards carry no `column`
+// field at all, so this is the one place that needs to know both
+// shapes exist.
+const columnOf = (c) => c.archivedColumn ?? c.column;
 
 /* Epic index — built once per board load over the full payload, so a
    parent's counts report the board and never the active filter. An
@@ -110,7 +113,7 @@ function buildEpicIndex(cards, doneSet) {
   const progress = new Map(); // parent id → { done, total }
   for (const [id, children] of kids) {
     let done = 0;
-    for (const c of children) if (doneSet.has(c.column)) done++;
+    for (const c of children) if (doneSet.has(columnOf(c))) done++;
     progress.set(id, { done, total: children.length });
   }
 

@@ -1,6 +1,18 @@
 schema_version = 2
 
 [[cards]]
+id = 'dvnpih'
+title = 'Card epics'
+column = 'done'
+description = "One card may point at another with `epic = <id>`: the parent is the epic, the pointing cards are its children. Nesting is exactly one level, and the relation is documentary — it never blocks a move or a delete.\n\nDelivered in five changes, from the file format up to the viewer. Specs live in openspec/specs/card-epics/, board-config/, viewer-server/ and viewer-ui/."
+created_at = 2026-08-09T14:11:19Z
+updated_at = 2026-08-19T17:47:46Z
+tags = ['schema', 'viewer', 'v0.4', 'v0.5']
+priority = 'medium'
+color = '#10b981'
+archived_at = 2026-08-19T20:21:19Z
+
+[[cards]]
 id = 'msf47i'
 title = 'Epic schema, palette, validation and CLI'
 column = 'done'
@@ -10,7 +22,19 @@ updated_at = 2026-08-19T17:47:30Z
 tags = ['schema', 'cli', 'v0.4']
 priority = 'medium'
 epic = 'dvnpih'
-archived_at = 2026-08-19T17:49:51Z
+archived_at = 2026-08-19T20:21:19Z
+
+[[cards]]
+id = 'df6v41'
+title = 'On epic details, click children in the list should open the selected children detail'
+column = 'done'
+description = ''
+created_at = 2026-08-17T19:34:50Z
+updated_at = 2026-08-19T12:05:59Z
+tags = ['ux']
+priority = 'medium'
+epic = 'dvnpih'
+archived_at = 2026-08-19T20:21:19Z
 
 [[cards]]
 id = '0vyyjq'
@@ -22,7 +46,7 @@ updated_at = 2026-08-19T17:47:26Z
 tags = ['viewer', 'v0.4']
 priority = 'medium'
 epic = 'dvnpih'
-archived_at = 2026-08-19T17:48:10Z
+archived_at = 2026-08-19T20:21:19Z
 
 [[cards]]
 id = 'y7sslg'
@@ -34,7 +58,7 @@ updated_at = 2026-08-19T17:47:20Z
 tags = ['viewer', 'ux', 'v0.4']
 priority = 'medium'
 epic = 'dvnpih'
-archived_at = 2026-08-19T17:48:08Z
+archived_at = 2026-08-19T20:21:19Z
 
 [[cards]]
 id = 'fvran4'
@@ -46,7 +70,30 @@ updated_at = 2026-08-19T17:47:13Z
 tags = ['viewer', 'v0.4']
 priority = 'low'
 epic = 'dvnpih'
-archived_at = 2026-08-19T17:48:06Z
+archived_at = 2026-08-19T20:21:19Z
+
+[[cards]]
+id = 'xeaa34'
+title = 'Focus an epic from the filter'
+column = 'done'
+description = "Scope the board to one epic from the filter popover. Clicking a card's epic chip toggles that scope.\n\nA focused epic stays visible: the clause is `card.epic === id || card.id === id`. Without the second half, focusing an epic makes it vanish along with its own progress bar and counter.\n\n`No epic` means \"unlinked\", not \"has no epic field\" — a parent carries no epic field either, so the naive definition would list it as unlinked. The reserved key is the empty string.\n\nShipped in bd15c5e."
+created_at = 2026-08-09T14:11:44Z
+updated_at = 2026-08-09T14:11:44Z
+tags = ['viewer', 'ux']
+priority = 'low'
+epic = 'dvnpih'
+archived_at = 2026-08-19T20:21:19Z
+
+[[cards]]
+id = 'nvwk16'
+title = 'Move a card to the top of its new column (CLI)'
+column = 'done'
+description = "`ezida move <id> <column>`, `ezida edit --column`, and `ezida add` all append the card to the bottom of the target column. On a long column — `done` has 21 cards — you have to scroll all the way down to see what you just added or moved.\n\nWanted: card lands at the **top** of the target column, for all three CLI entry points, plus the viewer's column-body drop.\n\nScope:\n- `ezida move` — move.go:41, calls `board.AppendCardToColumn` directly → insert at position 0.\n- `ezida edit --column` — edit.go:195, same call → position 0, regardless of which other flags are combined with `--column` in the same invocation.\n- `ezida add` — add.go:120, same call → new cards also land at position 0.\n- Viewer column-body drop — `List.onDrop` (app.jsx:879) hardcodes `list.cards.length` when dropping onto the column itself (blank space, not onto a card) → change to 0. Card-to-card drop (`CardItem.onDrop`) stays untouched — it's already positional (above/below by cursor Y).\n\n`board.MoveCard` is not in this path for these CLI callers — they call `board.AppendCardToColumn` directly. That's where the actual change lands; callers just stop asking for the bottom.\n\nOne OpenSpec change covers CLI + viewer together. Deltas expected on:\n  - card-writing:125  `move` re-places at the end → top\n  - card-writing:12   `add` appends at the end → top\n  - board-config:29   `edit --column` re-places at the end → top\n  - viewer column-drop: `List.onDrop` re-places at the end → top, when dropping on the column body"
+created_at = 2026-08-09T14:34:46Z
+updated_at = 2026-08-19T17:47:54Z
+tags = ['cli', 'ux', 'v0.5']
+priority = 'high'
+archived_at = 2026-08-19T20:16:31Z
 
 [[cards]]
 id = '5fdy8j'
@@ -178,18 +225,6 @@ updated_at = 2026-05-22T08:37:47Z
 tags = ['branding']
 priority = 'low'
 archived_at = 2026-08-19T17:43:12Z
-
-[[cards]]
-id = 'xeaa34'
-title = 'Focus an epic from the filter'
-column = 'done'
-description = "Scope the board to one epic from the filter popover. Clicking a card's epic chip toggles that scope.\n\nA focused epic stays visible: the clause is `card.epic === id || card.id === id`. Without the second half, focusing an epic makes it vanish along with its own progress bar and counter.\n\n`No epic` means \"unlinked\", not \"has no epic field\" — a parent carries no epic field either, so the naive definition would list it as unlinked. The reserved key is the empty string.\n\nShipped in bd15c5e."
-created_at = 2026-08-09T14:11:44Z
-updated_at = 2026-08-09T14:11:44Z
-tags = ['viewer', 'ux']
-priority = 'low'
-epic = 'dvnpih'
-archived_at = 2026-08-19T17:42:17Z
 
 [[cards]]
 id = 'yzenq4'

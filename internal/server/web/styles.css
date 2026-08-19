@@ -684,9 +684,8 @@ input, textarea { font: inherit; color: inherit; }
   border-color: color-mix(in srgb, var(--epic-tone) 24%, transparent);
 }
 .card-epic-chip svg { width: 10px; height: 10px; flex-shrink: 0; opacity: 0.9; }
-/* Clickable only on the board. The chip in the modal's parent row is a
-   span and keeps the default cursor, because there is nothing behind
-   the dialog for a scope to act on. */
+/* Clickable on the board (focus filter) and in the modal's parent row
+   (navigate to parent epic). */
 .card-epic-chip.is-clickable {
   cursor: pointer;
   font: inherit;
@@ -1493,13 +1492,35 @@ button:active:not(:disabled) { transform: translateY(0.5px); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 9px 12px;
+  gap: 8px;
+  padding: 0 8px 0 0;
   background: var(--surface-2);
   font-size: 13px;
   color: var(--text);
 }
 .modal-epic-child + .modal-epic-child { border-top: 1px solid var(--border); }
+.modal-epic-child-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.1s ease;
+}
+.modal-epic-child-main:hover {
+  background: var(--surface);
+}
+.modal-epic-child-main:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .modal-epic-child-title {
   overflow: hidden;
   text-overflow: ellipsis;

@@ -295,3 +295,58 @@ test.describe("the palette", () => {
     await expect(page.locator(".modal-epic-swatch")).toHaveCount(0);
   });
 });
+
+test.describe("navigation between epic and children in modal", () => {
+  test("clicking a child in the epic detail modal navigates to that child card's detail modal", async ({ page, board }) => {
+    await openBoard(page, board);
+    await openCard(page, "rl4m9x");
+
+    // Initially open on the epic card.
+    await expect(page.locator(".modal-title")).toHaveText("Card relations and a deliberately long epic title");
+    await expect(page.locator(".modal-epic-children")).toBeVisible();
+
+    // Click on child card 'f20wbo' (Card dependencies).
+    const childBtn = page.locator(".modal-epic-child-main", { hasText: "Card dependencies" });
+    await childBtn.click();
+
+    // Modal is now open on child card 'f20wbo'.
+    await expect(page.locator(".modal-title")).toHaveText("Card dependencies");
+    await expect(page.locator(".modal-epic-parent .modal-epic-id")).toHaveText("rl4m9x");
+    await expect(page.locator(".modal-epic-parent .card-epic-chip")).toContainText("Card relations");
+    await expect(page.locator(".modal-epic-children")).toHaveCount(0);
+  });
+
+  test("clicking the parent epic chip in the child detail modal navigates to the parent epic modal", async ({ page, board }) => {
+    await openBoard(page, board);
+    await openCard(page, "f20wbo");
+
+    // Initially open on the child card.
+    await expect(page.locator(".modal-title")).toHaveText("Card dependencies");
+    await expect(page.locator(".modal-epic-parent .modal-epic-id")).toHaveText("rl4m9x");
+
+    // Click on parent epic chip.
+    await page.locator(".modal-epic-parent .card-epic-chip").click();
+
+    // Modal is now open on the parent epic card.
+    await expect(page.locator(".modal-title")).toHaveText("Card relations and a deliberately long epic title");
+    await expect(page.locator(".modal-epic-children")).toBeVisible();
+    await expect(page.locator(".modal-epic-parent")).toHaveCount(0);
+  });
+
+  test("clicking remove on a child does not navigate to that child", async ({ page, board }) => {
+    await openBoard(page, board);
+    await openCard(page, "vw01k2");
+
+    // Initially open on epic 'vw01k2' with child 'l76gjt' (Markdown rendering).
+    await expect(page.locator(".modal-title")).toHaveText("Viewer polish");
+    const row = page.locator(".modal-epic-child", { hasText: "Markdown rendering" });
+    await expect(row).toBeVisible();
+
+    // Click the remove button on the child row.
+    await row.locator(".modal-epic-child-remove").click();
+
+    // The child is removed, and the modal remains on the parent epic.
+    await expect(page.locator(".modal-title")).toHaveText("Viewer polish");
+    await expect(page.locator(".modal-epic-child")).toHaveCount(0);
+  });
+});

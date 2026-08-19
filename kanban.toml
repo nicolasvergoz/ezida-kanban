@@ -84,6 +84,16 @@ tags = []
 priority = 'low'
 
 [[cards]]
+id = 'dlmeof'
+title = 'Deep-link card URLs and support browser navigation history'
+column = 'backlog'
+description = "Synchronize the open card detail modal with the browser URL (e.g. using query param '?card=<id>' or hash '#<id>'). Directly visiting a card URL opens its detail modal on initial load. Closing the modal clears the card parameter. Opening or navigating between cards pushes browser history states so back and forward buttons navigate the modal history stack."
+created_at = 2026-08-19T09:25:34Z
+updated_at = 2026-08-19T09:25:34Z
+tags = ['viewer', 'ux']
+priority = 'medium'
+
+[[cards]]
 id = '0jwp4x'
 title = 'Add version number in status overlay'
 column = 'done'
@@ -330,10 +340,10 @@ priority = 'medium'
 [[cards]]
 id = 'df6v41'
 title = 'On epic details, click children in the list should open the selected children detail'
-column = 'todo'
+column = 'done'
 description = ''
 created_at = 2026-08-17T19:34:50Z
-updated_at = 2026-08-18T20:59:39Z
+updated_at = 2026-08-19T12:05:59Z
 tags = ['ux']
 priority = 'medium'
 epic = 'dvnpih'

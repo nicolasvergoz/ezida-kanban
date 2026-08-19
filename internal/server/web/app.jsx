@@ -557,6 +557,7 @@ function App() {
         if (!card) { setOpenCardId(null); return null; }
         return (
           <CardDetailModal
+            key={card.id}
             card={card}
             list={list}
             allLists={board.lists}
@@ -564,6 +565,7 @@ function App() {
             priorityColors={board.priorityColors}
             epics={board.epics}
             onClose={() => setOpenCardId(null)}
+            onOpenCard={(id) => setOpenCardId(id)}
             onPatch={(patch, onFail) => patchCard(card.id, patch, onFail)}
             onPatchCard={(cardId, patch, onFail) => patchCard(cardId, patch, onFail)}
             onMoveColumn={(toListId, onFail) => moveCard(list.id, card.id, toListId, board.lists.find((l) => l.id === toListId).cards.length, onFail)}
@@ -1152,21 +1154,32 @@ function CardItem({ card, listId, index, dragRef, priorityColors, epics, onRemov
    the chip in the modal's parent row stays inert, because it sits over
    a board the user cannot see, so a scope set from it would have no
    observable effect until the modal closes. */
-function EpicChip({ card, onFocus }) {
+function EpicChip({ card, onFocus, onClick, title }) {
   const style = { "--epic-color": card.color || "var(--text-muted)" };
   const body = <><IconEpic size={10} /><span className="card-epic-text">{card.text}</span></>;
-  if (!onFocus) {
-    return <span className="card-epic-chip" style={style} title={card.text}>{body}</span>;
+  if (onFocus) {
+    return (
+      <button
+        type="button"
+        className="card-epic-chip is-clickable"
+        style={style}
+        title={title || `Focus ${card.text}`}
+        onClick={(e) => { e.stopPropagation(); onFocus(card.id); }}>
+        {body}
+      </button>);
   }
-  return (
-    <button
-      type="button"
-      className="card-epic-chip is-clickable"
-      style={style}
-      title={`Focus ${card.text}`}
-      onClick={(e) => { e.stopPropagation(); onFocus(card.id); }}>
-      {body}
-    </button>);
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className="card-epic-chip is-clickable"
+        style={style}
+        title={title || `Open ${card.text}`}
+        onClick={(e) => { e.stopPropagation(); onClick(card.id); }}>
+        {body}
+      </button>);
+  }
+  return <span className="card-epic-chip" style={style} title={title || card.text}>{body}</span>;
 }
 
 function EpicProgress({ done, total, className }) {
@@ -1546,7 +1559,7 @@ function formatAbsolute(iso) {
   return d.toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function CardDetailModal({ card, list, allLists, priorities, priorityColors, epics, onClose, onPatch, onPatchCard, onMoveColumn, onToggleTag, onRemove }) {
+function CardDetailModal({ card, list, allLists, priorities, priorityColors, epics, onClose, onOpenCard, onPatch, onPatchCard, onMoveColumn, onToggleTag, onRemove }) {
   const overlayRef = useRef(null);
   const [descDraft, setDescDraft] = useState(card.description || "");
   const [editingDesc, setEditingDesc] = useState(false);
@@ -1790,7 +1803,7 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
               <div className="modal-section-head"><label className="modal-label">Epic</label></div>
               {parent ?
                 <div className="modal-epic-parent">
-                  <EpicChip card={parent} />
+                  <EpicChip card={parent} onClick={onOpenCard ? () => onOpenCard(parent.id) : null} />
                   <span className="modal-epic-id">{parent.id}</span>
                   <div className="modal-epic-parent-actions">
                     <button
@@ -1843,8 +1856,14 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
               <ul className="modal-epic-children">
                 {children.map((c) =>
                   <li key={c.id} className="modal-epic-child">
-                    <span className="modal-epic-child-title" title={c.text}>{c.text}</span>
-                    <span className="modal-epic-child-col">{columnTitle(c.column)}</span>
+                    <button
+                      type="button"
+                      className="modal-epic-child-main"
+                      title={`Open ${c.text}`}
+                      onClick={() => onOpenCard && onOpenCard(c.id)}>
+                      <span className="modal-epic-child-title" title={c.text}>{c.text}</span>
+                      <span className="modal-epic-child-col">{columnTitle(c.column)}</span>
+                    </button>
                     {/* Removing a child is a PATCH on the child: the
                         relation lives in its `epic` field and nowhere
                         else, so the parent is never written. */}
@@ -1853,7 +1872,7 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
                       className="modal-epic-child-remove"
                       title={`Remove ${c.text} from this epic`}
                       aria-label={`Remove ${c.text} from this epic`}
-                      onClick={() => commitRelation(c.id, "", "children")}>
+                      onClick={(e) => { e.stopPropagation(); commitRelation(c.id, "", "children"); }}>
                       <IconClose size={11} />
                     </button>
                   </li>)}

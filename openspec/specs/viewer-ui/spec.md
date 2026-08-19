@@ -2481,9 +2481,9 @@ The `*` marker from `kanban.toml` MUST NEVER be rendered.
 
 The card-detail modal SHALL report a card's epic relation and SHALL offer the controls that change it.
 
-The modal MUST render an `Epic` section on **every** card. For a card carrying an `epic`, that section names the parent — the parent's colored chip and its id — alongside a reassign control and a detach control. For a card carrying none, it renders an attach affordance in the same place. The always-present section is what makes a first relation reachable from a board that has none; the board surface itself remains unchanged for a board without epics.
+The modal MUST render an `Epic` section on **every** card. For a card carrying an `epic`, that section names the parent — the parent's colored chip and its id — alongside a reassign control and a detach control. The parent epic chip SHALL be clickable to navigate directly to that parent epic card's detail modal. For a card carrying none, it renders an attach affordance in the same place. The always-present section is what makes a first relation reachable from a board that has none; the board surface itself remains unchanged for a board without epics.
 
-For a card referenced as an epic, the modal MUST additionally render a `Children` section listing each child with its title and column, plus the progress bar, the `done/total` counter, an add-a-child control, and a per-row remove control. A card MUST NEVER render both an assigned parent and a children list, because one-level nesting makes that state unrepresentable — and the attach affordance MUST NOT be offered on a card that has children.
+For a card referenced as an epic, the modal MUST additionally render a `Children` section listing each child with its title and column, plus the progress bar, the `done/total` counter, an add-a-child control, and a per-row remove control. Each child row (title and column) SHALL be clickable to navigate directly to that child card's detail modal. Activating the per-row remove control SHALL detach the child from the epic without triggering navigation to the child card. A card MUST NEVER render both an assigned parent and a children list, because one-level nesting makes that state unrepresentable — and the attach affordance MUST NOT be offered on a card that has children.
 
 Every relation write MUST be a single `PATCH /api/cards/{childId}` setting `epic` to the target id or to the empty string. The parent card MUST NEVER be written by the client to establish or break a relation.
 
@@ -2536,6 +2536,25 @@ Every relation write MUST be a single `PATCH /api/cards/{childId}` setting `epic
 
 - **WHEN** the modal opens on a card that has at least one child
 - **THEN** it MUST NOT render an attach affordance for that card
+
+#### Scenario: Clicking a child in the children list opens the child card detail modal
+
+- **WHEN** the modal is open on an epic card
+- **AND** the user clicks on a child item in the children list
+- **THEN** the modal switches to display the detail view of that child card
+
+#### Scenario: Activating remove on a child does not navigate to the child card
+
+- **WHEN** the modal is open on an epic card
+- **AND** the user clicks the remove button on a child row
+- **THEN** the child is removed from the epic
+- **AND** the modal remains on the parent epic card
+
+#### Scenario: Clicking parent epic chip opens the parent epic card detail modal
+
+- **WHEN** the modal is open on a child card that belongs to a parent epic
+- **AND** the user clicks the parent epic chip in the modal's Epic section
+- **THEN** the modal switches to display the detail view of that parent epic card
 
 ### Requirement: A card-search combobox picks a related card
 
@@ -2882,7 +2901,6 @@ scope from it would have no observable effect until the modal closes.
 - **THEN** the filter's epic set MUST be unchanged
 - **AND** the modal MUST remain open
 
-
 ### Requirement: Topbar exposes a server status overlay
 
 The topbar SHALL render a clickable dot in its right zone that opens a
@@ -2941,3 +2959,4 @@ verbatim with no parsing or reformatting. The row is placed after the
 - **WHEN** the board is refetched (via SSE or the refresh control)
   while the overlay is open
 - **THEN** the `Version` row's value is unchanged
+

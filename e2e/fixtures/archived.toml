@@ -1,0 +1,40 @@
+# A live epic (rl4m9x) with one live child (f20wbo), plus one
+# unrelated live card. No archive sibling is required to boot this
+# board — archive-actions.spec.ts uses this fixture with NO
+# .archive.toml at all, to prove the Archive section is created on
+# first use. archive-render.spec.ts pairs it with archived.archive.toml.
+schema_version = 2
+
+[board]
+columns = ['todo', 'ongoing', 'done']
+priorities = ['low', 'medium', 'high']
+
+[[cards]]
+id = 'a3f2k9'
+title = 'Unrelated live card'
+column = 'todo'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+priority = 'high'
+
+[[cards]]
+id = 'rl4m9x'
+title = 'Live epic'
+column = 'todo'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+color = '#8b5cf6'
+
+[[cards]]
+id = 'f20wbo'
+title = 'Live child'
+column = 'ongoing'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+epic = 'rl4m9x'

@@ -37,6 +37,11 @@ func runExport(cmd *cobra.Command, path string, asJSON bool) error {
 	if err != nil {
 		return err
 	}
+	archive, err := loadArchive(board.ArchivePathFor(path))
+	if err != nil {
+		return err
+	}
+	board.ReconcileArchive(b, archive)
 
 	counts := make(map[string]int, len(b.Board.Columns))
 	for _, col := range b.Board.Columns {
@@ -66,6 +71,29 @@ func runExport(cmd *cobra.Command, path string, asJSON bool) error {
 		})
 	}
 
+	var archivedCards []output.ArchivedExportCard
+	for _, c := range archive.Cards {
+		tags := c.Tags
+		if tags == nil {
+			tags = []string{}
+		}
+		archivedCards = append(archivedCards, output.ArchivedExportCard{
+			ExportCard: output.ExportCard{
+				ID:          c.ID,
+				Title:       c.Title,
+				Column:      c.Column,
+				Priority:    c.Priority,
+				Tags:        tags,
+				Description: c.Description,
+				Epic:        c.Epic,
+				Color:       c.Color,
+				CreatedAt:   c.CreatedAt,
+				UpdatedAt:   c.UpdatedAt,
+			},
+			ArchivedAt: c.ArchivedAt,
+		})
+	}
+
 	env := output.ExportEnvelope{
 		SchemaVersion:  b.SchemaVersion,
 		Columns:        b.Board.Columns,
@@ -76,6 +104,7 @@ func runExport(cmd *cobra.Command, path string, asJSON bool) error {
 		Cards:          cards,
 		ProjectName:    resolveProjectName(path),
 		Version:        server.Version,
+		ArchivedCards:  archivedCards,
 	}
 	buf, err := output.Export(env)
 	if err != nil {

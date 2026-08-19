@@ -39,6 +39,37 @@ function toUiBoard(server) {
     allCards.push(ui);
     (cardsByCol[c.column] = cardsByCol[c.column] || []).push(ui);
   }
+
+  // Archived cards are intentionally NOT folded into allCards: the
+  // LIVE epic index (below) stays live-only, so an archived child
+  // never inflates a live parent's progress and an archived parent
+  // never counts as "still an epic" for a live sibling's lookup.
+  const archivedCards = (server.archived_cards || []).map((c) => ({
+    id: c.id,
+    text: c.title || "",
+    tags: c.tags || [],
+    priority: c.priority || "",
+    description: c.description || "",
+    epic: c.epic || "",
+    color: c.color || "",
+    createdAt: c.created_at,
+    updatedAt: c.updated_at,
+    archivedAt: c.archived_at,
+    archivedColumn: c.column,
+  }));
+
+  // A SEPARATE index, used only to render the epic chip on an
+  // archived card — never for live progress or live chips. It is
+  // built over live + archived cards together, so an archived card
+  // still shows which epic it belonged to: an archived epic with an
+  // archived child (both in this pool), and a lone archived child of
+  // a still-live epic (the parent resolves from allCards) both
+  // display correctly. This is purely informational — the stored
+  // `epic` field survives archiving untouched either way, which is
+  // why it comes back on restore regardless of what the archive
+  // section displays.
+  const archiveEpics = buildEpicIndex([...allCards, ...archivedCards], doneSet);
+
   return {
     title: server.project_name || "",
     version: server.version || "",
@@ -52,6 +83,9 @@ function toUiBoard(server) {
     priorityColors: server.priority_colors || {},
     doneColumns,
     epics: buildEpicIndex(allCards, doneSet),
+    // null (not an empty object) so a plain board renders no Archive
+    // section at all — the DOM-level half of the omitempty contract.
+    archive: archivedCards.length ? { cards: archivedCards, epics: archiveEpics } : null,
   };
 }
 
@@ -226,6 +260,7 @@ const IconCheck = (p) => <Icon {...p} d={<polyline points="20 6 9 17 4 12" />} /
    a child card and the title of the parent it points at. */
 const IconEpic = (p) => <Icon {...p} d={<><rect x="3" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" /></>} />;
 const IconRefresh = (p) => <Icon {...p} d={<><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></>} />;
+const IconArchive = (p) => <Icon {...p} d={<><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8" /><line x1="10" y1="13" x2="14" y2="13" /></>} />;
 
 /* =========================================================
    Copyable ID — click to copy, brief "Copied" feedback.
@@ -310,6 +345,8 @@ function App() {
   const [filter, setFilter] = useState(DEFAULT_FILTER);
   const [filterOpen, setFilterOpen] = useState(false);
   const [openCardId, setOpenCardId] = useState(null);
+  const [openArchivedCardId, setOpenArchivedCardId] = useState(null);
+  const [archiveExpanded, setArchiveExpanded] = useState(false);
   const [sseStatus, setSseStatus] = useState("connecting"); // 'connecting'|'online'|'offline'
   const [refreshing, setRefreshing] = useState(false);
   const refreshingRef = useRef(false);
@@ -476,6 +513,42 @@ function App() {
     catch (e) { console.error(e); fetchBoard(); }
   };
 
+  const archiveCard = async (cardId, onFail) => {
+    try { await apiSend("POST", `/api/cards/${encodeURIComponent(cardId)}/archive`, {}); }
+    catch (e) { reportFailure(e, onFail); }
+    fetchBoard();
+  };
+
+  /* Returns whether the restore succeeded, so the caller — the
+     read-only archived-card view — can decide whether to close: the
+     one archive action most likely to genuinely fail (ID_COLLISION),
+     so unlike delete/archive it stays open on failure to show why. */
+  const unarchiveCard = async (cardId, onFail) => {
+    try {
+      await apiSend("POST", `/api/cards/${encodeURIComponent(cardId)}/unarchive`, {});
+    } catch (e) {
+      reportFailure(e, onFail);
+      return false;
+    } finally {
+      fetchBoard();
+    }
+    return true;
+  };
+
+  /* No pre-flight dry run: the server computes the cascade, so the
+     confirmation (when the cascade reaches outside the column) is
+     necessarily after the fact rather than before sending the request
+     — see design.md's "Non-drag affordances" decision. */
+  const archiveColumn = async (listId, onFail) => {
+    try {
+      const res = await apiSend("POST", `/api/columns/${encodeURIComponent(listId)}/archive`, {});
+      if (res && res.cascaded && res.cascaded.length) {
+        alert(`Also archived ${res.cascaded.length} card(s) belonging to epics in this column.`);
+      }
+    } catch (e) { reportFailure(e, onFail); }
+    fetchBoard();
+  };
+
   // Clicking a card's epic chip toggles that epic's scope — adding to
   // the filter rather than replacing it, like the tag chip.
   const focusEpic = (id) => setFilter((f) => {
@@ -549,7 +622,28 @@ function App() {
         onMoveList={moveList}
         onOpenCard={(cardId) => setOpenCardId(cardId)}
         onFocusEpic={focusEpic}
+        onArchiveColumn={archiveColumn}
+        archiveExpanded={archiveExpanded}
+        onToggleArchiveExpanded={() => setArchiveExpanded((v) => !v)}
+        onOpenArchivedCard={(cardId) => setOpenArchivedCardId(cardId)}
       />
+
+      {openArchivedCardId && (() => {
+        const card = board.archive?.cards.find((c) => c.id === openArchivedCardId);
+        if (!card) { setOpenArchivedCardId(null); return null; }
+        return (
+          <ArchivedCardDetailModal
+            card={card}
+            priorityColors={board.priorityColors}
+            epics={board.archive.epics}
+            onClose={() => setOpenArchivedCardId(null)}
+            onRestore={async (onFail) => {
+              const ok = await unarchiveCard(card.id, onFail);
+              if (ok) setOpenArchivedCardId(null);
+            }}
+          />
+        );
+      })()}
 
       {openCardId && (() => {
         const list = board.lists.find((l) => l.cards.some((c) => c.id === openCardId));
@@ -571,6 +665,8 @@ function App() {
             onMoveColumn={(toListId, onFail) => moveCard(list.id, card.id, toListId, board.lists.find((l) => l.id === toListId).cards.length, onFail)}
             onToggleTag={(tag, onFail) => toggleTag(card.id, tag, onFail)}
             onRemove={() => { removeCard(card.id); setOpenCardId(null); }}
+            onArchive={(onFail) => { archiveCard(card.id, onFail); setOpenCardId(null); }}
+            epicChildCount={board.epics.childrenOf(card.id).length}
           />
         );
       })()}
@@ -780,7 +876,7 @@ function ThemeToggle({ theme }) {
 /* =========================================================
    Board
 ========================================================= */
-function Board({ board, filter, filterActive, priorityColors, epics, onAddList, onPatchList, onRemoveList, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
+function Board({ board, filter, filterActive, priorityColors, epics, onAddList, onPatchList, onRemoveList, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic, onArchiveColumn, archiveExpanded, onToggleArchiveExpanded, onOpenArchivedCard }) {
   const [addingList, setAddingList] = useState(false);
   const dragRef = useRef({ kind: null, cardId: null, fromListId: null, listIdx: null });
   const wrapRef = useRef(null);
@@ -846,7 +942,16 @@ function Board({ board, filter, filterActive, priorityColors, epics, onAddList, 
             onMoveList={onMoveList}
             onOpenCard={(cid) => onOpenCard(cid)}
             onFocusEpic={onFocusEpic}
+            onArchiveColumn={() => onArchiveColumn(list.id)}
           />)}
+
+        {board.archive &&
+          <ArchiveColumn
+            archive={board.archive}
+            expanded={archiveExpanded}
+            onToggleExpanded={onToggleArchiveExpanded}
+            onOpenCard={onOpenArchivedCard}
+          />}
 
         {addingList ?
           <AddListComposer
@@ -860,9 +965,57 @@ function Board({ board, filter, filterActive, priorityColors, epics, onAddList, 
 }
 
 /* =========================================================
+   Archive column — a virtual, collapsed-by-default section listing
+   archived cards read-only. Not an entry of board.lists: it never
+   participates in column drag-reorder, rename, or delete, and is
+   marked data-archive="true" rather than data-column="archive" so a
+   real user column literally named "archive" stays addressable by
+   [data-column="archive"] without ambiguity.
+========================================================= */
+function ArchiveColumn({ archive, expanded, onToggleExpanded, onOpenCard }) {
+  const count = archive.cards.length;
+  if (!expanded) {
+    return (
+      <section className="list list-archive collapsed" data-archive="true">
+        <button className="list-archive-strip" onClick={onToggleExpanded} aria-label={`Show ${count} archived card${count === 1 ? "" : "s"}`}>
+          <IconArchive />
+          <span className="list-archive-count">{count}</span>
+        </button>
+      </section>
+    );
+  }
+  return (
+    <section className="list list-archive" data-archive="true">
+      <div className="list-header">
+        <button className="list-archive-collapse" onClick={onToggleExpanded} aria-label="Collapse archive">
+          <IconArchive />
+        </button>
+        <span className="list-title">ARCHIVE</span>
+        <span className="list-count">{count}</span>
+      </div>
+      <div className="cards">
+        {archive.cards.map((card) =>
+          <CardItem
+            key={card.id}
+            card={card}
+            listId="__archive__"
+            index={0}
+            dragRef={{ current: {} }}
+            priorityColors={{}}
+            epics={archive.epics}
+            readOnly
+            onOpen={() => onOpenCard(card.id)}
+          />)}
+        {count === 0 && <div className="list-empty">No archived cards</div>}
+      </div>
+    </section>
+  );
+}
+
+/* =========================================================
    List column
 ========================================================= */
-function ListColumn({ list, index, filter, filterActive, priorityColors, epics, dragRef, onPatch, onRemove, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic }) {
+function ListColumn({ list, index, filter, filterActive, priorityColors, epics, dragRef, onPatch, onRemove, onAddCard, onRemoveCard, onToggleTag, onMoveCard, onMoveList, onOpenCard, onFocusEpic, onArchiveColumn }) {
   const [adding, setAdding] = useState(false);
   const [isOver, setIsOver] = useState(false);
   const [draggingSelf, setDraggingSelf] = useState(false);
@@ -979,8 +1132,10 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, epics, 
         <span className="list-count" title={`${list.cards.length} cards`}>{list.cards.length}</span>
         <ListMenu
           done={list.done}
+          cardCount={list.cards.length}
           onToggleDone={() => onPatch({ done: !list.done })}
-          onRemove={onRemove} />
+          onRemove={onRemove}
+          onArchiveColumn={onArchiveColumn} />
       </header>
 
       <div className={"cards" + (visibleCards.length === 0 && !adding ? " empty" : "")}>
@@ -1016,7 +1171,7 @@ function ListColumn({ list, index, filter, filterActive, priorityColors, epics, 
 /* useClickOutside is correct here: its bubble-phase document listener
    only fails inside the card modal, which stops mousedown at its own
    container. This menu is not in the modal. */
-function ListMenu({ done, onToggleDone, onRemove }) {
+function ListMenu({ done, cardCount, onToggleDone, onRemove, onArchiveColumn }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useClickOutside(ref, () => setOpen(false), open);
@@ -1038,6 +1193,12 @@ function ListMenu({ done, onToggleDone, onRemove }) {
             <span className={"menu-check" + (done ? " on" : "")}><IconCheck size={12} /></span>
             Terminal column
           </button>
+          {cardCount > 0 &&
+            <button
+              className="add-card"
+              onClick={() => { onArchiveColumn(); setOpen(false); }}>
+              <IconArchive size={14} /> Archive all cards
+            </button>}
           <button
             className="add-card"
             style={{ color: "oklch(0.55 0.18 25)" }}
@@ -1051,7 +1212,7 @@ function ListMenu({ done, onToggleDone, onRemove }) {
 /* =========================================================
    Card
 ========================================================= */
-function CardItem({ card, listId, index, dragRef, priorityColors, epics, onRemove, onToggleTag, onMoveCard, onOpen, onFocusEpic }) {
+function CardItem({ card, listId, index, dragRef, priorityColors, epics, onRemove, onToggleTag, onMoveCard, onOpen, onFocusEpic, readOnly }) {
   const [dragging, setDragging] = useState(false);
   const [dropPos, setDropPos] = useState(null);
 
@@ -1106,17 +1267,17 @@ function CardItem({ card, listId, index, dragRef, priorityColors, epics, onRemov
 
   return (
     <article
-      className={"card" + (isEpic ? " is-epic" : "") + (dragging ? " dragging" : "") + (dropPos ? " drop-" + dropPos : "")}
+      className={"card" + (isEpic ? " is-epic" : "") + (dragging ? " dragging" : "") + (dropPos ? " drop-" + dropPos : "") + (readOnly ? " is-readonly" : "")}
       style={isEpic ? { "--epic-color": card.color || "var(--text-muted)" } : undefined}
       data-card-id={card.id}
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      draggable={!readOnly}
+      onDragStart={readOnly ? undefined : onDragStart}
+      onDragEnd={readOnly ? undefined : onDragEnd}
+      onDragOver={readOnly ? undefined : onDragOver}
+      onDragLeave={readOnly ? undefined : onDragLeave}
+      onDrop={readOnly ? undefined : onDrop}
       onClick={(e) => {
-        if (e.target.closest('.card-tag-chip, .card-tag-add, .card-tag-input, .card-delete, .card-epic-chip')) return;
+        if (!readOnly && e.target.closest('.card-tag-chip, .card-tag-add, .card-tag-input, .card-delete, .card-epic-chip')) return;
         onOpen?.();
       }}>
       <CopyableId className="card-id" value={card.id} />
@@ -1136,11 +1297,18 @@ function CardItem({ card, listId, index, dragRef, priorityColors, epics, onRemov
               <line x1="4" y1="17" x2="14" y2="17" />
             </svg>
           </span>}
-        <CardTags tags={card.tags || []} onToggle={onToggleTag} />
+        {readOnly ?
+          <span className="card-tags-readonly">{(card.tags || []).join(", ")}</span> :
+          <CardTags tags={card.tags || []} onToggle={onToggleTag} />}
       </div>
-      <button className="card-delete" onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Delete">
-        <IconClose />
-      </button>
+      {readOnly ?
+        <div className="card-archive-meta">
+          <span className="card-archived-col" title={`Archived from ${card.archivedColumn}`}>{card.archivedColumn}</span>
+          <span className="card-archived-at" title={card.archivedAt}>{formatRelative(card.archivedAt)}</span>
+        </div> :
+        <button className="card-delete" onClick={(e) => { e.stopPropagation(); onRemove(); }} title="Delete">
+          <IconClose />
+        </button>}
     </article>);
 }
 
@@ -1559,7 +1727,7 @@ function formatAbsolute(iso) {
   return d.toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-function CardDetailModal({ card, list, allLists, priorities, priorityColors, epics, onClose, onOpenCard, onPatch, onPatchCard, onMoveColumn, onToggleTag, onRemove }) {
+function CardDetailModal({ card, list, allLists, priorities, priorityColors, epics, onClose, onOpenCard, onPatch, onPatchCard, onMoveColumn, onToggleTag, onRemove, onArchive, epicChildCount }) {
   const overlayRef = useRef(null);
   const [descDraft, setDescDraft] = useState(card.description || "");
   const [editingDesc, setEditingDesc] = useState(false);
@@ -1678,6 +1846,15 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
             <CopyableId className="modal-id-value" value={card.id} />
           </div>
           <div className="modal-actions">
+            <button
+              className="modal-action"
+              onClick={() => {
+                if (epicChildCount > 0 && !window.confirm(`Archive this card and its ${epicChildCount} child card(s)?`)) return;
+                onArchive?.();
+              }}
+              title="Archive card">
+              <IconArchive size={14} />
+            </button>
             <button className="modal-action danger" onClick={() => { if (window.confirm("Delete this card?")) onRemove(); }} title="Delete card">
               <Icon d={<><polyline points="3 6 5 6 21 6" /><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2" /></>} size={14} />
             </button>
@@ -1953,6 +2130,126 @@ function CardDetailModal({ card, list, allLists, priorities, priorityColors, epi
           <span className="modal-foot-sep" />
           <div className="modal-foot-item">
             <span className="modal-foot-label">Modified</span>
+            <span className="modal-foot-value" title={formatAbsolute(card.updatedAt)}>{formatRelative(card.updatedAt)}</span>
+          </div>
+        </footer>
+      </div>
+    </div>);
+}
+
+/* =========================================================
+   Archived card detail — a deliberately separate, minimal component
+   rather than a `readOnly` branch inside CardDetailModal: that
+   component's ~30 pieces of local state and its `list`/`allLists`
+   props assume a live card throughout, and disabling each edit
+   affordance individually would be far easier to get subtly wrong
+   than never wiring them up in the first place. Every field is
+   inert; the only action is Restore.
+========================================================= */
+function ArchivedCardDetailModal({ card, priorityColors, epics, onClose, onRestore }) {
+  const overlayRef = useRef(null);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const prioColor = card.priority ? (priorityColors[card.priority] || "var(--text-muted)") : null;
+
+  // Informational only: the `epic` field survives archiving untouched
+  // regardless of whether it resolves here, which is why it comes
+  // back correctly on restore either way. `idx` is the archive-scoped
+  // index (live + archived cards), so it resolves a parent whether
+  // that parent is still live or was archived alongside this card.
+  const idx = epics || EMPTY_EPIC_INDEX;
+  const parent = idx.parentOf(card);
+  const children = idx.childrenOf(card.id);
+  const isParent = children.length > 0;
+
+  return (
+    <div
+      className="modal-overlay"
+      ref={overlayRef}
+      onMouseDown={(e) => { if (e.target === overlayRef.current) onClose(); }}
+      role="dialog"
+      aria-modal="true">
+      <div className="modal" onMouseDown={(e) => e.stopPropagation()}>
+        <header className="modal-head">
+          <div className="modal-id">
+            <CopyableId className="modal-id-value" value={card.id} />
+          </div>
+          <div className="modal-actions">
+            <button
+              className="modal-action"
+              onClick={() => onRestore((message) => setError(message))}
+              title="Restore card">
+              <IconRefresh size={14} />
+            </button>
+            <button className="modal-action" onClick={onClose} title="Close">
+              <IconClose size={14} />
+            </button>
+          </div>
+        </header>
+
+        <div className="modal-body">
+          <div className="modal-title-input" style={{ opacity: 0.8 }}>{card.text}</div>
+
+          <div className="modal-meta">
+            <div className="modal-field">
+              <span className="modal-label">Priority</span>
+              <span className="modal-select">
+                {prioColor && <span className="card-prio-pill" style={{ background: prioColor }} />}
+                {card.priority || "—"}
+              </span>
+            </div>
+            <div className="modal-field">
+              <span className="modal-label">Archived from</span>
+              <span className="modal-select">{card.archivedColumn}</span>
+            </div>
+          </div>
+
+          <div className="modal-section">
+            <span className="modal-label">Archived</span>
+            <div title={card.archivedAt}>{formatRelative(card.archivedAt)}</div>
+          </div>
+
+          {parent &&
+            <div className="modal-section">
+              <span className="modal-label">Epic</span>
+              <div>{parent.text}{parent.archivedAt ? " (archived)" : ""}</div>
+            </div>}
+
+          {isParent &&
+            <div className="modal-section">
+              <span className="modal-label">Children ({children.length})</span>
+              <div>{children.map((c) => c.text + (c.archivedAt ? " (archived)" : "")).join(", ")}</div>
+            </div>}
+
+          {card.description &&
+            <div className="modal-section">
+              <span className="modal-label">Description</span>
+              <div style={{ whiteSpace: "pre-wrap" }}>{card.description}</div>
+            </div>}
+
+          {(card.tags || []).length > 0 &&
+            <div className="modal-section">
+              <span className="modal-label">Tags</span>
+              <div>{card.tags.join(", ")}</div>
+            </div>}
+
+          {error && <div className="modal-error">{error}</div>}
+        </div>
+
+        <footer className="modal-foot">
+          <div className="modal-foot-item">
+            <span className="modal-foot-label">Created</span>
+            <span className="modal-foot-value" title={formatAbsolute(card.createdAt)}>{formatRelative(card.createdAt)}</span>
+          </div>
+          <span className="modal-foot-sep" />
+          <div className="modal-foot-item">
+            <span className="modal-foot-label">Updated</span>
             <span className="modal-foot-value" title={formatAbsolute(card.updatedAt)}>{formatRelative(card.updatedAt)}</span>
           </div>
         </footer>

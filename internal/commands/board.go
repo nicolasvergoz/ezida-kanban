@@ -40,12 +40,17 @@ func runBoard(cmd *cobra.Command, path string, asJSON bool) error {
 
 	out := cmd.OutOrStdout()
 	if asJSON {
+		archive, err := loadArchive(board.ArchivePathFor(path))
+		if err != nil {
+			return err
+		}
 		env := output.BoardEnvelope{
 			SchemaVersion:  b.SchemaVersion,
 			Columns:        b.Board.Columns,
 			DoneColumns:    b.Board.DoneColumns(),
 			Priorities:     b.Board.Priorities,
 			CardsPerColumn: counts,
+			ArchivedCount:  len(archive.Cards),
 		}
 		buf, err := output.Board(env)
 		if err != nil {

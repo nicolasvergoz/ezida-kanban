@@ -17,6 +17,10 @@ type BoardEnvelope struct {
 	DoneColumns    []string       `json:"done_columns"`
 	Priorities     []string       `json:"priorities"`
 	CardsPerColumn map[string]int `json:"cards_per_column"`
+	// ArchivedCount is the number of cards in the sibling archive
+	// file. omitempty suppresses zero, so a board that has never
+	// archived anything produces unchanged `ezida board --json` output.
+	ArchivedCount int `json:"archived_count,omitempty"`
 }
 
 // ColumnSummary is one entry of `ezida columns --json`.
@@ -198,6 +202,17 @@ type ExportEnvelope struct {
 	// Version is the build-time server.Version constant, so a static
 	// snapshot records the binary that produced it (design D4).
 	Version string `json:"version"`
+	// ArchivedCards mirrors boardResponse.ArchivedCards: omitempty, so
+	// a board that has never archived anything exports unchanged.
+	ArchivedCards []ArchivedExportCard `json:"archived_cards,omitempty"`
+}
+
+// ArchivedExportCard is ExportCard plus archived_at, mirroring
+// archivedCardResponse on the server side. ExportCard is embedded
+// anonymously so encoding/json flattens it — no second field list.
+type ArchivedExportCard struct {
+	ExportCard
+	ArchivedAt time.Time `json:"archived_at"`
 }
 
 // ErrorEnvelope is the JSON shape for any command's error output

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"net/http"
 	"slices"
@@ -47,10 +48,13 @@ func (s *serverState) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/board", s.handleBoard)
 	mux.HandleFunc("POST /api/cards", s.handleCreate)
 	mux.HandleFunc("POST /api/cards/{id}/move", s.handleMove)
+	mux.HandleFunc("POST /api/cards/{id}/archive", s.handleCardArchive)
+	mux.HandleFunc("POST /api/cards/{id}/unarchive", s.handleCardUnarchive)
 	mux.HandleFunc("PATCH /api/cards/{id}", s.handlePatch)
 	mux.HandleFunc("DELETE /api/cards/{id}", s.handleDelete)
 	mux.HandleFunc("POST /api/columns", s.handleColumnCreate)
 	mux.HandleFunc("POST /api/columns/move", s.handleColumnMove)
+	mux.HandleFunc("POST /api/columns/{name}/archive", s.handleColumnArchive)
 	mux.HandleFunc("PATCH /api/columns/{name}", s.handleColumnPatch)
 	mux.HandleFunc("DELETE /api/columns/{name}", s.handleColumnDelete)
 	mux.HandleFunc("GET /api/events", s.handleEvents)
@@ -322,6 +326,127 @@ func (s *serverState) handleDelete(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// --- Archive endpoints -------------------------------------------------------
+
+// handleCardArchive implements POST /api/cards/{id}/archive: archives
+// the named card, cascading to its epic children exactly as
+// board.ArchiveCard does. The archive file is saved before the board
+// (destination gains the cards before the source loses them), the same
+// order the CLI's mutateArchiveAndSave uses, so a crash between the
+// two writes can only duplicate a card, never lose one.
+func (s *serverState) handleCardArchive(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	archivePath := board.ArchivePathFor(s.boardPath)
+	archive, _, err := board.LoadArchive(archivePath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	archived, err := board.ArchiveCard(b, archive, id, time.Now().UTC().Truncate(time.Second))
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.SaveArchive(archivePath, archive); err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	cascaded := make([]string, 0, len(archived))
+	for _, c := range archived {
+		if c.ID != id {
+			cascaded = append(cascaded, c.ID)
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"archived": id,
+		"cascaded": cascaded,
+	})
+}
+
+// unarchivePayload is the JSON body shape accepted by
+// POST /api/cards/{id}/unarchive. Absent or empty means "use the
+// stored column".
+type unarchivePayload struct {
+	Column string `json:"column"`
+}
+
+// handleCardUnarchive implements POST /api/cards/{id}/unarchive:
+// restores the named archived card (and its archived children) exactly
+// as board.UnarchiveCard does. The board is saved before the archive
+// (destination gains before source loses), the inverse of the archive
+// route's order.
+func (s *serverState) handleCardUnarchive(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+
+	var p unarchivePayload
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil && !errors.Is(err, io.EOF) {
+		httpError(w, &InvalidBodyError{Reason: err.Error()})
+		return
+	}
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	archivePath := board.ArchivePathFor(s.boardPath)
+	archive, _, err := board.LoadArchive(archivePath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	restored, orphaned, relocated, err := board.UnarchiveCard(b, archive, id, p.Column)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	if err := board.Save(s.boardPath, b); err != nil {
+		httpError(w, err)
+		return
+	}
+	if err := board.SaveArchive(archivePath, archive); err != nil {
+		httpError(w, err)
+		return
+	}
+
+	var primary board.Card
+	cascaded := make([]string, 0, len(restored))
+	for _, c := range restored {
+		if c.ID == id {
+			primary = c
+			continue
+		}
+		cascaded = append(cascaded, c.ID)
+	}
+	if orphaned == nil {
+		orphaned = []string{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"card":      cardToResponse(primary),
+		"cascaded":  cascaded,
+		"orphaned":  orphaned,
+		"relocated": relocated,
+	})
+}
+
 // --- Column endpoints (UI-6) ------------------------------------------------
 
 // columnCreatePayload is the JSON body shape accepted by
@@ -542,6 +667,62 @@ func (s *serverState) handleColumnMove(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleColumnArchive implements POST /api/columns/{name}/archive:
+// archives every card in the named column, cascading to epic children
+// living in other columns, exactly as board.ArchiveColumn does. There
+// is no interactive prompt on this route — HTTP has no TTY to prompt
+// against — so it always behaves as the CLI's --yes path; the viewer
+// asks for confirmation client-side, before the request is even sent.
+// The column itself is never removed. Both saves are skipped when
+// nothing was archived, matching the CLI's empty-column no-op.
+func (s *serverState) handleColumnArchive(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+
+	b, err := board.Load(s.boardPath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	archivePath := board.ArchivePathFor(s.boardPath)
+	archive, _, err := board.LoadArchive(archivePath)
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	direct, cascaded, err := board.ArchiveColumn(b, archive, name, time.Now().UTC().Truncate(time.Second))
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+
+	directIDs := make([]string, 0, len(direct))
+	for _, c := range direct {
+		directIDs = append(directIDs, c.ID)
+	}
+	cascadedIDs := make([]string, 0, len(cascaded))
+	for _, c := range cascaded {
+		cascadedIDs = append(cascadedIDs, c.ID)
+	}
+
+	if len(directIDs) > 0 || len(cascadedIDs) > 0 {
+		if err := board.SaveArchive(archivePath, archive); err != nil {
+			httpError(w, err)
+			return
+		}
+		if err := board.Save(s.boardPath, b); err != nil {
+			httpError(w, err)
+			return
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"archived": directIDs,
+		"cascaded": cascadedIDs,
+	})
+}
+
 // handleIndex serves the embedded index.html with an explicit
 // Content-Type. Reading from webFS keeps the byte payload stable
 // across runs; tests assert on the exact bytes.
@@ -577,6 +758,21 @@ type boardResponse struct {
 	// at boot. Immutable for the process lifetime; it is a build
 	// constant, not a board value (design D3).
 	Version string `json:"version"`
+	// ArchivedCards is deliberately left nil (never make(...)) when
+	// the reconciled archive has no cards, so omitempty drops the key
+	// entirely and a board that has never archived anything produces
+	// a response byte-identical to one from before this field existed.
+	ArchivedCards []archivedCardResponse `json:"archived_cards,omitempty"`
+}
+
+// archivedCardResponse is the per-card JSON shape inside
+// boardResponse.ArchivedCards. cardResponse is embedded anonymously so
+// encoding/json flattens it into the same field set cardResponse
+// carries, plus archived_at — mirroring how board.ArchivedCard embeds
+// board.Card, with no second hand-written field list to keep in sync.
+type archivedCardResponse struct {
+	cardResponse
+	ArchivedAt time.Time `json:"archived_at"`
 }
 
 // cardResponse is the per-card JSON shape returned inside
@@ -632,6 +828,12 @@ func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
 		httpError(w, err)
 		return
 	}
+	archive, _, err := board.LoadArchive(board.ArchivePathFor(s.boardPath))
+	if err != nil {
+		httpError(w, err)
+		return
+	}
+	board.ReconcileArchive(b, archive)
 
 	counts := make(map[string]int, len(b.Board.Columns))
 	for _, col := range b.Board.Columns {
@@ -645,6 +847,13 @@ func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
 	for _, c := range b.Cards {
 		cards = append(cards, cardToResponse(c))
 	}
+	var archivedCards []archivedCardResponse
+	for _, c := range archive.Cards {
+		archivedCards = append(archivedCards, archivedCardResponse{
+			cardResponse: cardToResponse(c.Card),
+			ArchivedAt:   c.ArchivedAt,
+		})
+	}
 	resp := boardResponse{
 		SchemaVersion:  b.SchemaVersion,
 		Columns:        b.Board.Columns,
@@ -655,6 +864,7 @@ func (s *serverState) handleBoard(w http.ResponseWriter, r *http.Request) {
 		Cards:          cards,
 		ProjectName:    s.projectName,
 		Version:        s.version,
+		ArchivedCards:  archivedCards,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -693,6 +903,20 @@ func httpError(w http.ResponseWriter, err error) {
 		writeErrorJSON(w, http.StatusBadRequest,
 			"COLUMN_NOT_FOUND", err.Error(),
 			map[string]any{"column": colnf.Column})
+		return
+	}
+	var cna *board.CardNotArchivedError
+	if errors.As(err, &cna) {
+		writeErrorJSON(w, http.StatusNotFound,
+			"CARD_NOT_ARCHIVED", err.Error(),
+			map[string]any{"id": cna.ID})
+		return
+	}
+	var idc *board.IDCollisionError
+	if errors.As(err, &idc) {
+		writeErrorJSON(w, http.StatusConflict,
+			"ID_COLLISION", err.Error(),
+			map[string]any{"id": idc.ID})
 		return
 	}
 	var mte *board.MissingTitleError

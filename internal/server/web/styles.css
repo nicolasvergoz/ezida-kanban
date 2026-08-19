@@ -1809,4 +1809,72 @@ button:active:not(:disabled) { transform: translateY(0.5px); }
 
 /* Disable card grab cursor when a click is going to open the modal */
 .card { cursor: pointer; }
+
+/* ============ Archive ============ */
+/* A virtual column, not a real one: collapsed by default to a narrow
+   strip so an archive of hundreds of cards never crowds the board.
+   Absent entirely (no [data-archive] element at all) when there is
+   nothing archived — see toUiBoard's archive: null. */
+.list-archive {
+  cursor: default;
+}
+.list-archive.collapsed {
+  width: 56px;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 10px;
+}
+.list-archive-strip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  padding: 8px 4px;
+  border-radius: 10px;
+  width: 100%;
+}
+.list-archive-strip:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.list-archive-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.list-archive-collapse {
+  color: var(--text-faint);
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+}
+.list-archive-collapse:hover { background: var(--surface-2); color: var(--text); }
+
+/* Read-only cards inside the expanded Archive section: no grab
+   cursor (nothing to drag), and the corner that a live card spends on
+   the delete button here reports where the card came from instead. */
+.card.is-readonly {
+  cursor: pointer;
+}
+.card-archive-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.card-archived-col {
+  font-family: var(--font-mono);
+}
+.card-archived-at {
+  white-space: nowrap;
+}
+.card-tags-readonly {
+  font-size: 11px;
+  color: var(--text-faint);
+}
 .card:active { cursor: grabbing; }

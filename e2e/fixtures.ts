@@ -1,6 +1,6 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { copyFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { BIN } from "./global-setup";
@@ -14,6 +14,13 @@ export type Board = {
   dir: string;
   /** Current on-disk board file, for asserting what a mutation wrote. */
   read(): string;
+  /**
+   * Current on-disk archive file, or null when it does not exist —
+   * either because the fixture had no `.archive.toml` sibling, or
+   * because the last archived card has since been restored. A spec
+   * asserting "the archive is gone" checks for null, not empty text.
+   */
+  readArchive(): string | null;
 };
 
 /**
@@ -28,6 +35,10 @@ async function startServer(fixture: string): Promise<{ board: Board; stop: () =>
   const dir = mkdtempSync(path.join(tmpdir(), "ezida-e2e-"));
   const boardPath = path.join(dir, "kanban.toml");
   copyFileSync(path.join(FIXTURES, fixture), boardPath);
+
+  const archivePath = path.join(dir, "kanban.archive.toml");
+  const archiveSrc = path.join(FIXTURES, fixture.replace(/\.toml$/, ".archive.toml"));
+  if (existsSync(archiveSrc)) copyFileSync(archiveSrc, archivePath);
 
   const proc: ChildProcessWithoutNullStreams = spawn(
     BIN,
@@ -68,7 +79,12 @@ async function startServer(fixture: string): Promise<{ board: Board; stop: () =>
   }
 
   return {
-    board: { url, dir, read: () => readFileSync(boardPath, "utf8") },
+    board: {
+      url,
+      dir,
+      read: () => readFileSync(boardPath, "utf8"),
+      readArchive: () => (existsSync(archivePath) ? readFileSync(archivePath, "utf8") : null),
+    },
     stop: () => {
       proc.kill("SIGTERM");
       rmSync(dir, { recursive: true, force: true });
@@ -134,9 +150,29 @@ export function card(page: Page, id: string) {
   return page.locator(`[data-card-id="${id}"]`);
 }
 
-/** Ids of every card currently rendered, in DOM order. */
+/**
+ * Ids of every card currently rendered, in DOM order — live AND
+ * archived (an expanded Archive section renders `.card` elements
+ * too). Kept for existing callers; `liveCardIds` / `archivedCardIds`
+ * below are the scoped alternatives for specs that care which is
+ * which.
+ */
 export async function visibleCardIds(page: Page): Promise<string[]> {
   return page.locator(".card").evaluateAll((els) =>
+    els.map((e) => (e as HTMLElement).dataset.cardId ?? ""),
+  );
+}
+
+/** Ids of cards rendered inside a real column, in DOM order. */
+export async function liveCardIds(page: Page): Promise<string[]> {
+  return page.locator(".list[data-column] .card").evaluateAll((els) =>
+    els.map((e) => (e as HTMLElement).dataset.cardId ?? ""),
+  );
+}
+
+/** Ids of cards rendered inside the expanded Archive section. */
+export async function archivedCardIds(page: Page): Promise<string[]> {
+  return page.locator("[data-archive] .card").evaluateAll((els) =>
     els.map((e) => (e as HTMLElement).dataset.cardId ?? ""),
   );
 }

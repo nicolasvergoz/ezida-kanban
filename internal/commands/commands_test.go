@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -456,6 +457,54 @@ func TestBoard_JSONOutput(t *testing.T) {
 		if c.(string) != wantCols[i] {
 			t.Errorf("columns[%d]: %v, want %s", i, c, wantCols[i])
 		}
+	}
+}
+
+func TestBoard_OmitsArchivedCountWhenNoArchive(t *testing.T) {
+	path := copyFixture(t)
+	cmd := &cobra.Command{Use: "board"}
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	if err := runBoard(cmd, path, true); err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, stdout.String())
+	}
+	if _, has := got["archived_count"]; has {
+		t.Errorf("archived_count present with no archive: %v", got["archived_count"])
+	}
+}
+
+func TestBoard_ReportsArchivedCount(t *testing.T) {
+	path := copyFixture(t)
+	at := time.Now().UTC()
+	seed := &board.Archive{
+		SchemaVersion: board.SupportedSchemaVersion,
+		Cards: []board.ArchivedCard{
+			{Card: board.Card{ID: "dddddd", Title: "x", Column: "done", CreatedAt: at, UpdatedAt: at}, ArchivedAt: at},
+			{Card: board.Card{ID: "eeeeee", Title: "y", Column: "done", CreatedAt: at, UpdatedAt: at}, ArchivedAt: at},
+		},
+	}
+	if err := board.SaveArchive(board.ArchivePathFor(path), seed); err != nil {
+		t.Fatalf("seed archive: %v", err)
+	}
+
+	cmd := &cobra.Command{Use: "board"}
+	stdout := &bytes.Buffer{}
+	cmd.SetOut(stdout)
+	cmd.SetErr(&bytes.Buffer{})
+	if err := runBoard(cmd, path, true); err != nil {
+		t.Fatalf("board: %v", err)
+	}
+	var got map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal: %v\n%s", err, stdout.String())
+	}
+	if got["archived_count"].(float64) != 2 {
+		t.Errorf("archived_count = %v, want 2", got["archived_count"])
 	}
 }
 

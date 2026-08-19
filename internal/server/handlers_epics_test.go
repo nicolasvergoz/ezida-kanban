@@ -247,6 +247,7 @@ func TestWireShape_ExportMatchesBoard(t *testing.T) {
 	}{
 		{"envelope", boardResponse{}, output.ExportEnvelope{}},
 		{"card", cardResponse{}, output.ExportCard{}},
+		{"archived card", archivedCardResponse{}, output.ArchivedExportCard{}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.what, func(t *testing.T) {
@@ -261,12 +262,23 @@ func TestWireShape_ExportMatchesBoard(t *testing.T) {
 
 // jsonTags returns the sorted `json:"..."` tags of a struct type,
 // including the omitempty suffix so the two shapes must agree on
-// presence semantics as well as on names.
+// presence semantics as well as on names. An anonymous embedded field
+// with no direct tag (the way archivedCardResponse embeds
+// cardResponse) contributes its own type's tags in its place rather
+// than being skipped — otherwise a struct that differs only in what it
+// embeds would compare equal on nothing but the fields it added.
 func jsonTags(t reflect.Type) []string {
 	out := make([]string, 0, t.NumField())
 	for i := range t.NumField() {
-		tag := t.Field(i).Tag.Get("json")
-		if tag == "" || tag == "-" {
+		f := t.Field(i)
+		tag := f.Tag.Get("json")
+		if tag == "" {
+			if f.Anonymous && f.Type.Kind() == reflect.Struct {
+				out = append(out, jsonTags(f.Type)...)
+			}
+			continue
+		}
+		if tag == "-" {
 			continue
 		}
 		out = append(out, tag)

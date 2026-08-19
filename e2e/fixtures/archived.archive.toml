@@ -1,0 +1,51 @@
+# Paired with archived.toml. Three cases:
+#  - b7m1p4: a standalone archived card, stored column ("done") still
+#    exists on the live board.
+#  - vw01k2 + q7t6z2: an archived epic and its archived child, restored
+#    together by unarchiving either the parent or, per the CLI/server
+#    contract, the parent id specifically.
+#  - t07htj: stored column ("review") does NOT exist in archived.toml's
+#    [board].columns — exercises the relocated-restore path.
+schema_version = 2
+
+[[cards]]
+id = 'b7m1p4'
+title = 'Standalone archived card'
+column = 'done'
+description = 'Archived on its own.'
+created_at = 2026-05-01T09:00:00Z
+updated_at = 2026-05-01T09:00:00Z
+tags = ['docs']
+archived_at = 2026-08-01T10:00:00Z
+
+[[cards]]
+id = 'vw01k2'
+title = 'Archived epic'
+column = 'done'
+description = ''
+created_at = 2026-05-02T09:00:00Z
+updated_at = 2026-05-02T09:00:00Z
+tags = []
+color = '#10b981'
+archived_at = 2026-08-01T10:00:00Z
+
+[[cards]]
+id = 'q7t6z2'
+title = 'Archived child'
+column = 'done'
+description = ''
+created_at = 2026-05-02T09:05:00Z
+updated_at = 2026-05-02T09:05:00Z
+tags = []
+epic = 'vw01k2'
+archived_at = 2026-08-01T10:00:00Z
+
+[[cards]]
+id = 't07htj'
+title = 'Archived from a deleted column'
+column = 'review'
+description = ''
+created_at = 2026-05-03T09:00:00Z
+updated_at = 2026-05-03T09:00:00Z
+tags = []
+archived_at = 2026-08-01T10:00:00Z

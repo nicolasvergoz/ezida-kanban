@@ -342,6 +342,10 @@ drains in-flight requests within 5 seconds.
   `ezida list --epic`. The parent stays visible with its progress
   bar. A `No epic` pill shows the work that belongs to nothing.
 - Toggle between light and dark themes.
+- Archive a card or an entire column's cards, and restore an archived
+  card — from a collapsed-by-default Archive section at the end of the
+  board, which appears only once something has been archived and
+  shows each archived card's original column and archive date.
 
 The authoritative behavioural contract lives in
 [`openspec/specs/viewer-server/spec.md`](../openspec/specs/viewer-server/spec.md)
@@ -467,6 +471,11 @@ ISO 8601 UTC strings. Errors always go to stderr; the exit code is
   "cards_per_column": {"todo": 3, "ongoing": 1, "done": 7}
 }
 ```
+
+With an archive present, the payload additionally carries
+`"archived_count": 4` — the number of cards in `kanban.archive.toml`.
+The key is omitted entirely (not `0`) for a board that has never
+archived anything.
 
 ### `ezida list --json`
 

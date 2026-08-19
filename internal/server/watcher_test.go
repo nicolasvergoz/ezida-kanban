@@ -131,3 +131,69 @@ func waitEvent(w *Watcher, timeout time.Duration) bool {
 		return false
 	}
 }
+
+func TestWatcher_MissingSecondPathIsNotFatal(t *testing.T) {
+	boardPath := newWatcherFixture(t)
+	archivePath := filepath.Join(filepath.Dir(boardPath), "kanban.archive.toml")
+	if _, err := os.Stat(archivePath); !os.IsNotExist(err) {
+		t.Fatalf("test setup: archive path unexpectedly exists")
+	}
+
+	w, err := NewWatcher(boardPath, archivePath)
+	if err != nil {
+		t.Fatalf("NewWatcher with a missing second path: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go w.Run(ctx)
+
+	// The board path alone must still work.
+	writeAtomic(t, boardPath, []byte("schema_version = 2\n# after boot\n"))
+	if !waitEvent(w, 1*time.Second) {
+		t.Fatal("expected an event from the board path")
+	}
+}
+
+func TestWatcher_FiresOnSecondFileCreatedAfterBoot(t *testing.T) {
+	boardPath := newWatcherFixture(t)
+	archivePath := filepath.Join(filepath.Dir(boardPath), "kanban.archive.toml")
+
+	w, err := NewWatcher(boardPath, archivePath)
+	if err != nil {
+		t.Fatalf("NewWatcher: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go w.Run(ctx)
+
+	// The archive file does not exist yet — its creation, not just a
+	// later rewrite, must still fire an event.
+	writeAtomic(t, archivePath, []byte("schema_version = 2\n"))
+	if !waitEvent(w, 1*time.Second) {
+		t.Fatal("expected an event when the archive file was first created")
+	}
+}
+
+func TestWatcher_IgnoresUnrelatedFilesInSameDir(t *testing.T) {
+	boardPath := newWatcherFixture(t)
+	archivePath := filepath.Join(filepath.Dir(boardPath), "kanban.archive.toml")
+	noisePath := filepath.Join(filepath.Dir(boardPath), "noise.txt")
+
+	w, err := NewWatcher(boardPath, archivePath)
+	if err != nil {
+		t.Fatalf("NewWatcher: %v", err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go w.Run(ctx)
+
+	writeAtomic(t, noisePath, []byte("unrelated"))
+
+	deadline := time.After(3 * watcherDebounce)
+	select {
+	case <-w.Events():
+		t.Fatal("watcher fired for a file it does not watch")
+	case <-deadline:
+		// Expected: no event.
+	}
+}

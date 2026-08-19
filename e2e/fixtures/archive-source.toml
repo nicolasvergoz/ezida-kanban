@@ -1,0 +1,40 @@
+# Deliberately has NO archived.archive.toml-style sibling: startServer
+# pairs a fixture with "<stem>.archive.toml" by name, so this fixture
+# must not share a stem with one that has archived data already. Used
+# by archive-actions.spec.ts, which needs to start with nothing
+# archived and prove the Archive section is created on first use.
+schema_version = 2
+
+[board]
+columns = ['todo', 'ongoing', 'done']
+priorities = ['low', 'medium', 'high']
+
+[[cards]]
+id = 'a3f2k9'
+title = 'Unrelated live card'
+column = 'todo'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+priority = 'high'
+
+[[cards]]
+id = 'rl4m9x'
+title = 'Live epic'
+column = 'todo'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+color = '#8b5cf6'
+
+[[cards]]
+id = 'f20wbo'
+title = 'Live child'
+column = 'ongoing'
+description = ''
+created_at = 2026-05-20T14:30:00Z
+updated_at = 2026-05-20T14:30:00Z
+tags = []
+epic = 'rl4m9x'

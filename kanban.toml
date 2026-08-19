@@ -109,8 +109,8 @@ title = 'Add a reload/refresh button in the viewer nav bar'
 column = 'done'
 description = 'Add a reload/refresh button to the viewer topbar so the board can be re-fetched on demand, without a full page reload.'
 created_at = 2026-08-11T05:29:37Z
-updated_at = 2026-08-18T20:59:32Z
-tags = ['viewer', 'ux']
+updated_at = 2026-08-19T17:47:59Z
+tags = ['viewer', 'ux', 'v0.5']
 priority = 'high'
 
 [[cards]]
@@ -119,8 +119,8 @@ title = 'Move a card to the top of its new column (CLI)'
 column = 'done'
 description = "`ezida move <id> <column>`, `ezida edit --column`, and `ezida add` all append the card to the bottom of the target column. On a long column — `done` has 21 cards — you have to scroll all the way down to see what you just added or moved.\n\nWanted: card lands at the **top** of the target column, for all three CLI entry points, plus the viewer's column-body drop.\n\nScope:\n- `ezida move` — move.go:41, calls `board.AppendCardToColumn` directly → insert at position 0.\n- `ezida edit --column` — edit.go:195, same call → position 0, regardless of which other flags are combined with `--column` in the same invocation.\n- `ezida add` — add.go:120, same call → new cards also land at position 0.\n- Viewer column-body drop — `List.onDrop` (app.jsx:879) hardcodes `list.cards.length` when dropping onto the column itself (blank space, not onto a card) → change to 0. Card-to-card drop (`CardItem.onDrop`) stays untouched — it's already positional (above/below by cursor Y).\n\n`board.MoveCard` is not in this path for these CLI callers — they call `board.AppendCardToColumn` directly. That's where the actual change lands; callers just stop asking for the bottom.\n\nOne OpenSpec change covers CLI + viewer together. Deltas expected on:\n  - card-writing:125  `move` re-places at the end → top\n  - card-writing:12   `add` appends at the end → top\n  - board-config:29   `edit --column` re-places at the end → top\n  - viewer column-drop: `List.onDrop` re-places at the end → top, when dropping on the column body"
 created_at = 2026-08-09T14:34:46Z
-updated_at = 2026-08-18T18:52:32Z
-tags = ['cli', 'ux']
+updated_at = 2026-08-19T17:47:54Z
+tags = ['cli', 'ux', 'v0.5']
 priority = 'high'
 
 [[cards]]
@@ -129,8 +129,8 @@ title = 'Card epics'
 column = 'done'
 description = "One card may point at another with `epic = <id>`: the parent is the epic, the pointing cards are its children. Nesting is exactly one level, and the relation is documentary — it never blocks a move or a delete.\n\nDelivered in five changes, from the file format up to the viewer. Specs live in openspec/specs/card-epics/, board-config/, viewer-server/ and viewer-ui/."
 created_at = 2026-08-09T14:11:19Z
-updated_at = 2026-08-09T14:11:31Z
-tags = ['schema', 'viewer']
+updated_at = 2026-08-19T17:47:46Z
+tags = ['schema', 'viewer', 'v0.4', 'v0.5']
 priority = 'medium'
 color = '#10b981'
 

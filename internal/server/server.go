@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"syscall"
 	"time"
+
+	"github.com/nicolasvergoz/ezida-kanban/internal/board"
 )
 
 // Options carries the runtime configuration for the viewer HTTP
@@ -97,10 +99,18 @@ func runWithContext(ctx context.Context, opts Options) error {
 		boardPath = "kanban.toml"
 	}
 
-	// Build the watcher BEFORE binding the listener so a missing
-	// board file fails fast without occupying a port (ADR 0002 §D9 —
-	// watcher startup is part of the bring-up contract).
-	watcher, err := NewWatcher(boardPath)
+	// A missing board file fails fast without occupying a port (ADR
+	// 0002 §D9 — watcher startup is part of the bring-up contract).
+	// This check now lives here explicitly, rather than being an
+	// incidental side effect of NewWatcher's old per-file fsw.Add: the
+	// watcher itself must tolerate a missing archive path (it usually
+	// does not exist yet), so it can no longer fail on a missing path
+	// on its own.
+	if _, err := os.Stat(boardPath); err != nil {
+		return err
+	}
+
+	watcher, err := NewWatcher(boardPath, board.ArchivePathFor(boardPath))
 	if err != nil {
 		return err
 	}

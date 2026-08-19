@@ -3,7 +3,7 @@ name: ezida-kanban
 description: Use this skill when the user wants to view, add, move, edit, or delete cards in their project's Kanban board stored in a `kanban.toml` file at the project root. Triggers include phrases like "add to my kanban", "what's in my todo", "move X to done", "show my board", "what's in [column]", or any time a `kanban.toml` file is mentioned or visible. Also use when the user expresses an idea, bug, or TODO during conversation and you want to offer adding it to the board. Do NOT use this skill to plan your own tasks — the Kanban belongs to the developer, not to you.
 ---
 
-<!-- Source of truth for the embedded ezida skill. Edits to refs/SKILL.md are NOT propagated automatically; edit this file directly. -->
+<!-- Source of truth for the embedded ezida skill. Edits to .refs/SKILL.md are NOT propagated automatically; edit this file directly. -->
 
 # Ezida — Project Kanban
 

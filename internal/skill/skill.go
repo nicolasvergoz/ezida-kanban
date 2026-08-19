@@ -1,6 +1,6 @@
 // Package skill exposes the canonical ezida-kanban SKILL.md as
 // embedded bytes. The file at internal/skill/SKILL.md is the single
-// source of truth for the embedded skill; refs/SKILL.md is the
+// source of truth for the embedded skill; .refs/SKILL.md is the
 // historical human reference and is NOT propagated automatically (see
 // the HTML comment at the top of SKILL.md).
 package skill
